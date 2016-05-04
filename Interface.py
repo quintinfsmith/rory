@@ -80,7 +80,6 @@ class Interface(object):
                     current_path = []
             else:
                 current_path = []
-                
 import sys
 import console
 if __name__ == '__main__':
@@ -89,7 +88,7 @@ if __name__ == '__main__':
 
     w,h = console.getTerminalSize()
     sys.stdout.write('\033[0;0H')
-    sys.stdout.write('\033[47m%s' % ((w * h) * ' '))
+    sys.stdout.write('\033[46m%s' % ((w * h) * ' '))
 
     interface.play_along(midilike, [])
     interface.input_loop()
