@@ -10,8 +10,11 @@ class Player(object):
     NEXT_STATE = 1
     PREV_STATE = 2
     RAISE_QUIT = 4
+    RAISE_CHANGE = 8
 
     SHARPS = (1,3,6,8,10)
+
+    sidebar = '|'
 
     def __init__(self):
         self.note_range = [0, 127]
@@ -20,6 +23,62 @@ class Player(object):
         self.post_buffer = 4
         self.screen_size = console.getTerminalSize()
         self.screen_size = (self.screen_size[0], self.screen_size[1] - 3)
+        self.ignore = []
+
+    def toggle_track0(self):
+        self.toggle_trackn(0)
+
+    def toggle_track1(self):
+        self.toggle_trackn(1)
+
+    def toggle_track2(self):
+        self.toggle_trackn(2)
+
+    def toggle_track3(self):
+        self.toggle_trackn(3)
+
+    def toggle_track4(self):
+        self.toggle_trackn(4)
+
+    def toggle_track5(self):
+        self.toggle_trackn(5)
+
+    def toggle_track6(self):
+        self.toggle_trackn(6)
+
+    def toggle_track7(self):
+        self.toggle_trackn(7)
+
+    def toggle_track8(self):
+        self.toggle_trackn(8)
+
+    def toggle_track9(self):
+        self.toggle_trackn(9)
+
+    def toggle_track10(self):
+        self.toggle_trackn(10)
+
+    def toggle_track11(self):
+        self.toggle_trackn(11)
+
+    def toggle_track12(self):
+        self.toggle_trackn(12)
+
+    def toggle_track13(self):
+        self.toggle_trackn(13)
+
+    def toggle_track14(self):
+        self.toggle_trackn(14)
+
+    def toggle_track15(self):
+        self.toggle_trackn(15)
+
+    def toggle_trackn(self, n):
+        if n in self.ignore:
+            self.ignore.remove(n)
+        else:
+            self.ignore.append(n)
+        self.set_flag(self.RAISE_CHANGE)
 
     def _get_note_str(self, note, channel):
         """Convert Midi Note byte to Legible Character"""
@@ -48,10 +107,10 @@ class Player(object):
                 char = '\033[42m' + char + '\033[0m'
             line.append(char)
         sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
-        sys.stdout.write('\033[0m' + ''.join(line) + '\n')
+        sys.stdout.write('\033[0m' + self.sidebar + ''.join(line) + self.sidebar + '\n')
 
 
-    def play_along(self, midilike, controller, ignore):
+    def play_along(self, midilike, controller):
         """Display notes in console. Main function"""
         if controller.connected:
             controller.listen()
@@ -92,7 +151,7 @@ class Player(object):
         to_clear = [[]] * (screen_height + self.post_buffer)
 
         for y in range(screen_height):
-            sys.stdout.write('\033[%d;%dH%s\033[0m\n' % (y, x_offset, (' ' * num_of_keys)))
+            sys.stdout.write('\033[%d;%dH%s%s%s\033[0m\n' % (y, x_offset, self.sidebar, (' ' * num_of_keys), self.sidebar))
 
         while state_list:
             current_display = state_list[0:screen_height - self.post_buffer][::-1]
@@ -114,7 +173,7 @@ class Player(object):
 
             current_state = state_list.pop(0)
             states_matched.insert(0, current_state)
-            result = self._wait_for_input(current_state, controller, ignore)
+            result = self._wait_for_input(current_state, controller)
             if result == self.NEXT_STATE:
                 song_position += 1
             elif result == self.PREV_STATE:
@@ -132,7 +191,7 @@ class Player(object):
                 break
         sys.stdout.write('\n' + (' ' * screen_width))
 
-    def _wait_for_input(self, expected, controller, ignore=[]):
+    def _wait_for_input(self, expected, controller):
         """Waits for user to press correct key combination"""
         # 'expected' is in the form of a dictionary because we want
         # to consider which channel (or hand) is playing the note
@@ -146,7 +205,7 @@ class Player(object):
         actual_set = set()
         for key, event in expected.items():
             channel = event.channel
-            if not channel in ignore:
+            if not channel in self.ignore:
                 if not key in self.previously_expected_set:
                     expected_set.add(key)
                     expected_unset.add(key)
@@ -175,6 +234,9 @@ class Player(object):
             elif self.flag_isset(self.RAISE_QUIT):
                 self.flags[self.RAISE_QUIT] = 0
                 input_given = self.RAISE_QUIT
+            elif self.flag_isset(self.RAISE_CHANGE):
+                self.flags[self.RAISE_CHANGE] = 0
+                return self._wait_for_input(expected, controller)
             else:
                 time.sleep(.01)
                 continue

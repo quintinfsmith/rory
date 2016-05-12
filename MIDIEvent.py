@@ -7,12 +7,12 @@ class MIDIEvent(object):
     # Channel Voice Messages (first nibbles)
     NOTE_OFF = 0x80
     NOTE_ON = 0x90
-    POLYPHONIC_KEY_PRESSED = 0xA0
+    POLYPHONIC_KEY_PRESSURE = 0xA0
     CONTROL_CHANGE = 0xB0
     PROGRAM_CHANGE = 0xC0
     CHANNEL_PRESSURE = 0xD0
     PITCHWHEEL_CHANGE = 0xE0
-    CHANNEL_VOICE_MESSAGES = [NOTE_OFF, NOTE_ON, POLYPHONIC_KEY_PRESSED, CONTROL_CHANGE, PROGRAM_CHANGE, CHANNEL_PRESSURE, PITCHWHEEL_CHANGE, PITCHWHEEL_CHANGE]
+    CHANNEL_VOICE_MESSAGES = [NOTE_OFF, NOTE_ON, POLYPHONIC_KEY_PRESSURE, CONTROL_CHANGE, PROGRAM_CHANGE, CHANNEL_PRESSURE, PITCHWHEEL_CHANGE, PITCHWHEEL_CHANGE]
 
     # System Common Messages ( first byte )
     SYSTEM_EXCLUSIVE = 0xF0
@@ -30,6 +30,21 @@ class MIDIEvent(object):
     ACTIVE_SENSING = 0xFE
     RESET = 0xFF
     SYSTEM_REALTIME_MESSAGES = [TIMING_CLOCK, START, CONTINUE, STOP, ACTIVE_SENSING, RESET]
+    
+    #Meta-Event Messages
+    #SEQUENCE_NUMBER = 0x01
+    #TEXT = 0x02
+    #COPYRIGHT_NOTICE = 0x03
+    #TRACK_NAME = 0x04
+    #INSTRUMENT_NAME
+    #LYRIC
+    #MARKER
+    #CUE_POINT
+    #CHANNEL_PREFIX
+    #END_OF_TRACK
+    
+    
+    
 
     def __init__(self, eventtype):
         self.event_type = eventtype
@@ -54,21 +69,25 @@ class TextEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class CopyrightNoticeEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class TrackNameEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class InstrumentNameEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class LyricEvent(MetaEvent):
     def __init__(self, text):
@@ -79,11 +98,13 @@ class MarkerEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class CuePointEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        print(self.text)
 
 class ChannelPrefixEvent(MetaEvent):
     def __init__(self, prefix):
