@@ -107,7 +107,7 @@ class Player(object):
                 char = '\033[42m' + char + '\033[0m'
             line.append(char)
         sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
-        sys.stdout.write('\033[0m' + self.sidebar + ''.join(line) + self.sidebar + '\n')
+        sys.stdout.write('\033[0m' + ''.join(line) + '\n')
 
 
     def play_along(self, midilike, controller):
@@ -151,7 +151,7 @@ class Player(object):
         to_clear = [[]] * (screen_height + self.post_buffer)
 
         for y in range(screen_height):
-            sys.stdout.write('\033[%d;%dH%s%s%s\033[0m\n' % (y, x_offset, self.sidebar, (' ' * num_of_keys), self.sidebar))
+            sys.stdout.write('\033[%d;%dH%s\033[0m\n' % (y, x_offset, (' ' * num_of_keys)))
 
         while state_list:
             current_display = state_list[0:screen_height - self.post_buffer][::-1]
