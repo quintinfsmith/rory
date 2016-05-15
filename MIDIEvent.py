@@ -19,9 +19,9 @@ class MIDIEvent(object):
     SONG_POSITION_POINTER = 0xF2
     SONG_SELECT = 0xF3
     TUNE_REQUEST = 0xF6
-    END_OF_EXCLUSIVE =  0xF7
+    END_OF_EXCLUSIVE = 0xF7
     SYSTEM_COMMON_MESSAGES = [SYSTEM_EXCLUSIVE, SONG_POSITION_POINTER, SONG_SELECT, TUNE_REQUEST, END_OF_EXCLUSIVE]
-    
+
     # System Real-Time Messages
     TIMING_CLOCK = 0xF8
     START = 0xFB
@@ -30,7 +30,7 @@ class MIDIEvent(object):
     ACTIVE_SENSING = 0xFE
     RESET = 0xFF
     SYSTEM_REALTIME_MESSAGES = [TIMING_CLOCK, START, CONTINUE, STOP, ACTIVE_SENSING, RESET]
-    
+
     #Meta-Event Messages
     #SEQUENCE_NUMBER = 0x01
     #TEXT = 0x02
@@ -42,9 +42,9 @@ class MIDIEvent(object):
     #CUE_POINT
     #CHANNEL_PREFIX
     #END_OF_TRACK
-    
-    
-    
+
+
+
 
     def __init__(self, eventtype):
         self.event_type = eventtype
@@ -114,7 +114,6 @@ class ChannelPrefixEvent(MetaEvent):
 class EndOfTrackEvent(MetaEvent):
     def __init__(self):
         MetaEvent.__init__(self)
-        pass
 
 class SetTempoEvent(MetaEvent):
     def __init__(self, tempo):
@@ -202,7 +201,7 @@ class NoteOffEvent(ChannelVoiceEvent):
 
     def __repr__(self):
         return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
-        
+
 class NoteOnEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
         ChannelVoiceEvent.__init__(self, channel)
@@ -259,7 +258,7 @@ class PitchWheelChangeEvent(ChannelVoiceEvent):
         self.eid = self.PITCHWHEEL_CHANGE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(least) + chr(most)
+        return chr(self.eid + self.channel) + chr(self.least) + chr(self.most)
 
 class SystemCommonEvent(MIDIEvent):
     def __init__(self):
@@ -288,7 +287,7 @@ class TuneRequestEvent(SystemCommonEvent):
 class EndOfExclusiveEvent(SystemCommonEvent):
     def __init__(self):
         SystemCommonEvent.__init__(self)
-        
+
 class SystemRealTimeEvent(MIDIEvent):
     def __init__(self):
         MIDIEvent.__init__(self, self.SYSTEMREALTIMEEVENT)
