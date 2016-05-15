@@ -85,9 +85,8 @@ class Player(object):
         note_list = 'CCDDEFFGGAAB'
         note %= 12
         if note in self.SHARPS:
-            return '\033[7;3' + str(channel) + 'm' + note_list[note] + '\033[0m'
-        else:
-            return '\033[3' + str(channel) + 'm' + note_list[note] + '\033[0m'
+            return "\033[7;3%dm%s\033[0m" % (channel, note_list[note])
+        return "\033[3%dm%s\033[0m" % (channel, note_list[note])
 
     def draw_input_line(self, user_input, expected):
         num_of_keys = self.note_range[1] - self.note_range[0]
@@ -97,6 +96,7 @@ class Player(object):
         expected_set = set(expected.keys())
 
         line = []
+        line.append("\033[%d;%dH\033[0m%s" % (y_offset, x_offset, self.SIDEBAR))
         for i in range(num_of_keys):
             note = i + self.note_range[0]
             if i in expected_set:
@@ -104,11 +104,10 @@ class Player(object):
             else:
                 char = '-'
             if i in user_input:
-                char = '\033[42m' + char + '\033[0m'
+                char = "\033[42m%s\033[0m" % (char)
             line.append(char)
-        sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
-        sys.stdout.write('\033[0m' + self.SIDEBAR + ''.join(line) + self.SIDEBAR + '\n')
-
+        line.append("%s\n" % (self.SIDEBAR))
+        sys.stdout.write("".join(line))
 
     def play_along(self, midilike, controller):
         """Display notes in console. Main function"""
@@ -169,8 +168,7 @@ class Player(object):
                     sys.stdout.write(self._get_note_str(key, event.channel + 1))
                     to_clear[y].append(x_offset + key - self.note_range[0])
 
-            sys.stdout.write('\033[%d;%dH' % (screen_height, x_offset))
-            sys.stdout.write('\n')
+            sys.stdout.write('\033[%d;%dH\n' % (screen_height, x_offset))
 
             current_state = state_list.pop(0)
             states_matched.insert(0, current_state)
@@ -190,7 +188,8 @@ class Player(object):
 
             elif result == self.RAISE_QUIT:
                 break
-        sys.stdout.write('\n' + (' ' * screen_width))
+
+        sys.stdout.write("\n".ljust(screen_width+1))
 
     def _wait_for_input(self, expected, controller):
         """Waits for user to press correct key combination"""
