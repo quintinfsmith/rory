@@ -78,10 +78,9 @@ class MIDIInterpreter(SongInterpreter):
         return n
 
     def process_mtrk_event(self, firstbyte, queue, current_deltatime, track):
-        channel = firstbyte & 0x0F
-
         # Channel Voice Message
         if int(firstbyte >> 4) in (8, 9, 10, 11, 14):
+            channel = firstbyte & 0x0F
             b = self.pop_n(queue)
             c = self.pop_n(queue)
             if int(firstbyte >> 4) == 9 and c == 0:
@@ -91,6 +90,7 @@ class MIDIInterpreter(SongInterpreter):
                 self.cve[int(firstbyte >> 4)](channel, b, c))
 
         elif int(firstbyte >> 4) in (12, 13):
+            channel = firstbyte & 0x0F
             b = self.pop_n(queue)
             track.add_event(
                 current_deltatime,
