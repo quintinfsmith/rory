@@ -189,9 +189,6 @@ class ChannelVoiceEvent(MIDIEvent):
         MIDIEvent.__init__(self, self.CHANNELVOICEEVENT)
         self.channel = channel
 
-    def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
-
 class NoteOffEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
         ChannelVoiceEvent.__init__(self, channel)
