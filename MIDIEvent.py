@@ -159,7 +159,7 @@ class ChannelVoiceEvent(MIDIEvent):
     CHORUSED_PIANO = 0x05
     HARPSICHORD = 0x06
     CLAVINET = 0x07
-    CELESTA = 0x09
+    CELESTA = 0x08
     GLOCKENSPIEL = 0x09
     MUSIC_BOX = 0x0A
     VIBRAPHONE = 0x0B
