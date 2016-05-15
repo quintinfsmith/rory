@@ -1,10 +1,10 @@
-from MIDIEvent import MIDIEvent
-
 class MIDILike(object):
     """Usable object. Converted from midi files.
         Events are the same midi files from simplicities sake.
     """
     def __init__(self):
+        self.tpqn = None
+        self.midi_format = None
         self.tracks = []
 
     def __len__(self):
@@ -29,22 +29,27 @@ class MIDILike(object):
         track_reps = []
         for track in self.tracks:
             track_reps.append(repr(track))
-        track_reps.remove('')
+        track_reps.remove("")
 
-        head = 'MThd' + (chr(0) * 3) + chr(6) + chr(0) + chr(self.midi_format) + chr(0) + chr(len(self.tracks)) + chr(int(tpqn_bytes / 256)) + chr(int(tpqn_bytes % 256))
-        with open(path, 'w') as fp:
-            fp.write(head + ''.join(track_reps))
+        with open(path, "w") as fp:
+            fp.write("MThd")
+            fp.write("\x00\x00\x00\x06\x00")
+            fp.write(chr(self.midi_format))
+            fp.write("\x00")
+            fp.write(chr(len(self.tracks)))
+            fp.write(chr(int(tpqn_bytes / 256)))
+            fp.write(chr(int(tpqn_bytes % 256)))
+            fp.write("".join(track_reps))
 
 class MIDILikeTrack(object):
     """Track in MIDILike Object."""
     def __init__(self):
         self.events = {}
-    
+
     def get_events(self, tick):
         if tick in self.events.keys():
             return self.events[tick]
-        else:
-            return []
+        return []
 
     def add_event(self, dt, event):
         if not dt in self.events.keys():
@@ -57,10 +62,10 @@ class MIDILikeTrack(object):
         if k:
             k.sort()
             return k.pop()
-        else:
-            return 0
+        return 0
 
-    def _to_variable_length(self, n):
+    @staticmethod
+    def _to_variable_length(n):
         chrlist = []
         while n:
             if n > 0:
@@ -69,17 +74,19 @@ class MIDILikeTrack(object):
                 c = chr(0x7F & n)
             n >>= 7
             chrlist.insert(0, c)
-        return ''.join(chrlist)
+        return "".join(chrlist)
 
     def __repr__(self):
         e_reps = []
         for tick, eventlist in self.events.items():
+            tick_as_str = self._to_variable_length(tick)
             for event in eventlist:
-                e_reps.append(self._to_variable_length(tick) + repr(event))
+                e_reps.append(tick_as_str)
+                e_reps.append(repr(event))
 
-        e_string = ''.join(e_reps)
-        if e_string:
-            return "MTrk" + self._to_variable_length(len(e_string)) +e_string
-        else:
-            return ''
+        if e_reps:
+            e_string = "".join(e_reps)
+            return "MTrk%s%s" % (self._to_variable_length(len(e_string)), e_string)
+
+        return ""
 
