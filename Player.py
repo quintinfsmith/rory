@@ -105,8 +105,7 @@ class Player(object):
                 char = "\033[42m%s\033[0m" % (char)
             line.append(char)
 
-        sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
-        sys.stdout.write('\033[0m' + ''.join(line) + '\n')
+        sys.stdout.write("%s\n" % ("".join(line)))
 
     def play_along(self, midilike, controller):
         """Display notes in console. Main function"""
