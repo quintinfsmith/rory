@@ -12,8 +12,8 @@ class Player(object):
     RAISE_QUIT = 4
     RAISE_CHANGE = 8
 
+    NOTE_LIST = 'CCDDEFFGGAAB'
     SHARPS = (1, 3, 6, 8, 10)
-
     SIDEBAR = '|'
 
     def __init__(self):
@@ -82,11 +82,10 @@ class Player(object):
 
     def _get_note_str(self, note, channel):
         """Convert Midi Note byte to Legible Character"""
-        note_list = 'CCDDEFFGGAAB'
         note %= 12
         if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (channel, note_list[note])
-        return "\033[3%dm%s\033[0m" % (channel, note_list[note])
+            return "\033[7;3%dm%s\033[0m" % (channel, self.NOTE_LIST[note])
+        return "\033[3%dm%s\033[0m" % (channel, self.NOTE_LIST[note])
 
     def draw_input_line(self, user_input, expected):
         num_of_keys = self.note_range[1] - self.note_range[0]
