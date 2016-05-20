@@ -11,17 +11,18 @@ class InputNode(object):
     def __init__(self):
         self.children = {}
         self.action = None
-        self.args = {}
+        self.args = None
 
-    def set(self, path, action):
+    def set(self, path, action, args=None):
         if path:
             n = path[0]
             path = path[1:]
             if not n in self.children.keys():
                 self.children[n] = InputNode()
-            self.children[n].set(path, action)
+            self.children[n].set(path, action, args)
         else:
             self.action = action
+            self.args = args
 
     def get(self, path):
         if path:
@@ -44,32 +45,40 @@ class Interface(object):
             cache = {}
         self.active_threads = []
         self.player = Player()
+        self.number_register = 0
         self.cmdNode = InputNode()
         self.cmdNode.set('q', self.quit)
         self.cmdNode.set('l', self.player.next_state)
         self.cmdNode.set('o', self.player.prev_state)
-        self.cmdNode.set('t0', self.player.toggle_track0)
-        self.cmdNode.set('t1', self.player.toggle_track1)
-        self.cmdNode.set('t2', self.player.toggle_track2)
-        self.cmdNode.set('t3', self.player.toggle_track3)
-        self.cmdNode.set('t4', self.player.toggle_track4)
-        self.cmdNode.set('t5', self.player.toggle_track5)
-        self.cmdNode.set('t6', self.player.toggle_track6)
-        self.cmdNode.set('t7', self.player.toggle_track7)
-        self.cmdNode.set('t8', self.player.toggle_track8)
-        self.cmdNode.set('t9', self.player.toggle_track9)
-        self.cmdNode.set('ta', self.player.toggle_track10)
-        self.cmdNode.set('tb', self.player.toggle_track11)
-        self.cmdNode.set('tc', self.player.toggle_track12)
-        self.cmdNode.set('td', self.player.toggle_track13)
-        self.cmdNode.set('te', self.player.toggle_track14)
-        self.cmdNode.set('tf', self.player.toggle_track15)
+        self.cmdNode.set('0', self.set_register, 0)
+        self.cmdNode.set('1', self.set_register, 1)
+        self.cmdNode.set('2', self.set_register, 2)
+        self.cmdNode.set('3', self.set_register, 3)
+        self.cmdNode.set('4', self.set_register, 4)
+        self.cmdNode.set('5', self.set_register, 5)
+        self.cmdNode.set('6', self.set_register, 6)
+        self.cmdNode.set('7', self.set_register, 7)
+        self.cmdNode.set('8', self.set_register, 8)
+        self.cmdNode.set('9', self.set_register, 9)
+        self.cmdNode.set(chr(27), self.clear_register)
+        self.cmdNode.set('t', self.toggle_track)
         self.listening = False
         self.midi_interpreter = MIDIInterpreter()
         if 'songs' in cache:
             self.songsettings = cache['songs']
         else:
             self.songsettings = {}
+
+    def toggle_track(self):
+        self.player.toggle_trackn(self.number_register)
+        self.clear_register()
+
+    def set_register(self, n):
+        self.number_register *= 10
+        self.number_register += n
+
+    def clear_register(self):
+        self.number_register = 0
 
     def load_midi(self, midi_path):
         midilike = self.midi_interpreter(midi_path)
@@ -79,8 +88,8 @@ class Interface(object):
         self.listening = False
         self.player.quit()
 
-    def play_along(self, midilike):
-        thread = threading.Thread(target=self.player.play_along, args=[midilike, MIDIController()])
+    def play_along(self, midilike, hidden=[]):
+        thread = threading.Thread(target=self.player.play_along, args=[midilike, MIDIController(), hidden])
         thread.start()
         self.active_threads.append(thread)
 
@@ -92,7 +101,11 @@ class Interface(object):
             node = self.cmdNode.get(current_path)
             if node:
                 if node.action:
-                    node.action()
+                    if not node.args is None:
+                        node.action(node.args)
+                    else:
+                        node.action()
+
                     current_path = []
             else:
                 current_path = []
@@ -108,7 +121,7 @@ if __name__ == '__main__':
     sys.stdout.write('\033[0;0H\033[0m')
     for i in range(7):
         sys.stdout.write('\033[3%dm%s\033[0m' % (i + 1, hex(i)[2:]))
-    interface.play_along(midilike)
+    interface.play_along(midilike, [2,3,4,5,6,7,8,9,10,11,12,13,14,15])
     interface.input_loop()
     sys.stdout.write('\033[0;0H')
     sys.stdout.write('\033[0m%s' % ((w * h) * ' '))

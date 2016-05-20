@@ -1,3 +1,19 @@
+import math
+def to_variable_length(n):
+    b = ''
+    first = True
+    blength = math.log(n, 2)
+    blength += (7 - (blength % 7))   
+    while blength:
+        new_int = n & 0x7F
+        if not first:
+            new_int |= 0x80
+        b = chr(new_int) + b
+        n >>= 7
+        blength -= 7
+        first = False
+    return b
+
 class MIDIEvent(object):
     METAEVENT = 0
     SYSTEMREALTIMEEVENT = 1
@@ -19,9 +35,9 @@ class MIDIEvent(object):
     SONG_POSITION_POINTER = 0xF2
     SONG_SELECT = 0xF3
     TUNE_REQUEST = 0xF6
-    END_OF_EXCLUSIVE = 0xF7
+    END_OF_EXCLUSIVE =  0xF7
     SYSTEM_COMMON_MESSAGES = [SYSTEM_EXCLUSIVE, SONG_POSITION_POINTER, SONG_SELECT, TUNE_REQUEST, END_OF_EXCLUSIVE]
-
+    
     # System Real-Time Messages
     TIMING_CLOCK = 0xF8
     START = 0xFB
@@ -30,7 +46,7 @@ class MIDIEvent(object):
     ACTIVE_SENSING = 0xFE
     RESET = 0xFF
     SYSTEM_REALTIME_MESSAGES = [TIMING_CLOCK, START, CONTINUE, STOP, ACTIVE_SENSING, RESET]
-
+    
     #Meta-Event Messages
     #SEQUENCE_NUMBER = 0x01
     #TEXT = 0x02
@@ -42,9 +58,9 @@ class MIDIEvent(object):
     #CUE_POINT
     #CHANNEL_PREFIX
     #END_OF_TRACK
-
-
-
+    
+    
+    
 
     def __init__(self, eventtype):
         self.event_type = eventtype
@@ -64,29 +80,38 @@ class SequenceNumberEvent(MetaEvent):
     def __init__(self, seq):
         MetaEvent.__init__(self)
         self.sequence = seq
+        self.eid = 0x01
 
 class TextEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        self.eid = 0x02
         print(self.text)
+    def __repr__(self):
+        return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text
 
 class CopyrightNoticeEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        self.eid = 0x03
         print(self.text)
+    def __repr__(self):
+        return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text.decode("ascii")
 
 class TrackNameEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        self.eid = 0x04
         print(self.text)
 
 class InstrumentNameEvent(MetaEvent):
     def __init__(self, text):
         MetaEvent.__init__(self)
         self.text = text
+        self.eid = 0x05
         print(self.text)
 
 class LyricEvent(MetaEvent):
@@ -114,6 +139,8 @@ class ChannelPrefixEvent(MetaEvent):
 class EndOfTrackEvent(MetaEvent):
     def __init__(self):
         MetaEvent.__init__(self)
+        self.eid = 0x2F
+        pass
 
 class SetTempoEvent(MetaEvent):
     def __init__(self, tempo):
@@ -158,7 +185,7 @@ class ChannelVoiceEvent(MIDIEvent):
     CHORUSED_PIANO = 0x05
     HARPSICHORD = 0x06
     CLAVINET = 0x07
-    CELESTA = 0x08
+    CELESTA = 0x09
     GLOCKENSPIEL = 0x09
     MUSIC_BOX = 0x0A
     VIBRAPHONE = 0x0B
@@ -189,6 +216,9 @@ class ChannelVoiceEvent(MIDIEvent):
         MIDIEvent.__init__(self, self.CHANNELVOICEEVENT)
         self.channel = channel
 
+    def __repr__(self):
+        return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
+
 class NoteOffEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
         ChannelVoiceEvent.__init__(self, channel)
@@ -198,7 +228,7 @@ class NoteOffEvent(ChannelVoiceEvent):
 
     def __repr__(self):
         return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
-
+        
 class NoteOnEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
         ChannelVoiceEvent.__init__(self, channel)
@@ -255,7 +285,7 @@ class PitchWheelChangeEvent(ChannelVoiceEvent):
         self.eid = self.PITCHWHEEL_CHANGE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.least) + chr(self.most)
+        return chr(self.eid + self.channel) + chr(least) + chr(most)
 
 class SystemCommonEvent(MIDIEvent):
     def __init__(self):
@@ -284,7 +314,7 @@ class TuneRequestEvent(SystemCommonEvent):
 class EndOfExclusiveEvent(SystemCommonEvent):
     def __init__(self):
         SystemCommonEvent.__init__(self)
-
+        
 class SystemRealTimeEvent(MIDIEvent):
     def __init__(self):
         MIDIEvent.__init__(self, self.SYSTEMREALTIMEEVENT)

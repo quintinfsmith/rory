@@ -12,65 +12,18 @@ class Player(object):
     RAISE_QUIT = 4
     RAISE_CHANGE = 8
 
-    NOTE_LIST = 'CCDDEFFGGAAB'
-    SHARPS = (1, 3, 6, 8, 10)
+    SHARPS = (1,3,6,8,10)
+
+    sidebar = '|'
 
     def __init__(self):
-        self.flags = {}
-        self.ignore = []
         self.note_range = [0, 127]
-        self.post_buffer = 4
+        self.flags = {}
         self.previously_expected_set = set()
+        self.post_buffer = 4
         self.screen_size = console.getTerminalSize()
         self.screen_size = (self.screen_size[0], self.screen_size[1] - 3)
-
-    def toggle_track0(self):
-        self.toggle_trackn(0)
-
-    def toggle_track1(self):
-        self.toggle_trackn(1)
-
-    def toggle_track2(self):
-        self.toggle_trackn(2)
-
-    def toggle_track3(self):
-        self.toggle_trackn(3)
-
-    def toggle_track4(self):
-        self.toggle_trackn(4)
-
-    def toggle_track5(self):
-        self.toggle_trackn(5)
-
-    def toggle_track6(self):
-        self.toggle_trackn(6)
-
-    def toggle_track7(self):
-        self.toggle_trackn(7)
-
-    def toggle_track8(self):
-        self.toggle_trackn(8)
-
-    def toggle_track9(self):
-        self.toggle_trackn(9)
-
-    def toggle_track10(self):
-        self.toggle_trackn(10)
-
-    def toggle_track11(self):
-        self.toggle_trackn(11)
-
-    def toggle_track12(self):
-        self.toggle_trackn(12)
-
-    def toggle_track13(self):
-        self.toggle_trackn(13)
-
-    def toggle_track14(self):
-        self.toggle_trackn(14)
-
-    def toggle_track15(self):
-        self.toggle_trackn(15)
+        self.ignore = []
 
     def toggle_trackn(self, n):
         if n in self.ignore:
@@ -81,10 +34,12 @@ class Player(object):
 
     def _get_note_str(self, note, channel):
         """Convert Midi Note byte to Legible Character"""
+        note_list = 'CCDDEFFGGAAB'
         note %= 12
         if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (channel, self.NOTE_LIST[note])
-        return "\033[3%dm%s\033[0m" % (channel, self.NOTE_LIST[note])
+            return '\033[7;3' + str(channel) + 'm' + note_list[note] + '\033[0m'
+        else:
+            return '\033[3' + str(channel) + 'm' + note_list[note] + '\033[0m'
 
     def draw_input_line(self, user_input, expected):
         num_of_keys = self.note_range[1] - self.note_range[0]
@@ -94,7 +49,6 @@ class Player(object):
         expected_set = set(expected.keys())
 
         line = []
-        line.append("\033[%d;%dH\033[0m" % (y_offset, x_offset))
         for i in range(num_of_keys):
             note = i + self.note_range[0]
             if i in expected_set:
@@ -102,12 +56,13 @@ class Player(object):
             else:
                 char = '-'
             if i in user_input:
-                char = "\033[42m%s\033[0m" % (char)
+                char = '\033[42m' + char + '\033[0m'
             line.append(char)
+        sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
+        sys.stdout.write('\033[0m' + ''.join(line) + '\n')
 
-        sys.stdout.write("%s\n" % ("".join(line)))
 
-    def play_along(self, midilike, controller):
+    def play_along(self, midilike, controller, hidden=[]):
         """Display notes in console. Main function"""
         if controller.connected:
             controller.listen()
@@ -120,12 +75,12 @@ class Player(object):
         for tick in range(len(midilike)):
             for track in midilike.tracks:
                 for event in track.get_events(tick):
-                    if event.eid == event.NOTE_ON:
+                    if event.eid == event.NOTE_ON and event.channel != 10 and not event.channel in hidden:
                         if event.velocity == 0 and event.note in pressed_keys.keys():
                             del pressed_keys[event.note]
                         else:
                             pressed_keys[event.note] = event
-                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys():
+                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys() and event.channel != 10:
                         del pressed_keys[event.note]
             state_list.append(pressed_keys.copy())
 
@@ -154,10 +109,10 @@ class Player(object):
             current_display = state_list[0:screen_height - self.post_buffer][::-1]
             current_display += states_matched[0:min(self.post_buffer, len(states_matched))]
             mark_pos = screen_height - int(screen_height * song_position / len(state_list))
-
+            
             for y in range(len(current_display)):
                 for x in to_clear[y]:
-                    sys.stdout.write("\033[%d;%dH " % (y, x))
+                    sys.stdout.write("\033[%d;%dH " % (y,x))
                 line = current_display[y]
                 to_clear[y] = []
                 for key, event in line.items():
@@ -165,7 +120,8 @@ class Player(object):
                     sys.stdout.write(self._get_note_str(key, event.channel + 1))
                     to_clear[y].append(x_offset + key - self.note_range[0])
 
-            sys.stdout.write('\033[%d;%dH\n' % (screen_height, x_offset))
+            sys.stdout.write('\033[%d;%dH' % (screen_height, x_offset))
+            sys.stdout.write('\n')
 
             current_state = state_list.pop(0)
             states_matched.insert(0, current_state)
@@ -185,8 +141,7 @@ class Player(object):
 
             elif result == self.RAISE_QUIT:
                 break
-
-        sys.stdout.write("\n".ljust(screen_width+1))
+        sys.stdout.write('\n' + (' ' * screen_width))
 
     def _wait_for_input(self, expected, controller):
         """Waits for user to press correct key combination"""
@@ -197,7 +152,7 @@ class Player(object):
         # 'expected_unset' are the keys that need to be released before pressing again
         # 'actual_set' is the uncompromised set of pressed keys.
         #   it needs to be used when considering the next keys to be pressed
-        expected_set = set()
+        expected_set = set() 
         expected_unset = set()
         actual_set = set()
         for key, event in expected.items():
@@ -208,8 +163,7 @@ class Player(object):
                     expected_unset.add(key)
                 actual_set.add(key)
 
-        # If the key was expected NOT to be pressed last state but was,
-        # the user needs to release and press again
+        # If the key was expected NOT to be pressed last state but was, the user needs to release and press again
         while expected_unset:
             expected_unset &= controller.get_pressed()
 
@@ -248,7 +202,7 @@ class Player(object):
 
     def set_flag(self, flag, state=1):
         self.flags[flag] = state
-
+    
     def quit(self):
         self.set_flag(self.RAISE_QUIT)
 
