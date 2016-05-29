@@ -172,6 +172,8 @@ class Player(object):
         self.draw_input_line(last_pressed, expected)
         while input_given == 0:
             pressed = controller.get_pressed()
+            if pressed.symmetric_difference(last_pressed):
+                self.draw_input_line(pressed, expected)
             if not (expected_set - pressed):
                 input_given = self.NEXT_STATE
                 self.previously_expected_set = actual_set
@@ -192,8 +194,6 @@ class Player(object):
             else:
                 time.sleep(.01)
                 continue
-            if pressed.symmetric_difference(last_pressed):
-                self.draw_input_line(pressed, expected)
             last_pressed = pressed
         return input_given
 

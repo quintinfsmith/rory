@@ -121,7 +121,10 @@ if __name__ == '__main__':
     sys.stdout.write('\033[0;0H\033[0m')
     for i in range(7):
         sys.stdout.write('\033[3%dm%s\033[0m' % (i + 1, hex(i)[2:]))
-    interface.play_along(midilike, [2,3,4,5,6,7,8,9,10,11,12,13,14,15])
+    ignore = []
+    for i in sys.argv[2:]:
+        ignore.append(int(i))
+    interface.play_along(midilike, ignore)
     interface.input_loop()
     sys.stdout.write('\033[0;0H')
     sys.stdout.write('\033[0m%s' % ((w * h) * ' '))
