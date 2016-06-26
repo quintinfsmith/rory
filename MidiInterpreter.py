@@ -127,6 +127,8 @@ class MIDIInterpreter(SongInterpreter):
 
         elif firstbyte in (0xF1, 0xF4, 0xF5): # Undefined
             return 0 # TODO: isn't this handled by the else case?
+                     # SORTA: The "else" bytes would indicate a failure in the midi file itself. Someone could potentially use these bytes for their own purposes
+                     #   I know it's not a funcitonal difference, but should the occasion arise, i'll have these here for reference
 
         # Meta-Event
         elif firstbyte == 0xFF:
@@ -162,7 +164,7 @@ class MIDIInterpreter(SongInterpreter):
         mlo = MIDILike()
         chunkcount = {}
         while queue:
-            chunk_type = str(queue[0:4], 'ascii')
+            chunk_type = str(queue[0:4], 'utf-8')
             queue = queue[4:]
             if not chunk_type in chunkcount.keys():
                 chunkcount[chunk_type] = 0
@@ -187,6 +189,7 @@ class MIDIInterpreter(SongInterpreter):
                 mlo.set_format(midi_format)
             elif chunk_type == 'MTrk':
                 length = self.pop_n(queue, 4)
+                print(length)
                 subqueue = queue[:length]
                 queue = queue[length:]
                 while subqueue:
@@ -195,8 +198,8 @@ class MIDIInterpreter(SongInterpreter):
                     gb = self.process_mtrk_event(n, subqueue, current_deltatime, track)
                     if gb & 0xf0 == 0x90:
                         self.lastgoodbyte = gb
+                mlo.add_track(track)
             else:
                 break
-            mlo.add_track(track)
         return mlo
 

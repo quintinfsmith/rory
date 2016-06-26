@@ -1,18 +1,4 @@
-import math
-def to_variable_length(n):
-    b = ''
-    first = True
-    blength = math.log(n, 2)
-    blength += (7 - (blength % 7))   
-    while blength:
-        new_int = n & 0x7F
-        if not first:
-            new_int |= 0x80
-        b = chr(new_int) + b
-        n >>= 7
-        blength -= 7
-        first = False
-    return b
+from localfuncs import to_variable_length
 
 class MIDIEvent(object):
     METAEVENT = 0
@@ -59,15 +45,15 @@ class MIDIEvent(object):
     #CHANNEL_PREFIX
     #END_OF_TRACK
     
-    
-    
-
     def __init__(self, eventtype):
         self.event_type = eventtype
         self.eid = 0
 
     def get_type(self):
         return self.event_type
+
+    def __repr__(self):
+        return ""
 
     def __str__(self):
         return ''
@@ -81,6 +67,8 @@ class SequenceNumberEvent(MetaEvent):
         MetaEvent.__init__(self)
         self.sequence = seq
         self.eid = 0x01
+    #def __repr__(self):
+    #    return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.sequence)) + self.sequence
 
 class TextEvent(MetaEvent):
     def __init__(self, text):
@@ -88,8 +76,9 @@ class TextEvent(MetaEvent):
         self.text = text
         self.eid = 0x02
         print(self.text)
-    def __repr__(self):
-        return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text
+
+    #def __repr__(self):
+    #    return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text
 
 class CopyrightNoticeEvent(MetaEvent):
     def __init__(self, text):
@@ -97,8 +86,9 @@ class CopyrightNoticeEvent(MetaEvent):
         self.text = text
         self.eid = 0x03
         print(self.text)
-    def __repr__(self):
-        return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text.decode("ascii")
+
+    #def __repr__(self):
+    #    return chr(0xFF) + chr(self.eid) + to_variable_length(len(self.text)) + self.text.decode("ascii")
 
 class TrackNameEvent(MetaEvent):
     def __init__(self, text):
@@ -140,7 +130,6 @@ class EndOfTrackEvent(MetaEvent):
     def __init__(self):
         MetaEvent.__init__(self)
         self.eid = 0x2F
-        pass
 
 class SetTempoEvent(MetaEvent):
     def __init__(self, tempo):
@@ -216,9 +205,6 @@ class ChannelVoiceEvent(MIDIEvent):
         MIDIEvent.__init__(self, self.CHANNELVOICEEVENT)
         self.channel = channel
 
-    def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
-
 class NoteOffEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
         ChannelVoiceEvent.__init__(self, channel)
@@ -227,7 +213,7 @@ class NoteOffEvent(ChannelVoiceEvent):
         self.eid = self.NOTE_OFF
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
+        return chr(self.eid | self.channel) + chr(self.note) + chr(self.velocity)
         
 class NoteOnEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, velocity):
@@ -237,7 +223,7 @@ class NoteOnEvent(ChannelVoiceEvent):
         self.eid = self.NOTE_ON
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.note) + chr(self.velocity)
+        return chr(self.eid | self.channel) + chr(self.note) + chr(self.velocity)
 
 class PolyphonicKeyPressureEvent(ChannelVoiceEvent):
     def __init__(self, channel, note, pressure):
@@ -247,7 +233,7 @@ class PolyphonicKeyPressureEvent(ChannelVoiceEvent):
         self.eid = self.POLYPHONIC_KEY_PRESSURE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.note) + chr(self.pressure)
+        return chr(self.eid | self.channel) + chr(self.note) + chr(self.pressure)
 
 class ControlChangeEvent(ChannelVoiceEvent):
     def __init__(self, channel, controller, new_value):
@@ -257,7 +243,7 @@ class ControlChangeEvent(ChannelVoiceEvent):
         self.eid = self.CONTROL_CHANGE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.controller) + chr(self.new_value)
+        return chr(self.eid | self.channel) + chr(self.controller) + chr(self.new_value)
 
 class ProgramChangeEvent(ChannelVoiceEvent):
     def __init__(self, channel, program):
@@ -266,7 +252,7 @@ class ProgramChangeEvent(ChannelVoiceEvent):
         self.eid = self.PROGRAM_CHANGE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.program)
+        return chr(self.eid | self.channel) + chr(self.program)
 
 class ChannelPressureEvent(ChannelVoiceEvent):
     def __init__(self, channel, pressure):
@@ -275,7 +261,7 @@ class ChannelPressureEvent(ChannelVoiceEvent):
         self.eid = self.CHANNEL_PRESSURE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(self.pressure)
+        return chr(self.eid | self.channel) + chr(self.pressure)
 
 class PitchWheelChangeEvent(ChannelVoiceEvent):
     def __init__(self, channel, least, most):
@@ -285,7 +271,7 @@ class PitchWheelChangeEvent(ChannelVoiceEvent):
         self.eid = self.PITCHWHEEL_CHANGE
 
     def __repr__(self):
-        return chr(self.eid + self.channel) + chr(least) + chr(most)
+        return chr(self.eid | self.channel) + chr(least) + chr(most)
 
 class SystemCommonEvent(MIDIEvent):
     def __init__(self):
@@ -296,7 +282,7 @@ class SystemExclusiveEvent(SystemCommonEvent):
         SystemCommonEvent.__init__(self)
         self.manufacturer_id = manufacturer_id
         self.dump = dump
-
+    
 class SongPositionPointerEvent(SystemCommonEvent):
     def __init__(self, position):
         SystemCommonEvent.__init__(self)

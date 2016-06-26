@@ -114,6 +114,7 @@ import console
 if __name__ == '__main__':
     interface = Interface()
     midilike = interface.load_midi(sys.argv[1])
+    note_range = midilike.get_note_range()
 
     w,h = console.getTerminalSize()
     sys.stdout.write('\033[0;0H')

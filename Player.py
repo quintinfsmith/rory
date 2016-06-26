@@ -32,7 +32,7 @@ class Player(object):
             self.ignore.append(n)
         self.set_flag(self.RAISE_CHANGE)
 
-    def _get_note_str(self, note, channel):
+    def _get_note_str(self, note, channel=10):
         """Convert Midi Note byte to Legible Character"""
         note_list = 'CCDDEFFGGAAB'
         note %= 12
@@ -42,22 +42,23 @@ class Player(object):
             return '\033[3' + str(channel) + 'm' + note_list[note] + '\033[0m'
 
     def draw_input_line(self, user_input, expected):
-        num_of_keys = self.note_range[1] - self.note_range[0]
-        x_offset = int((self.screen_size[0] - num_of_keys - 2) / 2)
+        num_of_keys = self.note_range[1] - self.note_range[0] + 1
+        x_offset = int((self.screen_size[0] - num_of_keys - 2) / 2) - 1
         y_offset = self.screen_size[1] - 1 - self.post_buffer
 
         expected_set = set(expected.keys())
 
-        line = []
+        line = [self._get_note_str(self.note_range[0] - 1)]
         for i in range(num_of_keys):
             note = i + self.note_range[0]
-            if i in expected_set:
-                char = self._get_note_str(i, expected[i].channel + 1)
+            if note in expected_set:
+                char = self._get_note_str(note, expected[note].channel + 1)
             else:
                 char = '-'
-            if i in user_input:
+            if note in user_input:
                 char = '\033[42m' + char + '\033[0m'
             line.append(char)
+        line.append(self._get_note_str(self.note_range[1] + 1))
         sys.stdout.write('\033[' + str(y_offset) + ';' + str(x_offset) + 'H')
         sys.stdout.write('\033[0m' + ''.join(line) + '\n')
 
@@ -66,9 +67,9 @@ class Player(object):
         """Display notes in console. Main function"""
         if controller.connected:
             controller.listen()
-
-        num_of_keys = self.note_range[1] - self.note_range[0]
-        squash_factor = 4 / midilike.tpqn
+        self.note_range = midilike.get_note_range()
+        num_of_keys = self.note_range[1] - self.note_range[0] + 1
+        squash_factor = 8 / midilike.tpqn
 
         state_list = []
         pressed_keys = {}
@@ -192,9 +193,9 @@ class Player(object):
                 self.flags[self.RAISE_CHANGE] = 0
                 return self._wait_for_input(expected, controller)
             else:
-                time.sleep(.01)
                 continue
             last_pressed = pressed
+            time.sleep(.02)
         return input_given
 
     def flag_isset(self, flag):
