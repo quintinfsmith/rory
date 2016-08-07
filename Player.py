@@ -55,11 +55,18 @@ class Player(Box, Interactor):
     def _get_note_str(self, note, channel=10):
         """Convert Midi Note byte to Legible Character"""
         note_list = 'CCDDEFFGGAAB'
+        if channel > 7:
+            c = (channel + 1) % 8
+            bolder = ""
+        else:
+            c = channel
+            bolder = "1;"
+
         note %= 12
         if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (channel + 1, note_list[note])
+            return "\033[%s7;3%dm%s\033[0m" % (bolder, c, note_list[note])
         else:
-            return "\033[3%dm%s\033[0m" % (channel + 1, note_list[note])
+            return "\033[%s3%dm%s\033[0m" % (bolder, c, note_list[note])
 
     def play_along(self, midilike, controller, hidden=[]):
         """Display notes in console. Main function"""
