@@ -8,6 +8,7 @@ class Box(object):
         self.id_gen = 0
         self.parent = None
         self.refresh_flag = False
+        self.has_border = False
         self.grid = []
         self.box_positions = {}
         self.boxes = {}
@@ -16,6 +17,9 @@ class Box(object):
             self.grid.append([])
             for x in range(width):
                 self.grid[-1].append("")
+
+    def toggle_border(self):
+        self.has_border ^= True
 
     def width(self):
         return len(self.grid[0])
@@ -34,6 +38,18 @@ class Box(object):
         outgrid = []
         for line in self.grid:
             outgrid.append(line.copy())
+
+        if self.has_border:
+            for y in range(len(outgrid)):
+                if y in (0, len(outgrid) - 1):
+                    for x in range(len(outgrid[y])):
+                        if not outgrid[y][x]:
+                            outgrid[y][x] = "."
+                else:
+                    if not outgrid[y][0]:
+                        outgrid[y][0] = "|"
+                    if not outgrid[y][-1]:
+                        outgrid[y][-1] = "|"
 
         if not self.refresh_flag:
             return outgrid

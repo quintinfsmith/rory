@@ -35,6 +35,7 @@ class Player(Box, Interactor):
     def __init__(self):
         Box.__init__(self)
         Interactor.__init__(self)
+        self.toggle_border()
 
         self.assign_sequence("l", self.next_state)
         self.assign_sequence("o", self.prev_state)
@@ -66,7 +67,7 @@ class Player(Box, Interactor):
             controller.listen()
         #self.note_range = midilike.get_note_range()
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
-        self.resize(num_of_keys, self.screen_size[1])
+        self.resize(num_of_keys + 2, self.screen_size[1])
         self.refresh()
         squash_factor = 8 / midilike.tpqn
 
@@ -96,12 +97,12 @@ class Player(Box, Interactor):
         for _ in range(screen_height):
             state_list.append({})
 
-        input_box_id = self.add_box(x=0, y=screen_height - 1, width=127, height=1)
+        input_box_id = self.add_box(x=1, y=screen_height - 6, width=127, height=1)
         for x in range(127):
             self.boxes[input_box_id].set(x, 0, "-")
 
         for j in range(len(state_list)):
-            new_bid = self.add_box(x=0, y=screen_height - 1 - j, width=127, height=1)
+            new_bid = self.add_box(x=1, y=screen_height - 6 - j, width=127, height=1)
             newBox = self.boxes[new_bid]
             for key, event in state_list[j].items():
                 if event.channel != 10:
@@ -111,6 +112,7 @@ class Player(Box, Interactor):
         self.playing = True
         self.refresh()
         while self.playing:
+            call_refresh = False
             result = self._wait_for_input(state_list[self.song_position], controller)
             if result == self.RAISE_QUIT:
                 self.playing = False
@@ -123,7 +125,10 @@ class Player(Box, Interactor):
                     y = (y + 1) % len(state_list)
                     self.box_positions[b_id] = (x,y)
                     self.boxes[b_id].set_refresh_flag()
-                self.refresh()
+                strpos = "%9d" % self.song_position
+                for c in range(len(strpos)):
+                    self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
+                call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
                 while (first or not state_list[self.song_position]) and self.song_position > 0:
@@ -135,7 +140,10 @@ class Player(Box, Interactor):
                         x, y = pos
                         y = (y - 1) % len(state_list)
                         self.box_positions[b_id] = (x,y)
-                self.refresh()
+                strpos = "%9d" % self.song_position
+                for c in range(len(strpos)):
+                    self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
+                call_refresh = True
             elif result == self.RAISE_JUMP:
                 sorted_keys = list(self.boxes.keys())
                 sorted_keys.sort()
@@ -147,6 +155,11 @@ class Player(Box, Interactor):
                     y = ((screen_height - 1) - i) + self.song_position
                     x = 0
                     self.box_positions[b_id] = (x,y)
+                strpos = "%9d" % self.song_position
+                for c in range(len(strpos)):
+                    self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
+                call_refresh = True
+            if call_refresh:
                 self.refresh()
                 
 
