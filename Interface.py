@@ -15,22 +15,25 @@ class Interface(BoxEnvironment, Interactor):
         self.init_screen()
         self.midi_interpreter = MIDIInterpreter()
         self.active_threads = []
+        self.interactorstack = []
+        for y in range(self.height()):
+            for x in range(self.width()):
+                self.set(x, y, " ")
 
         self.listening = False
 
         self.assign_sequence("q", self.quit)
 
-
     def show_player(self):
         player = Player()
         player.parent = self
         new_id = self.id_gen
+        player.id = new_id
         self.id_gen += 1
+        self.interactorstack.append(new_id)
         self.boxes[new_id] = player
-        w = console.getTerminalSize()[0]
-        self.box_positions[new_id] = ((w - 130) // 2,1)
+        self.box_positions[new_id] = ((self.width() - 130) // 2,0)
         self.player = player
-
 
     def toggle_track(self):
         self.player.toggle_trackn(self.general_register)
@@ -42,7 +45,6 @@ class Interface(BoxEnvironment, Interactor):
 
     def quit(self):
         self.listening = False
-        self.player.quit()
         self.destroy()
 
     def play_along(self, midilike, hidden=[]):
@@ -53,10 +55,16 @@ class Interface(BoxEnvironment, Interactor):
     def input_loop(self):
         self.listening = True
         while self.listening:
-            if self.player and self.player.playing: #Kludge
-                self.player.get_input()
-            else:
-                self.get_input()
+            while self.interactorstack:
+                c = self.interactorstack.pop()
+                if c in self.boxes.keys():
+                    self.interactorstack.append(c)
+                    active = self.boxes[c]
+                    break
+
+            if not self.interactorstack:
+                active = self
+            active.get_input()
 
 import sys
 import console

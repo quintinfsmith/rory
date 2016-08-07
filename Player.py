@@ -20,6 +20,7 @@ class Player(Box, Interactor):
 
     def quit(self):
         self.set_flag(self.RAISE_QUIT)
+        self.kill()
 
     def next_state(self):
         self.set_flag(self.NEXT_STATE)
@@ -38,17 +39,16 @@ class Player(Box, Interactor):
         self.toggle_border()
 
         self.assign_sequence("l", self.next_state)
-        self.assign_sequence("o", self.prev_state)
+        self.assign_sequence("k", self.prev_state)
         self.assign_sequence("j", self.jump)
         self.assign_sequence("q", self.quit)
 
-        self.note_range = [0, 128]
+        self.note_range = [0, 127]
         self.playing = False
         self.flags = {}
         self.previously_expected_set = set()
         self.post_buffer = 4
-        self.screen_size = console.getTerminalSize()
-        self.screen_size = (self.screen_size[0], self.screen_size[1] - 3)
+
         self.ignore = []
         self.song_position = 0
 
@@ -74,7 +74,7 @@ class Player(Box, Interactor):
             controller.listen()
         #self.note_range = midilike.get_note_range()
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
-        self.resize(num_of_keys + 2, self.screen_size[1])
+        self.resize(num_of_keys + 2, self.parent.height())
         self.refresh()
         squash_factor = 8 / midilike.tpqn
 
@@ -95,21 +95,18 @@ class Player(Box, Interactor):
                 while len(state_list) <= tick * squash_factor:
                     state_list.append({})
                 state_list[int(tick * squash_factor)] = pressed_keys.copy()
-
-        # Shrink State_list length
-        screen_width, screen_height = self.screen_size
         
         for _ in range(self.post_buffer * 5):
             state_list.insert(0, {})
-        for _ in range(screen_height):
+        for _ in range(self.height()):
             state_list.append({})
 
-        input_box_id = self.add_box(x=1, y=screen_height - 6, width=128, height=1)
+        input_box_id = self.add_box(x=1, y=self.height()- 6, width=128, height=1)
         for x in range(128):
             self.boxes[input_box_id].set(x, 0, "-")
 
         for j in range(len(state_list)):
-            new_bid = self.add_box(x=1, y=screen_height - 6 - j, width=128, height=1)
+            new_bid = self.add_box(x=1, y=self.height() - 6 - j, width=128, height=1)
             newBox = self.boxes[new_bid]
             for key, event in state_list[j].items():
                 if event.channel != 10:
@@ -117,7 +114,7 @@ class Player(Box, Interactor):
 
         self.key_boxes = []
         for x in range(128):
-            k = self.add_box(x=x + 1, y =screen_height - 6, width=1, height=1)
+            k = self.add_box(x=x + 1, y =self.height() - 6, width=1, height=1)
             self.key_boxes.append(k)
             b = self.boxes[k]
             b.set(0,0,"\033[42m \033[40m")
@@ -167,7 +164,7 @@ class Player(Box, Interactor):
                     b_id = sorted_keys[i]
                     if b_id == input_box_id or b_id in self.key_boxes:
                         continue
-                    y = ((screen_height - 1) - i) + self.song_position
+                    y = ((self.height() - 5) - i) + self.song_position
                     x = 0
                     self.box_positions[b_id] = (x,y)
                 strpos = "%9d" % self.song_position

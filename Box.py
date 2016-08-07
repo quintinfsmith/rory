@@ -47,16 +47,17 @@ class Box(object):
             outgrid.append(line.copy())
 
         if self.has_border:
-            for y in range(len(outgrid)):
-                if y in (0, len(outgrid) - 1):
-                    for x in range(len(outgrid[y])):
-                        if not outgrid[y][x]:
-                            outgrid[y][x] = "."
-                else:
-                    if not outgrid[y][0]:
-                        outgrid[y][0] = "|"
-                    if not outgrid[y][-1]:
-                        outgrid[y][-1] = "|"
+            for x in range(self.width()):
+                if not outgrid[0][x]:
+                    outgrid[0][x] = "."
+                if not outgrid[-1][x]:
+                    outgrid[-1][x] = "."
+
+            for y in range(self.height() - 2):
+                if not outgrid[y + 1][0]:
+                    outgrid[y + 1][0] = "|"
+                if not outgrid[y + 1][-1]:
+                    outgrid[y + 1][-1] = "|"
 
         if not self.refresh_flag:
             return outgrid
@@ -69,8 +70,8 @@ class Box(object):
             if boxpos[1] >= self.height() or boxpos[0] >= self.width() or (boxpos[1] + box.height() <= 0) or (boxpos[0] + box.width() <= 0):
                 continue
             boxdisp = box.get_display()
-            for y in range(min(len(boxdisp), len(outgrid) - boxpos[1])):
-                for x in range(min(len(boxdisp[0]), len(outgrid[0]) - boxpos[0])):
+            for y in range(min(box.height(), len(outgrid) - boxpos[1])):
+                for x in range(min(box.width(), len(outgrid[0]) - boxpos[0])):
                     try:
                         if boxdisp[y][x]:
                             outgrid[boxpos[1] + y][boxpos[0] + x] = boxdisp[y][x]
@@ -79,7 +80,6 @@ class Box(object):
         self.refresh_flag = False
         return outgrid
             
-
     def resize(self, new_width, new_height):
         old = self.grid.copy()
         self.reinit_flag = True
@@ -137,23 +137,38 @@ class Box(object):
         box.parent = self
         new_id = self.id_gen
         self.id_gen += 1
+        box.id = new_id
         self.boxes[new_id] = box
         self.box_positions[new_id] = (x,y)
 
         return new_id
+
+    def rem_box(self, b_id):
+        try:
+            del self.boxes[b_id]
+        except KeyError:
+            pass
+        try:
+            del self.box_positions[b_id]
+        except KeyError:
+            pass
+
+    def kill(self):
+        if self.parent:
+            self.parent.rem_box(self.id)
+            self.parent.refresh()
         
 class BoxEnvironment(Box):
     def __init__(self):
         width, height = console.getTerminalSize()
         self.draw_cache = []
-        height -= 1
         Box.__init__(self, width, height)
 
     def init_screen(self):
-        sys.stdout.write("\033[?25l")       
+        sys.stdout.write("\033[?25l")
 
     def destroy(self):
-        sys.stdout.write("\033[0;0H")
+        sys.stdout.write("\033[1;1H")
         sys.stdout.write("\033[?25h")
 
     def refresh(self):
@@ -162,17 +177,6 @@ class BoxEnvironment(Box):
         for x, y, c in disp:
             if not c:
                 c = " "
-            sys.stdout.write("\033[%d;%dH%s" % (y, x, c))
-        sys.stdout.write("\n")
+            sys.stdout.write("\033[%d;%dH%s" % (y + 1, x + 1, c))
+        sys.stdout.write("\033[1;1H\n")
 
-if __name__ == "__main__":
-    be = BoxEnvironment()
-    be.init_screen()
-    new_box = be.add_box(x=10, y=10, w=10, h=2)
-    new_box.set(3,1, "H")
-    new_box.set(4,1, "E")
-    new_box.set(5,1, "L")
-    new_box.set(6,1, "L")
-    new_box.set(7,1, "O")
-    be.refresh()
-    be.destroy()
