@@ -28,7 +28,7 @@ class Interface(BoxEnvironment, Interactor):
         self.id_gen += 1
         self.boxes[new_id] = player
         w = console.getTerminalSize()[0]
-        self.box_positions[new_id] = ((w - 129) // 2,1)
+        self.box_positions[new_id] = ((w - 130) // 2,1)
         self.player = player
 
 

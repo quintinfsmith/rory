@@ -42,7 +42,7 @@ class Player(Box, Interactor):
         self.assign_sequence("j", self.jump)
         self.assign_sequence("q", self.quit)
 
-        self.note_range = [0, 127]
+        self.note_range = [0, 128]
         self.playing = False
         self.flags = {}
         self.previously_expected_set = set()
@@ -97,16 +97,24 @@ class Player(Box, Interactor):
         for _ in range(screen_height):
             state_list.append({})
 
-        input_box_id = self.add_box(x=1, y=screen_height - 6, width=127, height=1)
-        for x in range(127):
+        input_box_id = self.add_box(x=1, y=screen_height - 6, width=128, height=1)
+        for x in range(128):
             self.boxes[input_box_id].set(x, 0, "-")
 
         for j in range(len(state_list)):
-            new_bid = self.add_box(x=1, y=screen_height - 6 - j, width=127, height=1)
+            new_bid = self.add_box(x=1, y=screen_height - 6 - j, width=128, height=1)
             newBox = self.boxes[new_bid]
             for key, event in state_list[j].items():
                 if event.channel != 10:
                     newBox.set(key, 0, self._get_note_str(key, event.channel))
+
+        self.key_boxes = []
+        for x in range(128):
+            k = self.add_box(x=x + 1, y =screen_height - 6, width=1, height=1)
+            self.key_boxes.append(k)
+            b = self.boxes[k]
+            b.set(0,0,"\033[42m \033[40m")
+            b.hide()
 
         self.song_position = 0
         self.playing = True
@@ -119,7 +127,7 @@ class Player(Box, Interactor):
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(state_list)
                 for b_id, pos in self.box_positions.items():
-                    if b_id == input_box_id:
+                    if b_id == input_box_id or b_id in self.key_boxes:
                         continue
                     x, y = pos
                     y = (y + 1) % len(state_list)
@@ -135,7 +143,7 @@ class Player(Box, Interactor):
                     first = False
                     self.song_position = max(0, self.song_position - 1)
                     for b_id, pos in self.box_positions.items():
-                        if b_id == input_box_id:
+                        if b_id == input_box_id or b_id in self.key_boxes:
                             continue
                         x, y = pos
                         y = (y - 1) % len(state_list)
@@ -150,7 +158,7 @@ class Player(Box, Interactor):
 
                 for i in range(len(sorted_keys)):
                     b_id = sorted_keys[i]
-                    if b_id == input_box_id:
+                    if b_id == input_box_id or b_id in self.key_boxes:
                         continue
                     y = ((screen_height - 1) - i) + self.song_position
                     x = 0
@@ -190,6 +198,13 @@ class Player(Box, Interactor):
         last_pressed = set()
         while input_given == 0:
             pressed = controller.get_pressed()
+
+            for k in last_pressed:
+                self.key_boxes[k].hide()
+
+            for k in pressed:
+                self.key_boxes[k].show()
+            
             if pressed.symmetric_difference(last_pressed):
                 #self.draw_input_line(pressed, expected)
                 pass

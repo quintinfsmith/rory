@@ -9,6 +9,7 @@ class Box(object):
         self.parent = None
         self.refresh_flag = False
         self.has_border = False
+        self.hidden = False
         self.grid = []
         self.box_positions = {}
         self.boxes = {}
@@ -17,6 +18,12 @@ class Box(object):
             self.grid.append([])
             for x in range(width):
                 self.grid[-1].append("")
+
+    def hide(self):
+        self.hidden = True
+
+    def show(self):
+        self.hidden = False
 
     def toggle_border(self):
         self.has_border ^= True
@@ -55,6 +62,9 @@ class Box(object):
             return outgrid
 
         for box_id, box in self.boxes.items():
+            if box.hidden:
+                continue
+
             boxpos = self.box_positions[box_id]
             if boxpos[1] >= self.height() or boxpos[0] >= self.width() or (boxpos[1] + box.height() <= 0) or (boxpos[0] + box.width() <= 0):
                 continue
