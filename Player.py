@@ -52,6 +52,8 @@ class Player(Box, Interactor):
         self.ignore = []
         self.song_position = 0
 
+        self.key_boxes = []
+
     def _get_note_str(self, note, channel=10):
         """Convert Midi Note byte to Legible Character"""
         note_list = 'CCDDEFFGGAAB'
@@ -117,7 +119,7 @@ class Player(Box, Interactor):
             k = self.add_box(x=x + 1, y =self.height() - 6, width=1, height=1)
             self.key_boxes.append(k)
             b = self.boxes[k]
-            b.set(0,0,"\033[42m \033[40m")
+            b.set(0,0,"\033[42mX\033[40m")
             b.hide()
 
         self.song_position = 0
@@ -203,15 +205,15 @@ class Player(Box, Interactor):
         while input_given == 0:
             pressed = controller.get_pressed()
 
-            for k in last_pressed:
-                self.key_boxes[k].hide()
-
-            for k in pressed:
-                self.key_boxes[k].show()
             
             if pressed.symmetric_difference(last_pressed):
                 #self.draw_input_line(pressed, expected)
-                pass
+                for k in range(128):
+                    self.boxes[self.key_boxes[k]].hide()
+                for k in pressed:
+                    self.boxes[self.key_boxes[k]].show()
+                self.refresh()
+
             if not (expected_set - pressed):
                 input_given = self.NEXT_STATE
                 self.previously_expected_set = actual_set
@@ -226,14 +228,10 @@ class Player(Box, Interactor):
             elif self.flag_isset(self.RAISE_QUIT):
                 self.flags[self.RAISE_QUIT] = 0
                 input_given = self.RAISE_QUIT
-            elif self.flag_isset(self.RAISE_MIDI_INPUT_CHANGE):
-                self.flags[self.RAISE_MIDI_INPUT_CHANGE] = 0
-                return self._wait_for_input(expected, controller)
+                
             elif self.flag_isset(self.RAISE_JUMP):
                 self.flags[self.RAISE_JUMP] = 0
                 input_given = self.RAISE_JUMP
-            else:
-                continue
             last_pressed = pressed
         return input_given
 
@@ -243,5 +241,5 @@ class Player(Box, Interactor):
 
     def set_flag(self, flag, state=1):
         self.flags[flag] = state
-    
+
 
