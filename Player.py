@@ -38,10 +38,15 @@ class Player(Box, Interactor):
         Interactor.__init__(self)
         self.toggle_border()
 
+        self.loop = [0,0]
+
         self.assign_sequence("l", self.next_state)
         self.assign_sequence("k", self.prev_state)
         self.assign_sequence("j", self.jump)
         self.assign_sequence("q", self.quit)
+        self.assign_sequence("[", self.set_loop_start)
+        self.assign_sequence("]", self.set_loop_end)
+        self.assign_sequence("/", self.clear_loop)
 
         self.note_range = [0, 127]
         self.playing = False
@@ -97,7 +102,7 @@ class Player(Box, Interactor):
                 while len(state_list) <= tick * squash_factor:
                     state_list.append({})
                 state_list[int(tick * squash_factor)] = pressed_keys.copy()
-        
+
         for _ in range(self.post_buffer * 5):
             state_list.insert(0, {})
         for _ in range(self.height()):
@@ -127,7 +132,11 @@ class Player(Box, Interactor):
         self.refresh()
         while self.playing:
             call_refresh = False
-            result = self._wait_for_input(state_list[self.song_position], controller)
+            if self.loop[1] > 1 and self.song_position == self.loop[1]:
+                self.song_position = self.loop[0]
+                result = self.RAISE_JUMP
+            else:   
+                result = self._wait_for_input(state_list[self.song_position], controller)
             if result == self.RAISE_QUIT:
                 self.playing = False
             elif result == self.NEXT_STATE:
@@ -175,7 +184,6 @@ class Player(Box, Interactor):
                 call_refresh = True
             if call_refresh:
                 self.refresh()
-                
 
     def _wait_for_input(self, expected, controller):
         """Waits for user to press correct key combination"""
@@ -186,7 +194,7 @@ class Player(Box, Interactor):
         # 'expected_unset' are the keys that need to be released before pressing again
         # 'actual_set' is the uncompromised set of pressed keys.
         #   it needs to be used when considering the next keys to be pressed
-        expected_set = set() 
+        expected_set = set()
         expected_unset = set()
         actual_set = set()
         for key, event in expected.items():
@@ -205,7 +213,6 @@ class Player(Box, Interactor):
         while input_given == 0:
             pressed = controller.get_pressed()
 
-            
             if pressed.symmetric_difference(last_pressed):
                 #self.draw_input_line(pressed, expected)
                 for k in range(128):
@@ -228,18 +235,28 @@ class Player(Box, Interactor):
             elif self.flag_isset(self.RAISE_QUIT):
                 self.flags[self.RAISE_QUIT] = 0
                 input_given = self.RAISE_QUIT
-                
             elif self.flag_isset(self.RAISE_JUMP):
                 self.flags[self.RAISE_JUMP] = 0
                 input_given = self.RAISE_JUMP
             last_pressed = pressed
         return input_given
 
+    def set_loop_start(self):
+        self.loop[0] = self.general_register
+        self.clear_register()
+
+    def set_loop_end(self):
+        self.loop[1] = self.general_register 
+        self.clear_register()
+
+    def clear_loop(self):
+        self.loop = [0,0]
 
     def flag_isset(self, flag):
         return flag in self.flags.keys() and self.flags[flag]
 
     def set_flag(self, flag, state=1):
         self.flags[flag] = state
+
 
 
