@@ -41,44 +41,40 @@ class Box(object):
     def set_refresh_flag(self):
         self.refresh_flag = True
 
-    def get_display(self):
-        outgrid = []
-        for line in self.grid:
-            outgrid.append(line.copy())
+    def get_display(self, offset=(0,0)):
+        # Depth first!
+        top = self
+        while top.parent:
+            top = top.parent
 
-        if self.has_border:
-            for x in range(self.width()):
-                if not outgrid[0][x]:
-                    outgrid[0][x] = "."
-                if not outgrid[-1][x]:
-                    outgrid[-1][x] = "."
-
-            for y in range(self.height() - 2):
-                if not outgrid[y + 1][0]:
-                    outgrid[y + 1][0] = "|"
-                if not outgrid[y + 1][-1]:
-                    outgrid[y + 1][-1] = "|"
-
-        if not self.refresh_flag:
-            return outgrid
+        boxes = []
 
         for box_id, box in self.boxes.items():
             if box.hidden:
                 continue
-
             boxpos = self.box_positions[box_id]
-            if boxpos[1] >= self.height() or boxpos[0] >= self.width() or (boxpos[1] + box.height() <= 0) or (boxpos[0] + box.width() <= 0):
+            nox = boxpos[0] + offset[0]
+            noy = boxpos[1] + offset[1]
+
+            if noy >= top.height() or \
+               nox >= top.width() or \
+              (noy + box.height() <= 0) or \
+              (nox + box.width() <= 0):
                 continue
-            boxdisp = box.get_display()
-            for y in range(min(box.height(), len(outgrid) - boxpos[1])):
-                for x in range(min(box.width(), len(outgrid[0]) - boxpos[0])):
-                    try:
-                        if boxdisp[y][x]:
-                            outgrid[boxpos[1] + y][boxpos[0] + x] = boxdisp[y][x]
-                    except IndexError:
-                        pass
+            boxdisp = box.get_display((nox, noy))
+            boxes.append(boxdisp)
+
+        out = {}
+        for y in range(self.height()):
+            if (y + offset[1]) < top.height() and y + offset[1] >= 0:
+                for x in range(self.width()):
+                    if (x + offset[0]) < top.width() and (x + offset[0]) >= 0 and self.grid[y][x]:
+                        out[(x + offset[0], y + offset[1])] = self.grid[y][x]
+        for box in boxes:
+            out.update(box)
+    
         self.refresh_flag = False
-        return outgrid
+        return out
             
     def resize(self, new_width, new_height):
         old = self.grid.copy()
@@ -105,12 +101,12 @@ class Box(object):
     def get_diff(self):
         disp = self.get_display()
         diff = []
-        for y in range(len(disp)):
-            for x in range(len(disp[y])):
-                if not self.cached:
-                    diff.append((x, y, disp[y][x]))
-                elif self.cached[y][x] != disp[y][x]:
-                    diff.append((x, y, disp[y][x]))
+        for key, c in disp.items():
+            x, y  = key
+            if not self.cached:
+                diff.append((x, y, c))
+            elif self.cached[(x,y)] != c:
+                diff.append((x, y, c))
 
         self.cached = disp
         return diff

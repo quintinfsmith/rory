@@ -112,9 +112,14 @@ class Player(Box, Interactor):
         for x in range(128):
             self.boxes[input_box_id].set(x, 0, "-")
 
+
+        sbi_y = self.height() - 5 - len(state_list)
+        shiftbox_id = self.add_box(x=1, y=sbi_y, width=128, height=len(state_list))
+
+        shiftbox = self.boxes[shiftbox_id]
         for j in range(len(state_list)):
-            new_bid = self.add_box(x=1, y=self.height() - 6 - j, width=128, height=1)
-            newBox = self.boxes[new_bid]
+            new_bid = shiftbox.add_box(x=1, y=shiftbox.height() - 1 - j, width=128, height=1)
+            newBox = shiftbox.boxes[new_bid]
             for key, event in state_list[j].items():
                 if event.channel != 10:
                     newBox.set(key, 0, self._get_note_str(key, event.channel))
@@ -141,13 +146,10 @@ class Player(Box, Interactor):
                 self.playing = False
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(state_list)
-                for b_id, pos in self.box_positions.items():
-                    if b_id == input_box_id or b_id in self.key_boxes:
-                        continue
-                    x, y = pos
-                    y = (y + 1) % len(state_list)
-                    self.box_positions[b_id] = (x,y)
-                    self.boxes[b_id].set_refresh_flag()
+
+                y = sbi_y + self.song_position
+                self.box_positions[shiftbox_id] = (0,y)
+
                 strpos = "%9d" % self.song_position
                 for c in range(len(strpos)):
                     self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
@@ -157,27 +159,17 @@ class Player(Box, Interactor):
                 while (first or not state_list[self.song_position]) and self.song_position > 0:
                     first = False
                     self.song_position = max(0, self.song_position - 1)
-                    for b_id, pos in self.box_positions.items():
-                        if b_id == input_box_id or b_id in self.key_boxes:
-                            continue
-                        x, y = pos
-                        y = (y - 1) % len(state_list)
-                        self.box_positions[b_id] = (x,y)
+                    y = sbi_y + self.song_position
+                    self.box_positions[shiftbox_id] = (0,y)
+
                 strpos = "%9d" % self.song_position
                 for c in range(len(strpos)):
                     self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
                 call_refresh = True
             elif result == self.RAISE_JUMP:
-                sorted_keys = list(self.boxes.keys())
-                sorted_keys.sort()
-
-                for i in range(len(sorted_keys)):
-                    b_id = sorted_keys[i]
-                    if b_id == input_box_id or b_id in self.key_boxes:
-                        continue
-                    y = ((self.height() - 5) - i) + self.song_position
-                    x = 0
-                    self.box_positions[b_id] = (x,y)
+                y = sbi_y + self.song_position
+                x = 0
+                self.box_positions[shiftbox_id] = (x,y)
                 strpos = "%9d" % self.song_position
                 for c in range(len(strpos)):
                     self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
