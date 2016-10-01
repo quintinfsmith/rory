@@ -112,9 +112,8 @@ class Player(Box, Interactor):
         for x in range(128):
             self.boxes[input_box_id].set(x, 0, "-")
 
-
         sbi_y = self.height() - 5 - len(state_list)
-        shiftbox_id = self.add_box(x=1, y=sbi_y, width=128, height=len(state_list))
+        shiftbox_id = self.add_box(x=0, y=sbi_y, width=128, height=len(state_list))
 
         shiftbox = self.boxes[shiftbox_id]
         for j in range(len(state_list)):
@@ -146,7 +145,6 @@ class Player(Box, Interactor):
                 self.playing = False
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(state_list)
-
                 y = sbi_y + self.song_position
                 self.box_positions[shiftbox_id] = (0,y)
 
@@ -206,7 +204,6 @@ class Player(Box, Interactor):
             pressed = controller.get_pressed()
 
             if pressed.symmetric_difference(last_pressed):
-                #self.draw_input_line(pressed, expected)
                 for k in range(128):
                     self.boxes[self.key_boxes[k]].hide()
                 for k in pressed:

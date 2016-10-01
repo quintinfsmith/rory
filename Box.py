@@ -1,5 +1,17 @@
 import console
 import sys
+import math
+
+def log(msg):
+    with open("testlog", "a") as fp:
+        fp.write(msg)
+
+def do_collide(a, b):
+    ax = a[0] + (a[2] / 2)
+    bx = b[0] + (b[2] / 2)
+    ay = a[1] + (a[3] / 2)
+    by = b[1] + (b[3] / 2)
+    return (math.fabs(ax - bx) * 2) < (a[2] + b[2]) and (math.fabs(ay - by) * 2) < (a[3] + b[3])
 
 class Box(object):
     def __init__(self, width=10, height=10):
@@ -41,6 +53,9 @@ class Box(object):
     def set_refresh_flag(self):
         self.refresh_flag = True
 
+    def cache_visible(self, boxes):
+        self.cached_visible = boxes
+
     def get_display(self, offset=(0,0)):
         # Depth first!
         top = self
@@ -49,20 +64,22 @@ class Box(object):
 
         boxes = []
 
+        a = (0, 0, top.width(), top.height())
+        collided = False
         for box_id, box in self.boxes.items():
             if box.hidden:
                 continue
             boxpos = self.box_positions[box_id]
             nox = boxpos[0] + offset[0]
             noy = boxpos[1] + offset[1]
-
-            if noy >= top.height() or \
-               nox >= top.width() or \
-              (noy + box.height() <= 0) or \
-              (nox + box.width() <= 0):
-                continue
-            boxdisp = box.get_display((nox, noy))
-            boxes.append(boxdisp)
+            log("%d,%d,%d,%d\n" % (nox, noy, box.width(), box.height()))
+            b = (nox, noy, box.width(), box.height())
+            if do_collide(a, b):
+                boxdisp = box.get_display((nox, noy))
+                boxes.append(boxdisp)
+                collided = True
+            elif collided:
+                break 
 
         out = {}
         for y in range(self.height()):
