@@ -9,6 +9,7 @@ class MIDIController(object):
         self.current_pressed = set([])
         self.listening = False
         self.changed = True
+        self.tosend = set([])
 
     def listen(self):
         import threading
@@ -42,6 +43,8 @@ class MIDIController(object):
                     self.disable_note(note)
 
     def get_pressed(self):
-        self.changed = False
-        return self.current_pressed.copy()
+        if self.changed:
+            self.tosend = self.current_pressed.copy()
+            self.changed = False
+        return self.tosend
 

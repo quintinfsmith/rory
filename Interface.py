@@ -5,7 +5,7 @@ from MIDILike import *
 from Player import Player
 from MidiInterpreter import MIDIInterpreter
 from MIDIController import *
-from Box import BoxEnvironment, Box
+from Box import BoxEnvironment, Box, log
 from Interactor import Interactor
 
 class Interface(BoxEnvironment, Interactor):
@@ -26,13 +26,12 @@ class Interface(BoxEnvironment, Interactor):
 
     def show_player(self):
         player = Player()
-        player.parent = self
-        new_id = self.id_gen
-        player.id = new_id
-        self.id_gen += 1
-        self.interactorstack.append(new_id)
+        new_id = self.add_box(w=player.width(), h=player.height(), x=(self.width() - 90) // 2, y=0)
         self.boxes[new_id] = player
-        self.box_positions[new_id] = ((self.width() - 130) // 2,0)
+        player.parent = self
+        player.id = new_id
+
+        self.interactorstack.append(new_id)
         self.player = player
 
     def toggle_track(self):

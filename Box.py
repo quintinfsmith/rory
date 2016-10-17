@@ -1,10 +1,11 @@
 import console
 import sys
+import time
 import math
 
 def log(msg):
     with open("testlog", "a") as fp:
-        fp.write(msg)
+        fp.write(msg + "\n")
 
 def do_collide(a, b):
     ax = a[0] + (a[2] / 2)
@@ -25,6 +26,7 @@ class Box(object):
         self.grid = []
         self.box_positions = {}
         self.boxes = {}
+        self.active_box_list = []
         self.cached = [] # for diff()
         for y in range(height):
             self.grid.append([])
@@ -53,44 +55,40 @@ class Box(object):
     def set_refresh_flag(self):
         self.refresh_flag = True
 
-    def cache_visible(self, boxes):
-        self.cached_visible = boxes
-
+        
     def get_display(self, offset=(0,0)):
-        # Depth first!
+        if not self.active_box_list:
+            boxes = set(self.boxes.keys())
+        else:
+            boxes = []
+            while self.active_box_list:
+                boxes.append(self.active_box_list.pop().id)
+
+        
+
+        subdisp = {}
+        for box_id in boxes:
+            box = self.boxes[box_id]
+            boxpos = self.box_positions[box_id]
+            new_offset = (offset[0] + boxpos[0], offset[1] + boxpos[1])
+            tmp = box.get_display(new_offset)
+            subdisp.update(tmp)
+
         top = self
         while top.parent:
-            top = top.parent
-
-        boxes = []
-
-        a = (0, 0, top.width(), top.height())
-        collided = False
-        for box_id, box in self.boxes.items():
-            if box.hidden:
-                continue
-            boxpos = self.box_positions[box_id]
-            nox = boxpos[0] + offset[0]
-            noy = boxpos[1] + offset[1]
-            log("%d,%d,%d,%d\n" % (nox, noy, box.width(), box.height()))
-            b = (nox, noy, box.width(), box.height())
-            if do_collide(a, b):
-                boxdisp = box.get_display((nox, noy))
-                boxes.append(boxdisp)
-                collided = True
-            elif collided:
-                break 
+           top = top.parent
 
         out = {}
         for y in range(self.height()):
-            if (y + offset[1]) < top.height() and y + offset[1] >= 0:
-                for x in range(self.width()):
-                    if (x + offset[0]) < top.width() and (x + offset[0]) >= 0 and self.grid[y][x]:
-                        out[(x + offset[0], y + offset[1])] = self.grid[y][x]
-        for box in boxes:
-            out.update(box)
-    
-        self.refresh_flag = False
+            ny = y + offset[1]
+            if ny < 0 or ny >= top.height():
+                continue
+            for x in range(self.width()):
+                nx = x + offset[0]
+                if  nx >= 0 and  nx < top.width() and self.grid[y][x]:
+                    out[(nx,ny)] = self.grid[y][x]
+
+        out.update(subdisp)
         return out
             
     def resize(self, new_width, new_height):
@@ -124,7 +122,6 @@ class Box(object):
                 diff.append((x, y, c))
             elif self.cached[(x,y)] != c:
                 diff.append((x, y, c))
-
         self.cached = disp
         return diff
 
@@ -135,10 +132,11 @@ class Box(object):
         except KeyError:
             return default
 
-    def refresh(self):
-        self.refresh_flag = True
+    def refresh(self, active_box_list=[]):
+        if active_box_list:
+            self.active_box_list = active_box_list.copy()
         if self.parent:
-            self.parent.refresh()  
+            self.parent.refresh()
 
     def add_box(self, **kwargs):
         x = self._parse_kwargs("x", kwargs, 0)
@@ -155,6 +153,9 @@ class Box(object):
         self.box_positions[new_id] = (x,y)
 
         return new_id
+
+    def move_box(self, box_id, x, y):
+        self.box_positions[box_id] = (x,y)
 
     def rem_box(self, b_id):
         try:
@@ -175,6 +176,12 @@ class BoxEnvironment(Box):
     def __init__(self):
         width, height = console.getTerminalSize()
         self.draw_cache = []
+        self.w_coords = []
+        self.c_coords = []
+        for y in range(height):
+            self.c_coords.append((20, y))
+            for x in range(width):
+                self.w_coords.append((x,y))
         Box.__init__(self, width, height)
 
     def init_screen(self):
@@ -184,8 +191,8 @@ class BoxEnvironment(Box):
         sys.stdout.write("\033[1;1H")
         sys.stdout.write("\033[?25h")
 
-    def refresh(self):
-        self.refresh_flag = True
+    def refresh(self, active_box_list=[]):
+        self.active_box_list = active_box_list
         disp = self.get_diff()
         for x, y, c in disp:
             if not c:
