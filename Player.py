@@ -40,9 +40,9 @@ class Player(Box, Interactor):
 
         self.loop = [0,0]
 
-        self.assign_sequence("l", self.next_state)
+        self.assign_sequence("j", self.next_state)
         self.assign_sequence("k", self.prev_state)
-        self.assign_sequence("j", self.jump)
+        self.assign_sequence("p", self.jump)
         self.assign_sequence("q", self.quit)
         self.assign_sequence("[", self.set_loop_start)
         self.assign_sequence("]", self.set_loop_end)
@@ -58,6 +58,8 @@ class Player(Box, Interactor):
 
         self.ignore = []
         self.song_position = 0
+
+        self.active_boxes = []
 
         self.key_boxes = []
         self.active_key_boxes = [] # for refresh call
@@ -78,13 +80,13 @@ class Player(Box, Interactor):
             return "\033[3%dm%s\033[0m" % (channel, s)
 
     def update_pressed_line(self, pressed):
+        """Redraw Pressed Keys"""
         if pressed.symmetric_difference(self.last_pressed):
             self.active_key_boxes = []
             for p in pressed:
-                self.active_key_boxes.append(self.get_box[self.key_boxes[p]])
+                self.active_key_boxes.append(self.boxes[self.key_boxes[p - self.note_range[0]]])
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
-            
 
     def play_along(self, midilike, controller, hidden=[]):
         """Display notes in console. Main function"""
@@ -118,11 +120,6 @@ class Player(Box, Interactor):
         for _ in range(self.height()):
             state_list.insert(0, {})
 
-
-        for i in range(88):
-            if i % 12 in (1,4,6,9,11):
-                for j in range(self.height() - 1):
-                    self.set(i, j, "\033[47m \033[0m")
         box_list = []
         for j in range(len(state_list)):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
@@ -143,11 +140,11 @@ class Player(Box, Interactor):
             k = self.add_box(x=x, y=self.height() - space_buffer - 1, width=1, height=1)
             self.key_boxes.append(k)
             b = self.boxes[k]
-            b.set(0,0, ".")
+            b.set(0,0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[x % 12])
             if x % 12:
-                self.set(x, self.height() - space_buffer - 1, "-")
+                self.set(x, self.height() - space_buffer - 1, ":")
             else:
-                self.set(x, self.height() - space_buffer - 1, ".")
+                self.set(x, self.height() - space_buffer - 1, "=")
 
         self.song_position = 0
         self.playing = True
@@ -157,8 +154,11 @@ class Player(Box, Interactor):
             if self.loop[1] > 1 and self.song_position == self.loop[1]:
                 self.song_position = self.loop[0]
                 result = self.RAISE_JUMP
-            else:   
+            elif len(state_list) > self.song_position + space_buffer:   
                 result = self._wait_for_input(state_list[self.song_position + space_buffer], controller)
+            else:
+                result = self.RAISE_QUIT
+
             if result == self.RAISE_QUIT:
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
@@ -166,7 +166,7 @@ class Player(Box, Interactor):
                 
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(state_list)
-                while not state_list[self.song_position + space_buffer]:
+                while self.song_position < len(state_list) - space_buffer - 1 and not state_list[self.song_position + space_buffer]:
                     self.song_position = min(len(state_list) - 1, self.song_position + 1)
 
                 strpos = "%9d" % self.song_position
@@ -188,13 +188,15 @@ class Player(Box, Interactor):
                 for c in range(len(strpos)):
                     self.set(self.width() - len(strpos) + c, self.height() - 1, strpos[c])
                 call_refresh = True
+
             if call_refresh:
-                active_boxes = box_list[self.song_position:self.song_position + self.height()]
+                self.active_boxes = box_list[max(0, self.song_position): min(len(box_list), self.song_position + self.height())]
                 y = self.height() - 1
-                for box in active_boxes:
+                for box in self.active_boxes:
                     self.move_box(box.id, 0, y)
                     y -= 1
-                self.refresh(active_boxes + self.active_key_boxes)
+                self.refresh(self.active_boxes + self.active_key_boxes)
+        self.quit()
 
     def _wait_for_input(self, expected, controller):
         """Waits for user to press correct key combination"""
@@ -219,6 +221,7 @@ class Player(Box, Interactor):
         # If the key was expected NOT to be pressed last state but was, the user needs to release and press again
         while expected_unset:
             expected_unset &= controller.get_pressed()
+
         input_given = 0
         while input_given == 0:
             pressed = controller.get_pressed()
@@ -240,11 +243,11 @@ class Player(Box, Interactor):
         return input_given
 
     def set_loop_start(self):
-        self.loop[0] = self.general_register
+        self.loop[0] = self.song_position
         self.clear_register()
 
     def set_loop_end(self):
-        self.loop[1] = self.general_register 
+        self.loop[1] = self.song_position
         self.clear_register()
 
     def clear_loop(self):

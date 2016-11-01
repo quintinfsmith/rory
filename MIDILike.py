@@ -107,7 +107,6 @@ class MIDILikeTrack(object):
                 for c in list(repr(event)):
                     e_reps += bytes([ord(c)])
             last_tick = tick
-        print(e_reps)
         if e_reps:
             out = b"MTrk"
             out += to_bytes(len(e_reps), 4)

@@ -63,6 +63,7 @@ class Interface(BoxEnvironment, Interactor):
 
             if not self.interactorstack:
                 active = self
+                self.quit()
             active.get_input()
 
 import sys

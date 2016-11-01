@@ -34,7 +34,9 @@ class MIDIInterpreter(SongInterpreter):
             0x02: TextEvent,
             0x03: CopyrightNoticeEvent,
             0x04: TrackNameEvent,
-            0x05: InstrumentNameEvent
+            0x05: InstrumentNameEvent,
+            0x58: TimeSignatureEvent,
+            0x59: KeySignatureEvent
         }
         self.lastgoodbyte = None
 
@@ -84,10 +86,12 @@ class MIDIInterpreter(SongInterpreter):
             b = self.pop_n(queue)
             c = self.pop_n(queue)
             if int(firstbyte >> 4) == 9 and c == 0:
-                firstbyte &= 0xEF
+                tmpbyte = firstbyte & 0xEF
+            else:
+                tmpbyte = firstbyte
             track.add_event(
                 current_deltatime,
-                self.cve[int(firstbyte >> 4)](channel, b, c))
+                self.cve[int(tmpbyte >> 4)](channel, b, c))
 
         elif int(firstbyte >> 4) in (12, 13):
             channel = firstbyte & 0x0F
@@ -160,9 +164,9 @@ class MIDIInterpreter(SongInterpreter):
         tpqn = 120
         with open(midifile, 'rb') as fp:
             queue = bytearray(fp.read())
-        self.lastgoodbyte = 0x90
         mlo = MIDILike()
         chunkcount = {}
+        self.lastgoodbyte = 0x90
         while queue:
             chunk_type = str(queue[0:4], 'utf-8')
             queue = queue[4:]
@@ -196,7 +200,7 @@ class MIDIInterpreter(SongInterpreter):
                     current_deltatime += self.get_variable_length(subqueue)
                     n = self.pop_n(subqueue)
                     gb = self.process_mtrk_event(n, subqueue, current_deltatime, track)
-                    if gb & 0xf0 == 0x90:
+                    if (gb & 0xf0) >> 4 in self.cve.keys():
                         self.lastgoodbyte = gb
                 mlo.add_track(track)
             else:

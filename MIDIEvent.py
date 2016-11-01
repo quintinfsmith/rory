@@ -146,7 +146,11 @@ class SMTPEOffsetEvent(MetaEvent):
         self.ff = ff
 
 class TimeSignatureEvent(MetaEvent):
-    def __init__(self, numerator, denominator, clocks_per_metronome, thirtyseconds_per_quarter):
+    def __init__(self, db):
+        numerator = db[0]
+        denominator = db[1]
+        clocks_per_metronome = db[2]
+        thirtyseconds_per_quarter = db[3]
         MetaEvent.__init__(self)
         self.numerator = numerator
         self.denominator = 2 ** denominator
@@ -154,7 +158,9 @@ class TimeSignatureEvent(MetaEvent):
         self.thirtyseconds_per_quarter = thirtyseconds_per_quarter
 
 class KeySignatureEvent(MetaEvent):
-    def __init__(self, sharp_count, mi):
+    def __init__(self, db):
+        sharp_count = db[0]
+        mi = db[1]
         MetaEvent.__init__(self)
         self.sharp_count = sharp_count
         self.mi = mi
