@@ -150,12 +150,12 @@ class TimeSignatureEvent(MetaEvent):
         numerator = db[0]
         denominator = db[1]
         clocks_per_metronome = db[2]
-        thirtyseconds_per_quarter = db[3]
+        thirtysecondths_per_quarter = db[3]
         MetaEvent.__init__(self)
         self.numerator = numerator
         self.denominator = 2 ** denominator
         self.clocks_per_metronome = clocks_per_metronome
-        self.thirtyseconds_per_quarter = thirtyseconds_per_quarter
+        self.thirtysecondths_per_quarter = thirtysecondths_per_quarter
 
 class KeySignatureEvent(MetaEvent):
     def __init__(self, db):

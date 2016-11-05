@@ -1,5 +1,5 @@
+'''Mutable Midi Library'''
 from localfuncs import to_variable_length, to_bytes
-import sys
 
 class MIDILike(object):
     """Usable object. Converted from midi files.
@@ -11,6 +11,7 @@ class MIDILike(object):
         self.tracks = []
 
     def get_note_range(self):
+        '''Return min/max notes played in the entire midi'''
         cmin = 127
         cmax = 0
         for track in self.tracks:
@@ -21,21 +22,25 @@ class MIDILike(object):
 
     def __len__(self):
         """The length of the longest track"""
-        m = 0
+        longest_track_length = 0
         for track in self.tracks:
-            m = max(len(track), m)
-        return m
+            longest_track_length = max(len(track), longest_track_length)
+        return longest_track_length
 
-    def set_format(self, f):
-        self.midi_format = f
+    def set_format(self, format_byte):
+        '''Set Midi Format'''
+        self.midi_format = format_byte
 
     def set_tpqn(self, tpqn):
+        '''Set Ticks Per Quarter Note'''
         self.tpqn = tpqn
 
     def add_track(self, track):
+        '''add MidiTrack'''
         self.tracks.append(track)
 
     def save_as(self, path):
+        '''Save to specified path'''
         tpqn_bytes = 0xFFFF & self.tpqn
 
         track_reps = []
@@ -45,16 +50,16 @@ class MIDILike(object):
         while b"" in track_reps:
             track_reps.remove(b"")
 
-        with open(path, "wb") as fp:
-            fp.write(b"MThd")
-            fp.write(b"\x00\x00\x00\x06\x00")
-            fp.write(bytes([self.midi_format]))
-            fp.write(b"\x00")
-            fp.write(bytes([len(track_reps)]))
-            fp.write(bytes([int(tpqn_bytes / 256)]))
-            fp.write(bytes([int(tpqn_bytes % 256)]))
+        with open(path, "wb") as filepipe:
+            filepipe.write(b"MThd")
+            filepipe.write(b"\x00\x00\x00\x06\x00")
+            filepipe.write(bytes([self.midi_format]))
+            filepipe.write(b"\x00")
+            filepipe.write(bytes([len(track_reps)]))
+            filepipe.write(bytes([int(tpqn_bytes / 256)]))
+            filepipe.write(bytes([int(tpqn_bytes % 256)]))
             for track in track_reps:
-                fp.write(track)
+                filepipe.write(track)
 
 class MIDILikeTrack(object):
     """Track in MIDILike Object."""
@@ -62,6 +67,7 @@ class MIDILikeTrack(object):
         self.events = {}
 
     def get_note_range(self):
+        '''Return min/max notes played in the entire midi track'''
         cmin = 127
         cmax = 0
         for events in self.events.values():
@@ -72,14 +78,16 @@ class MIDILikeTrack(object):
         return (cmin, cmax)
 
     def get_events(self, tick):
+        '''Return list of events at specified "Tick"'''
         if tick in self.events.keys():
             return self.events[tick]
         return []
 
-    def add_event(self, dt, event):
-        if not dt in self.events.keys():
-            self.events[dt] = []
-        self.events[dt].append(event)
+    def add_event(self, delta_tick, event):
+        """Add Midi Event"""
+        if not delta_tick in self.events.keys():
+            self.events[delta_tick] = []
+        self.events[delta_tick].append(event)
 
     def __len__(self):
         """The total number of ticks in this track"""
@@ -90,6 +98,7 @@ class MIDILikeTrack(object):
         return 0
 
     def __bytes__(self):
+        """Convert to Bytes (ie, for saving)"""
         e_reps = b""
         last_tick = 0
         zero_tickstr = to_variable_length(0)
@@ -104,8 +113,8 @@ class MIDILikeTrack(object):
                 else:
                     e_reps += zero_tickstr
                 first = False
-                for c in list(repr(event)):
-                    e_reps += bytes([ord(c)])
+                for character in list(repr(event)):
+                    e_reps += bytes([ord(character)])
             last_tick = tick
         if e_reps:
             out = b"MTrk"
@@ -113,4 +122,3 @@ class MIDILikeTrack(object):
             out += bytes(e_reps)
             return out
         return b""
-

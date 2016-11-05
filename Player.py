@@ -140,11 +140,11 @@ class Player(Box, Interactor):
             k = self.add_box(x=x, y=self.height() - space_buffer - 1, width=1, height=1)
             self.key_boxes.append(k)
             b = self.boxes[k]
-            b.set(0,0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[x % 12])
+            b.set(0,0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[(x - 3) % 12])
             if x % 12:
-                self.set(x, self.height() - space_buffer - 1, ":")
+                self.set(x, self.height() - space_buffer - 1, " ")
             else:
-                self.set(x, self.height() - space_buffer - 1, "=")
+                self.set(x, self.height() - space_buffer - 1, ".")
 
         self.song_position = 0
         self.playing = True
@@ -213,9 +213,8 @@ class Player(Box, Interactor):
         for key, event in expected.items():
             channel = event.channel
             if not channel in self.ignore:
-                if not key in self.last_pressed:
-                    expected_set.add(key)
-                    expected_unset.add(key)
+                expected_set.add(key)
+                expected_unset.add(key)
                 actual_set.add(key)
 
         # If the key was expected NOT to be pressed last state but was, the user needs to release and press again
@@ -227,6 +226,7 @@ class Player(Box, Interactor):
             pressed = controller.get_pressed()
             if not (expected_set - pressed):
                 input_given = self.NEXT_STATE
+
             if self.flag_isset(self.PREV_STATE):
                 self.flags[self.PREV_STATE] = 0
                 input_given = self.PREV_STATE

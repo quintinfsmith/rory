@@ -1,15 +1,15 @@
-import json
+''' Author: Quintin Smith '''
+import sys
 import threading
-import os
-from MIDILike import *
 from Player import Player
 from MidiInterpreter import MIDIInterpreter
-from MIDIController import *
-from Box import BoxEnvironment, Box, log
+from MIDIController import MIDIController
+from Box import BoxEnvironment
 from Interactor import Interactor
 
 class Interface(BoxEnvironment, Interactor):
-    def __init__(self, cache_path='.cache.json'):
+    '''Interface to Run the MidiPlayer'''
+    def __init__(self):
         BoxEnvironment.__init__(self)
         Interactor.__init__(self)
         self.init_screen()
@@ -21,10 +21,11 @@ class Interface(BoxEnvironment, Interactor):
                 self.set(x, y, " ")
 
         self.listening = False
-
         self.assign_sequence("q", self.quit)
+        self.player = None
 
     def show_player(self):
+        '''Displays MidiPlayer Box'''
         player = Player()
         new_id = self.add_box(w=player.width(), h=player.height(), x=(self.width() - 90) // 2, y=0)
         self.boxes[new_id] = player
@@ -34,24 +35,26 @@ class Interface(BoxEnvironment, Interactor):
         self.interactorstack.append(new_id)
         self.player = player
 
-    def toggle_track(self):
-        self.player.toggle_trackn(self.general_register)
-        self.clear_register()
-
     def load_midi(self, midi_path):
-        midilike = self.midi_interpreter(midi_path)
-        return midilike
+        '''Load Midi Like Object from path'''
+        return self.midi_interpreter(midi_path)
 
     def quit(self):
+        '''shut it all down'''
         self.listening = False
         self.destroy()
 
-    def play_along(self, midilike, hidden=[]):
-        thread = threading.Thread(target=self.player.play_along, args=[midilike, MIDIController(), hidden])
+    def play_along(self, selected_mlo, hidden=None):
+        '''Run the Player with the loaded MidiLike Object'''
+        if not hidden:
+            hidden = list()
+        thread = threading.Thread(target=self.player.play_along,\
+          args=[selected_mlo, MIDIController(), hidden])
         thread.start()
         self.active_threads.append(thread)
 
     def input_loop(self):
+        '''Main loop, just handles computer keyboard input'''
         self.listening = True
         while self.listening:
             while self.interactorstack:
@@ -66,8 +69,6 @@ class Interface(BoxEnvironment, Interactor):
                 self.quit()
             active.get_input()
 
-import sys
-import console
 if __name__ == '__main__':
     sys.stdout.write("\033?25l")
     interface = Interface()
