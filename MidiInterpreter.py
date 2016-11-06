@@ -1,6 +1,6 @@
+from MIDIEvent import SequenceNumberEvent, TextEvent, CopyrightNoticeEvent, TrackNameEvent, InstrumentNameEvent, LyricEvent, MarkerEvent, CuePointEvent, ChannelPrefixEvent, EndOfTrackEvent, SetTempoEvent, SMTPEOffsetEvent, TimeSignatureEvent, KeySignatureEvent, SequencerSpecificEvent, NoteOffEvent, NoteOnEvent, PolyphonicKeyPressureEvent, ControlChangeEvent, ProgramChangeEvent, ChannelPressureEvent, PitchWheelChangeEvent, SystemExclusiveEvent, SongPositionPointerEvent, SongSelectEvent, TuneRequestEvent, EndOfExclusiveEvent, TimingClockEvent, StartEvent, ContinueEvent, StopEvent, ActiveSensingEvent, ResetEvent
 from Interpreter import SongInterpreter
 from MIDILike import MIDILike, MIDILikeTrack
-from MIDIEvent import *
 
 class MIDIInterpreter(SongInterpreter):
     """Interpret MIDIs"""
