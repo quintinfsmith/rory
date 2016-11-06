@@ -37,7 +37,6 @@ class Player(Box, Interactor):
     def __init__(self):
         Box.__init__(self)
         Interactor.__init__(self)
-        self.toggle_border()
 
         self.loop = [0, 0]
 
@@ -64,6 +63,9 @@ class Player(Box, Interactor):
 
         self.key_boxes = []
         self.active_key_boxes = [] # for refresh call
+
+    def width(self):
+        return (self.note_range[1] - self.note_range[0]) + 2
 
     def _get_note_str(self, note, channel=10):
         '''Convert Midi Note byte to Legible Character'''
@@ -139,14 +141,18 @@ class Player(Box, Interactor):
         self.key_boxes = []
         self.active_key_boxes = []
         for x in range(88):
-            k = self.add_box(x=x, y=self.height() - space_buffer - 1, width=1, height=1)
+            k = self.add_box(x=x + 1, y=self.height() - space_buffer - 1, width=1, height=1)
             self.key_boxes.append(k)
             new_box = self.boxes[k]
             new_box.set(0, 0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[(x - 3) % 12])
             if x % 12:
-                self.set(x, self.height() - space_buffer - 1, " ")
+                self.set(x + 1, self.height() - space_buffer - 1, "~")
             else:
-                self.set(x, self.height() - space_buffer - 1, ".")
+                self.set(x + 1, self.height() - space_buffer - 1, chr(9474))
+
+        for y in range(self.height()):
+            self.set(0,y, chr(9474))
+            self.set(self.width() - 1,y, chr(9474))
 
         self.song_position = 0
         self.playing = True
@@ -173,7 +179,7 @@ class Player(Box, Interactor):
 
                 strpos = "%9d" % self.song_position
                 for c, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) + c, self.height() - 1, character)
+                    self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
                 call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
@@ -183,19 +189,19 @@ class Player(Box, Interactor):
 
                 strpos = "%9d" % self.song_position
                 for i, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) + i, self.height() - 1, character)
+                    self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
             elif result == self.RAISE_JUMP:
                 strpos = "%9d" % self.song_position
                 for i, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) + i, self.height() - 1, character)
+                    self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
 
             if call_refresh:
                 self.active_boxes = box_list[max(0, self.song_position): min(len(box_list), self.song_position + self.height())]
                 y = self.height() - 1
                 for box in self.active_boxes:
-                    self.move_box(box.id, 0, y)
+                    self.move_box(box.id, 1, y)
                     y -= 1
                 self.refresh(self.active_boxes + self.active_key_boxes)
         self.quit()

@@ -23,7 +23,6 @@ class Box(object):
         self.id_gen = 0
         self.parent = None
         self.refresh_flag = False
-        self.has_border = False
         self.hidden = False
         self.grid = []
         self.box_positions = {}
@@ -43,10 +42,6 @@ class Box(object):
     def show(self):
         '''Make Visible for get_display'''
         self.hidden = False
-
-    def toggle_border(self):
-        '''Show/Hide Border'''
-        self.has_border ^= True
 
     def width(self):
         '''get Width'''
@@ -93,7 +88,7 @@ class Box(object):
                 continue
             for x in range(self.width()):
                 nx = x + offset[0]
-                if  nx >= 0 and  nx < top.width() and self.grid[y][x]:
+                if nx >= 0 and nx < top.width() and self.grid[y][x]:
                     out[(nx, ny)] = self.grid[y][x]
 
         out.update(subdisp)
