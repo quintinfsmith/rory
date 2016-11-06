@@ -146,7 +146,7 @@ class Player(Box, Interactor):
             new_box = self.boxes[k]
             new_box.set(0, 0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[(x - 3) % 12])
             if x % 12:
-                self.set(x + 1, self.height() - space_buffer - 1, "~")
+                self.set(x + 1, self.height() - space_buffer - 1, " ")
             else:
                 self.set(x + 1, self.height() - space_buffer - 1, chr(9474))
 
