@@ -38,7 +38,7 @@ class Player(Box, Interactor):
         Box.__init__(self)
         Interactor.__init__(self)
 
-        self.loop = [0, 0]
+        self.loop = [0, -1]
 
         self.assign_sequence("j", self.next_state)
         self.assign_sequence("k", self.prev_state)
@@ -145,7 +145,7 @@ class Player(Box, Interactor):
             self.key_boxes.append(k)
             new_box = self.boxes[k]
             new_box.set(0, 0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[(x - 3) % 12])
-            if x % 12:
+            if x % 12 != 0:
                 self.set(x + 1, self.height() - space_buffer - 1, " ")
             else:
                 self.set(x + 1, self.height() - space_buffer - 1, chr(9474))
@@ -159,7 +159,7 @@ class Player(Box, Interactor):
         self.refresh()
         while self.playing:
             call_refresh = False
-            if self.loop[1] > 1 and self.song_position == self.loop[1]:
+            if self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position + space_buffer == len(state_list) - 1):
                 self.song_position = self.loop[0]
                 result = self.RAISE_JUMP
             elif len(state_list) > self.song_position + space_buffer:
@@ -177,7 +177,7 @@ class Player(Box, Interactor):
                 while self.song_position < len(state_list) - space_buffer - 1 and not state_list[self.song_position + space_buffer]:
                     self.song_position = min(len(state_list) - 1, self.song_position + 1)
 
-                strpos = "%9d" % self.song_position
+                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
                 for c, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
                 call_refresh = True
@@ -187,12 +187,12 @@ class Player(Box, Interactor):
                     first = False
                     self.song_position = max(0, self.song_position - 1)
 
-                strpos = "%9d" % self.song_position
+                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
                 for i, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
             elif result == self.RAISE_JUMP:
-                strpos = "%9d" % self.song_position
+                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
                 for i, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
@@ -262,7 +262,7 @@ class Player(Box, Interactor):
 
     def clear_loop(self):
         '''Stop Looping'''
-        self.loop = [0, 0]
+        self.loop = [0, -1]
 
     def flag_isset(self, flag):
         '''Check if flag is set'''
