@@ -54,7 +54,6 @@ class Player(Box, Interactor):
         self.playing = False
         self.flags = {}
         self.previously_expected_set = set()
-        self.post_buffer = 4
 
         self.ignore = []
         self.song_position = 0
@@ -120,7 +119,7 @@ class Player(Box, Interactor):
                     state_list.append({})
                 state_list[int(tick * squash_factor)] = pressed_keys.copy()
 
-        for _ in range(self.post_buffer * 5):
+        for _ in range(self.height()):
             state_list.append({})
         for _ in range(self.height()):
             state_list.insert(0, {})
@@ -177,9 +176,6 @@ class Player(Box, Interactor):
                 while self.song_position < len(state_list) - space_buffer - 1 and not state_list[self.song_position + space_buffer]:
                     self.song_position = min(len(state_list) - 1, self.song_position + 1)
 
-                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
-                for c, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
                 call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
@@ -187,17 +183,15 @@ class Player(Box, Interactor):
                     first = False
                     self.song_position = max(0, self.song_position - 1)
 
-                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
-                for i, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
             elif result == self.RAISE_JUMP:
-                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
-                for i, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) - 1 + i, self.height() - 1, character)
                 call_refresh = True
 
             if call_refresh:
+                strpos = "%9d/%d" % (self.song_position + space_buffer - self.height(), len(state_list) - (2 * self.height()) - 1)
+                for c, character in enumerate(strpos):
+                    self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
+
                 self.active_boxes = box_list[max(0, self.song_position): min(len(box_list), self.song_position + self.height())]
                 y = self.height() - 1
                 for box in self.active_boxes:
@@ -259,6 +253,8 @@ class Player(Box, Interactor):
         '''set current positions as loop end'''
         self.loop[1] = self.song_position
         self.clear_register()
+        self.set_flag(self.RAISE_JUMP, 1)
+        self.general_register = self.loop[0]
 
     def clear_loop(self):
         '''Stop Looping'''
