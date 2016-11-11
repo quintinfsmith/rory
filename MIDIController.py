@@ -2,12 +2,12 @@
 import os
 class MIDIController(object):
     '''Read Input from Midi Device'''
-    def __init__(self):
-        self.connected = os.path.exists('/dev/midi1')
+    def __init__(self, midipath="/dev/midi1"):
+        self.connected = os.path.exists(midipath)
         if not self.connected:
             self.pipe = open('/dev/zero', 'rb')
         else:
-            self.pipe = open('/dev/midi1', 'rb')
+            self.pipe = open(midipath, 'rb')
         self.current_pressed = set([])
         self.listening = False
         self.changed = True

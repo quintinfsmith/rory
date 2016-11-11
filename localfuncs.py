@@ -1,3 +1,23 @@
+import os
+import tty
+import termios
+import sys
+
+def get_terminal_size():
+    '''return dimensions of current terminal session'''
+    height, width = os.popen("stty size", "r").read().split()
+    return (int(width), int(height))
+
+def read_character():
+    '''Read character from stdin'''
+    init_fileno = sys.stdin.fileno() # store original pipe n
+    init_attr = termios.tcgetattr(init_fileno)  # store original input settings
+    try:
+        tty.setraw(sys.stdin.fileno()) # remove wait for "return"
+        ch = sys.stdin.read(1) # Read single character into memory
+    finally:
+        termios.tcsetattr(init_fileno, termios.TCSADRAIN, init_attr) # reset input settings
+    return ch
 
 def from_twos_comp(n, bits=8):
     '''Convert two's compliment representation of n'''
@@ -35,7 +55,7 @@ def get_variable_length(queue):
     return n
 
 def to_variable_length(n):
-    '''create byte list from integer'''
+    '''create variable length byte list from integer'''
     out = []
     first = True
     while n > 0 or first:
@@ -51,6 +71,7 @@ def to_variable_length(n):
     return bytes(out)
 
 def to_bytes(n, l=4):
+    '''create byte list representation of integer'''
     out = b""
     first = True
     while n > 0 or first:
@@ -60,5 +81,3 @@ def to_bytes(n, l=4):
 
     out = (b"\x00" * (l - len(out))) + out
     return out
-
-

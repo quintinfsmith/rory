@@ -1,9 +1,9 @@
 '''Plays MIDILike Objects'''
 
 from Box import Box
-from Interactor import Interactor
+from Interactor import RegisteredInteractor
 
-class Player(Box, Interactor):
+class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
     NEXT_STATE = 1
     PREV_STATE = 2
@@ -36,7 +36,7 @@ class Player(Box, Interactor):
 
     def __init__(self):
         Box.__init__(self)
-        Interactor.__init__(self)
+        RegisteredInteractor.__init__(self)
 
         self.loop = [0, -1]
 

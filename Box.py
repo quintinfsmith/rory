@@ -1,7 +1,8 @@
 import sys
 import math
+import os
+from localfuncs import get_terminal_size
 
-import console
 
 def log(msg):
     with open("testlog", "a") as filepipe:
@@ -188,7 +189,7 @@ class Box(object):
 class BoxEnvironment(Box):
     """Canvas on which to manipulate boxes"""
     def __init__(self):
-        width, height = console.getTerminalSize()
+        width, height = get_terminal_size()
         self.draw_cache = []
         self.w_coords = []
         self.c_coords = []
@@ -216,5 +217,5 @@ class BoxEnvironment(Box):
         for x, y, c in disp:
             if not c:
                 c = " "
-            sys.stdout.write("\033[%d;%dH%s" % (y + 1, x + 1, c))
+            sys.stdout.write("\033[%d;%dH%s" % (y + 2, x + 1, c))
         sys.stdout.write("\033[1;1H\n")
