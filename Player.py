@@ -197,7 +197,7 @@ class Player(Box, Interactor):
                 for box in self.active_boxes:
                     self.move_box(box.id, 1, y)
                     y -= 1
-                self.refresh(self.active_boxes + self.active_key_boxes)
+                self.refresh(self.active_key_boxes + self.active_boxes)
         self.quit()
 
     def _wait_for_input(self, expected, controller):

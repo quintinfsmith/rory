@@ -1,6 +1,7 @@
 from MIDIEvent import SequenceNumberEvent, TextEvent, CopyrightNoticeEvent, TrackNameEvent, InstrumentNameEvent, LyricEvent, MarkerEvent, CuePointEvent, ChannelPrefixEvent, EndOfTrackEvent, SetTempoEvent, SMTPEOffsetEvent, TimeSignatureEvent, KeySignatureEvent, SequencerSpecificEvent, NoteOffEvent, NoteOnEvent, PolyphonicKeyPressureEvent, ControlChangeEvent, ProgramChangeEvent, ChannelPressureEvent, PitchWheelChangeEvent, SystemExclusiveEvent, SongPositionPointerEvent, SongSelectEvent, TuneRequestEvent, EndOfExclusiveEvent, TimingClockEvent, StartEvent, ContinueEvent, StopEvent, ActiveSensingEvent, ResetEvent
 from Interpreter import SongInterpreter
 from MIDILike import MIDILike, MIDILikeTrack
+from localfuncs import pop_n, from_twos_comp, to_twos_comp, get_variable_length
 
 class MIDIInterpreter(SongInterpreter):
     """Interpret MIDIs"""
@@ -40,51 +41,12 @@ class MIDIInterpreter(SongInterpreter):
         }
         self.lastgoodbyte = None
 
-    @staticmethod
-    def from_twos_comp(n, bits=8):
-        """Convert two's compliment representation of n"""
-        f = 0
-        for _ in range(bits):
-            f <<= 2
-            f += 1
-        return (n - 1).__xor__(f)
-
-    @staticmethod
-    def to_twos_comp(n, bits=8):
-        """Get two's compliment representation of n"""
-        f = 0
-        for _ in range(bits):
-            f <<= 2
-            f += 1
-        return n.__xor__(f)
-
-    @staticmethod
-    def pop_n(queue, nbytes=1):
-        """Get first N bytes from byte list"""
-        out = 0
-        for _ in range(nbytes):
-            out <<= 8
-            out += int(queue.pop(0))
-        return out
-
-    @staticmethod
-    def get_variable_length(queue):
-        """Calculate variable length integer from byte list"""
-        n = 0
-        while True:
-            n <<= 7
-            c = int(queue.pop(0))
-            n += c & 0x7F
-            if not c & 0x80:
-                break
-        return n
-
     def process_mtrk_event(self, firstbyte, queue, current_deltatime, track):
         # Channel Voice Message
         if int(firstbyte >> 4) in (8, 9, 10, 11, 14):
             channel = firstbyte & 0x0F
-            b = self.pop_n(queue)
-            c = self.pop_n(queue)
+            b = pop_n(queue)
+            c = pop_n(queue)
             if int(firstbyte >> 4) == 9 and c == 0:
                 tmpbyte = firstbyte & 0xEF
             else:
@@ -95,7 +57,7 @@ class MIDIInterpreter(SongInterpreter):
 
         elif int(firstbyte >> 4) in (12, 13):
             channel = firstbyte & 0x0F
-            b = self.pop_n(queue)
+            b = pop_n(queue)
             track.add_event(
                 current_deltatime,
                 self.cve[int(firstbyte >> 4)](channel, b))
@@ -104,29 +66,29 @@ class MIDIInterpreter(SongInterpreter):
         elif firstbyte == 0xF0:
             dump = []
             while True:
-                x = self.pop_n(queue)
+                x = pop_n(queue)
                 if x == 0xF7:
                     break
                 dump.append(x)
             track.add_event(current_deltatime, SystemExclusiveEvent(firstbyte, dump))
 
         elif firstbyte == 0xF2: # Song Position pointer
-            nb = self.pop_n(queue)
-            nc = self.pop_n(queue)
+            nb = pop_n(queue)
+            nc = pop_n(queue)
             track.add_event(
                 current_deltatime,
                 SongPositionPointerEvent((nc & 0x7) + ((nb & 0x7) << 7)))
 
         elif firstbyte == 0xF3:
-            b = self.pop_n(queue)
+            b = pop_n(queue)
             track.add_event(current_deltatime, SongSelectEvent(b))
 
         elif firstbyte == 0xF6:
             track.add_event(current_deltatime, self.se[firstbyte]())
 
         elif firstbyte == 0xF7:
-            vlen = self.get_variable_length(queue)
-            data = self.pop_n(queue, vlen)
+            vlen = get_variable_length(queue)
+            data = pop_n(queue, vlen)
             track.add_event(current_deltatime, SystemExclusiveEvent(0xF0, data))
 
         elif firstbyte in (0xF1, 0xF4, 0xF5): # Undefined
@@ -136,10 +98,10 @@ class MIDIInterpreter(SongInterpreter):
 
         # Meta-Event
         elif firstbyte == 0xFF:
-            meta_type = self.pop_n(queue)
-            v_length = self.get_variable_length(queue)
+            meta_type = pop_n(queue)
+            v_length = get_variable_length(queue)
             event_data_bytes = queue[0:v_length]
-            self.pop_n(queue, v_length)
+            pop_n(queue, v_length)
             # Deal with Meta Events Later
             if meta_type in self.me.keys():
                 track.add_event(current_deltatime, self.me[meta_type](event_data_bytes))
@@ -177,10 +139,10 @@ class MIDIInterpreter(SongInterpreter):
             track = MIDILikeTrack()
             current_deltatime = 0
             if chunk_type == 'MThd':
-                self.pop_n(queue, 4) # pop size
-                midi_format = self.pop_n(queue, 2)
-                self.pop_n(queue, 2) # pop num_tracks
-                divword = self.pop_n(queue, 2)
+                pop_n(queue, 4) # pop size
+                midi_format = pop_n(queue, 2)
+                pop_n(queue, 2) # pop num_tracks
+                divword = pop_n(queue, 2)
                 if divword & 0x8000:
                     neg = int((divword & 0x7F00) >> 8)
                     SMPTE = self.from_twos_comp(neg, 7)
@@ -192,13 +154,13 @@ class MIDIInterpreter(SongInterpreter):
                 mlo.set_tpqn(tpqn)
                 mlo.set_format(midi_format)
             elif chunk_type == 'MTrk':
-                length = self.pop_n(queue, 4)
+                length = pop_n(queue, 4)
                 print(length)
                 subqueue = queue[:length]
                 queue = queue[length:]
                 while subqueue:
-                    current_deltatime += self.get_variable_length(subqueue)
-                    n = self.pop_n(subqueue)
+                    current_deltatime += get_variable_length(subqueue)
+                    n = pop_n(subqueue)
                     gb = self.process_mtrk_event(n, subqueue, current_deltatime, track)
                     if (gb & 0xf0) >> 4 in self.cve.keys():
                         self.lastgoodbyte = gb
