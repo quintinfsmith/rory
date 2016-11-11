@@ -34,3 +34,5 @@ Notes:
   
   The Midi Library I created is incomplete, so not every midi will be read perfectly, though any I've used have worked without issue.
   
+  I've generated some scale excercises in scales/*.mid.
+  
