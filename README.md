@@ -9,7 +9,7 @@ Requirements:
       Python 3
   
   
-Usage: ./main.py <midifile>
+Usage: ./main.py \<midifile\>
 
 
 Controls:
@@ -24,8 +24,10 @@ Controls:
     ] - set loop end
   
     / - clear loop
-  
-    <n> p - jump to state <n>
+
+    p - jump to start
+
+    [number] p - jump to state [number]
 
 
 Notes:
