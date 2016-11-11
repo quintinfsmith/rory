@@ -201,6 +201,7 @@ class BoxEnvironment(Box):
 
     def init_screen(self):
         '''Prepare screen for use'''
+        sys.stdout.write("\033[1;1H")
         sys.stdout.write("\033[?25l")
 
     def destroy(self):
@@ -217,5 +218,5 @@ class BoxEnvironment(Box):
         for x, y, c in disp:
             if not c:
                 c = " "
-            sys.stdout.write("\033[%d;%dH%s" % (y + 2, x + 1, c))
+            sys.stdout.write("\033[%d;%dH%s" % (y + 1, x + 1, c))
         sys.stdout.write("\033[1;1H\n")
