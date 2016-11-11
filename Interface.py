@@ -6,13 +6,13 @@ from Player import Player
 from MidiInterpreter import MIDIInterpreter
 from MIDIController import MIDIController
 from Box import BoxEnvironment
-from Interactor import Interactor
+from Interactor import RegisteredInteractor
 
-class Interface(BoxEnvironment, Interactor):
+class Interface(BoxEnvironment, RegisteredInteractor):
     '''Interface to Run the MidiPlayer'''
     def __init__(self):
         BoxEnvironment.__init__(self)
-        Interactor.__init__(self)
+        RegisteredInteractor.__init__(self)
         self.init_screen()
         self.midi_interpreter = MIDIInterpreter()
         self.active_threads = []
@@ -24,6 +24,11 @@ class Interface(BoxEnvironment, Interactor):
         self.listening = False
         self.assign_sequence("q", self.quit)
         self.player = None
+        self.midi_controller_path = "/dev/midi1"
+
+    def set_midicontroller_path(self, path):
+        '''Use a different Midi Input Device'''
+        self.midi_controller_path = path
 
     def show_player(self):
         '''Displays MidiPlayer Box'''
@@ -50,7 +55,7 @@ class Interface(BoxEnvironment, Interactor):
         if not hidden:
             hidden = list()
         thread = threading.Thread(target=self.player.play_along,\
-          args=[selected_mlo, MIDIController(), hidden])
+          args=[selected_mlo, MIDIController(self.midi_controller_path), hidden])
         thread.start()
         self.active_threads.append(thread)
 
