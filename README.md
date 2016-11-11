@@ -1,5 +1,5 @@
 # misophonia
-Learn Piano using MIDI files
+Learn Piano using MIDI files and a MIDI Keyboard
 
 
 Requirements:
@@ -7,9 +7,13 @@ Requirements:
       Unix like OS
   
       Python 3
+
+      Some way of connecting your MIDI keyboard (or any MIDI instrument) to your computer
   
   
 Usage: ./main.py \<midifile\>
+
+
 
 
 Controls:
