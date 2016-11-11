@@ -4,35 +4,35 @@ Learn Piano using MIDI files
 
 Requirements:
 
-  Unix like OS
+      Unix like OS
   
-  Python 3
+      Python 3
   
   
 Usage: ./main.py <midifile>
 
 
 Controls:
-  q - quit
+    q - quit
   
-  j - Next State
+    j - Next State
   
-  k - Previous state
+    k - Previous state
   
-  [ - set loop start
+    [ - set loop start
   
-  ] - set loop end
+    ] - set loop end
   
-  / - clear loop
+    / - clear loop
   
-  <n> p - jump to state <n>
+    <n> p - jump to state <n>
 
 
 Notes:
 
-  You may need to modify MIDIController.py to choose your midi device.
+    You may need to modify MIDIController.py to choose your midi device.
   
-  The Midi Library I created is incomplete, so not every midi will be read perfectly, though any I've used have worked without issue.
+    The Midi Library I created is incomplete, so not every midi will be read perfectly, though any I've used have worked without issue.
   
-  I've generated some scale excercises in scales/*.mid.
+    I've generated some scale excercises in scales/*.mid
   
