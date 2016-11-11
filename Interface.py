@@ -1,5 +1,5 @@
-''' Author: Quintin Smith '''
-#!/usr/bin/python3
+'''Interface between user and player'''
+
 import sys
 import threading
 from Player import Player
@@ -74,12 +74,3 @@ class Interface(BoxEnvironment, RegisteredInteractor):
                 active = self
                 self.quit()
             active.get_input()
-
-if __name__ == '__main__':
-    sys.stdout.write("\033?25l")
-    interface = Interface()
-    midilike = interface.load_midi(sys.argv[1])
-    note_range = midilike.get_note_range()
-    interface.show_player()
-    interface.play_along(midilike)
-    interface.input_loop()
