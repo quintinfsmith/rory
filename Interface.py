@@ -1,4 +1,5 @@
 ''' Author: Quintin Smith '''
+#!/usr/bin/python3
 import sys
 import threading
 from Player import Player
