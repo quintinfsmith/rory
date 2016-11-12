@@ -69,7 +69,7 @@ class Player(Box, RegisteredInteractor):
     def _get_note_str(self, note, channel=10):
         '''Convert Midi Note byte to Legible Character'''
         note_list = 'CCDDEFFGGAAB'
-        channel += 1
+        color_trans = [7,3,6,2,5,4,1,3]
         if channel > 7:
             note_list = note_list.lower()
             channel %= 8
@@ -77,9 +77,9 @@ class Player(Box, RegisteredInteractor):
         note %= 12
         display_character = note_list[note]
         if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (channel, display_character)
+            return "\033[7;3%dm%s\033[0m" % (color_trans[channel], display_character)
         else:
-            return "\033[3%dm%s\033[0m" % (channel, display_character)
+            return "\033[3%dm%s\033[0m" % (color_trans[channel], display_character)
 
     def update_pressed_line(self, pressed):
         '''Redraw Pressed Keys'''
