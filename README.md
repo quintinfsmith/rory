@@ -11,7 +11,9 @@ Requirements:
       Some way of connecting your MIDI keyboard (or any MIDI instrument) to your computer
   
   
-Usage: ./main.py \<midifile\>
+Usage: 1: ensure your console is at least 90 chacters wide
+
+       2: $ ./main.py \<midifile\> 
 
 
 
