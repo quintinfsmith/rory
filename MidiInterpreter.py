@@ -110,7 +110,7 @@ class MIDIInterpreter(SongInterpreter):
         elif firstbyte >= 0xF8:
             track.add_event(current_deltatime, SystemRealTimeEvent())
 
-        elif firstbyte < 128:
+        elif firstbyte < 0x80:
             queue.insert(0, firstbyte)
             return self.process_mtrk_event(self.lastgoodbyte, queue, current_deltatime, track)
 

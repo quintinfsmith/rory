@@ -111,18 +111,13 @@ class Player(Box, RegisteredInteractor):
                             del pressed_keys[event.note]
                         else:
                             pressed_keys[event.note] = event
-                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys() and event.channel != 10:
+                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys():
                         del pressed_keys[event.note]
 
             if len(pressed_keys.keys()):
                 while len(state_list) <= tick * squash_factor:
                     state_list.append({})
                 state_list[int(tick * squash_factor)] = pressed_keys.copy()
-
-        for _ in range(self.height()):
-            state_list.append({})
-        for _ in range(self.height()):
-            state_list.insert(0, {})
 
         box_list = []
         for j, current_state in enumerate(state_list):
@@ -135,7 +130,6 @@ class Player(Box, RegisteredInteractor):
                     except IndexError:
                         pass
             box_list.append(new_box)
-        self.refresh()
 
         self.key_boxes = []
         self.active_key_boxes = []
@@ -155,15 +149,20 @@ class Player(Box, RegisteredInteractor):
 
         self.song_position = 0
         self.playing = True
-        self.refresh()
+        first = True
         while self.playing:
             call_refresh = False
-            if self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position + space_buffer == len(state_list) - 1):
+            if first: # Draw the initial state before waiting for any input
+                first = False
+                call_refresh = True
+                result = 0
+
+            elif self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position == len(state_list)):
                 self.song_position = self.loop[0]
                 result = self.RAISE_JUMP
-            elif len(state_list) > self.song_position + space_buffer:
-                result = self._wait_for_input(state_list[self.song_position + space_buffer], controller)
-            else:
+            elif len(state_list) > self.song_position:
+                result = self._wait_for_input(state_list[self.song_position], controller)
+            else: # Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
             if result == self.RAISE_QUIT:
@@ -173,13 +172,13 @@ class Player(Box, RegisteredInteractor):
 
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(state_list)
-                while self.song_position < len(state_list) - space_buffer - 1 and not state_list[self.song_position + space_buffer]:
-                    self.song_position = min(len(state_list) - 1, self.song_position + 1)
+                while self.song_position < len(state_list) and not state_list[self.song_position]:
+                    self.song_position = (self.song_position + 1) % len(state_list)
 
                 call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
-                while (first or not state_list[self.song_position + space_buffer]) and self.song_position > 0:
+                while (first or not state_list[self.song_position]) and self.song_position > 0:
                     first = False
                     self.song_position = max(0, self.song_position - 1)
 
@@ -188,12 +187,14 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
 
             if call_refresh:
-                strpos = "%9d/%d" % (self.song_position + space_buffer - self.height(), len(state_list) - (2 * self.height()) - 1)
+                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
                 for c, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
 
-                self.active_boxes = box_list[max(0, self.song_position): min(len(box_list), self.song_position + self.height())]
-                y = self.height() - 1
+                self.active_boxes = box_list[max(0, self.song_position - space_buffer): min(len(box_list), self.song_position - space_buffer + self.height())]
+
+                y = len(self.active_boxes) - 1
+                y += max(0, (self.song_position - space_buffer + self.height()) - len(box_list))
                 for box in self.active_boxes:
                     self.move_box(box.id, 1, y)
                     y -= 1
