@@ -2,6 +2,7 @@
 
 from Box import Box
 from Interactor import RegisteredInteractor
+from MIDIInterface import MIDIInterface
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
@@ -90,45 +91,24 @@ class Player(Box, RegisteredInteractor):
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
 
-    def play_along(self, midilike, controller, hidden=None):
+    def play_along(self, midilike, controller):
         '''Display notes in console. Main function'''
-        if not hidden:
-            hidden = []
-        if controller.connected:
-            controller.listen()
+        midi_interface = MIDIInterface(midilike, controller)
+
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         self.resize(num_of_keys + 2, self.parent.height())
         squash_factor = 8 / midilike.tpqn
         space_buffer = 8
 
-        state_list = []
-        for tick in range(len(midilike)):
-            pressed_keys = {}
-            for track in midilike.tracks:
-                for event in track.get_events(tick):
-                    if event.eid == event.NOTE_ON and event.channel != 10 and not event.channel in hidden:
-                        if event.velocity == 0 and event.note in pressed_keys.keys():
-                            del pressed_keys[event.note]
-                        else:
-                            pressed_keys[event.note] = event
-                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys():
-                        del pressed_keys[event.note]
-
-            if len(pressed_keys.keys()):
-                while len(state_list) <= tick * squash_factor:
-                    state_list.append({})
-                state_list[int(tick * squash_factor)] = pressed_keys.copy()
-
         box_list = []
-        for j, current_state in enumerate(state_list):
+        for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
             for key, event in current_state.items():
-                if event.channel != 10:
-                    try:
-                        new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
-                    except IndexError:
-                        pass
+                try:
+                    new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
+                except IndexError:
+                    pass
             box_list.append(new_box)
 
         self.key_boxes = []
@@ -157,11 +137,11 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
                 result = 0
 
-            elif self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position == len(state_list)):
+            elif self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position == len(midi_interface)):
                 self.song_position = self.loop[0]
                 result = self.RAISE_JUMP
-            elif len(state_list) > self.song_position:
-                result = self._wait_for_input(state_list[self.song_position], controller)
+            elif len(midi_interface) > self.song_position:
+                result = self._wait_for_input(midi_interface)
             else: # Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
@@ -171,14 +151,14 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
 
             elif result == self.NEXT_STATE:
-                self.song_position = (self.song_position + 1) % len(state_list)
-                while self.song_position < len(state_list) and not state_list[self.song_position]:
-                    self.song_position = (self.song_position + 1) % len(state_list)
+                self.song_position = (self.song_position + 1) % len(midi_interface)
+                while self.song_position < len(midi_interface) and midi_interface.is_state_empty(self.song_position):
+                    self.song_position = (self.song_position + 1) % len(midi_interface)
 
                 call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
-                while (first or not state_list[self.song_position]) and self.song_position > 0:
+                while (first or midi_interface.is_state_empty(self.song_position)) and self.song_position > 0:
                     first = False
                     self.song_position = max(0, self.song_position - 1)
 
@@ -187,7 +167,7 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
 
             if call_refresh:
-                strpos = "%9d/%d" % (self.song_position, len(state_list) - 1)
+                strpos = "%9d/%d" % (self.song_position, len(midi_interface) - 1)
                 for c, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
 
@@ -201,36 +181,18 @@ class Player(Box, RegisteredInteractor):
                 self.refresh(self.active_key_boxes + self.active_boxes)
         self.quit()
 
-    def _wait_for_input(self, expected, controller):
+    def _wait_for_input(self, midi_interface):
         '''Waits for user to press correct key combination'''
-        # 'expected' is in the form of a dictionary because we want
-        # to consider which channel (or hand) is playing the note
-        # 'ignore' is the list of channel numbers which we don't need
-        # to press to leave the function call
-        # 'expected_unset' are the keys that need to be released before pressing again
-        # 'actual_set' is the uncompromised set of pressed keys.
-        #   it needs to be used when considering the next keys to be pressed
-        expected_set = set()
-        expected_unset = set()
-        actual_set = set()
-        for key, event in expected.items():
-            channel = event.channel
-            if not channel in self.ignore:
-                expected_set.add(key)
-                expected_unset.add(key)
-                actual_set.add(key)
 
-        # If the key was expected NOT to be pressed last state but was, the user needs to release and press again
-        while expected_unset:
-            expected_unset &= controller.get_pressed()
+        while not midi_interface.states_unmatch(self.song_position, midi_interface.get_pressed()):
+            pass
 
         input_given = 0
         while input_given == 0:
-            pressed = controller.get_pressed()
-            if not (expected_set - pressed):
+            pressed = midi_interface.get_pressed()
+            if midi_interface.states_match(self.song_position, pressed):
                 input_given = self.NEXT_STATE
-
-            if self.flag_isset(self.PREV_STATE):
+            elif self.flag_isset(self.PREV_STATE):
                 self.flags[self.PREV_STATE] = 0
                 input_given = self.PREV_STATE
             elif self.flag_isset(self.NEXT_STATE):
