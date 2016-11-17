@@ -55,7 +55,7 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         if not hidden:
             hidden = list()
         thread = threading.Thread(target=self.player.play_along,\
-          args=[selected_mlo, MIDIController(self.midi_controller_path), hidden])
+          args=[selected_mlo, MIDIController(self.midi_controller_path)])
         thread.start()
         self.active_threads.append(thread)
 
