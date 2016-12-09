@@ -8,7 +8,6 @@ if len(sys.argv) < 2:
     print("Specify Midi To Play")
     sys.exit()
 interface = Interface()
-midilike = interface.load_midi(sys.argv[1])
 interface.show_player()
-interface.play_along(midilike)
+midilike = interface.play_along(sys.argv[1])
 interface.input_loop()

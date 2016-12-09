@@ -9,6 +9,11 @@ class MIDILike(object):
         self.tpqn = None
         self.midi_format = None
         self.tracks = []
+        self.path = ""
+
+    def set_path(self, path):
+        '''Give the object a path'''
+        self.path = path
 
     def get_note_range(self):
         '''Return min/max notes played in the entire midi'''

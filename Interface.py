@@ -1,6 +1,8 @@
 '''Interface between user and player'''
 
+import os
 import sys
+import json
 import threading
 from Player import Player
 from MidiInterpreter import MIDIInterpreter
@@ -25,6 +27,12 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         self.assign_sequence("q", self.quit)
         self.player = None
         self.midi_controller_path = "/dev/midi1"
+        self.settings_path = "./settings.json"
+        if os.path.isfile(self.settings_path):
+            with open(self.settings_path, "r") as fp:
+                self.settings = json.loads(fp.read())
+        else:
+            self.settings = {}
 
     def set_midicontroller_path(self, path):
         '''Use a different Midi Input Device'''
@@ -41,6 +49,11 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         self.interactorstack.append(new_id)
         self.player = player
 
+    def save_settings(self):
+        '''Save settings...'''
+        with open(self.settings_path, "w") as fp:
+            fp.write(json.dumps(self.settings))
+
     def load_midi(self, midi_path):
         '''Load Midi Like Object from path'''
         return self.midi_interpreter(midi_path)
@@ -50,10 +63,13 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         self.listening = False
         self.destroy()
 
-    def play_along(self, selected_mlo, hidden=None):
+    def play_along(self, midi_path, hidden=None):
         '''Run the Player with the loaded MidiLike Object'''
         if not hidden:
             hidden = list()
+
+        selected_mlo = self.load_midi(midi_path)
+
         thread = threading.Thread(target=self.player.play_along,\
           args=[selected_mlo, MIDIController(self.midi_controller_path)])
         thread.start()

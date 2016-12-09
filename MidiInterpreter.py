@@ -127,6 +127,7 @@ class MIDIInterpreter(SongInterpreter):
         with open(midifile, 'rb') as fp:
             queue = bytearray(fp.read())
         mlo = MIDILike()
+        mlo.set_path(midifile)
         chunkcount = {}
         self.lastgoodbyte = 0x90
         while queue:

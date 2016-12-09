@@ -3,6 +3,7 @@
 from Box import Box
 from Interactor import RegisteredInteractor
 from MIDIInterface import MIDIInterface
+from localfuncs import read_character
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
@@ -35,6 +36,46 @@ class Player(Box, RegisteredInteractor):
         self.song_position = self.general_register
         self.clear_register()
 
+    def get_settings(self):
+        '''Get cached settings from Interface'''
+        try:
+            return self.parent.settings[self.active_midi.path]
+        except KeyError:
+            return {}
+
+    def set_settings(self, new_settings, do_save=False):
+        '''Cache Settings in Interface'''
+        self.parent.settings[self.active_midi.path] = new_settings
+        if do_save:
+            self.parent.save_settings()
+
+    def point_jump(self):
+        '''Jump to saved point'''
+        jumpkey = read_character()
+        settings = self.get_settings()
+        if not "jump_points" in settings.keys():
+            return None
+
+        jump_points = settings["jump_points"]
+        if jumpkey in jump_points.keys():
+            self.set_flag(self.RAISE_JUMP)
+            self.song_position = jump_points[jumpkey]
+
+    def set_jump_point(self):
+        '''Save a point to be jumped to'''
+        jumpkey = read_character()
+        settings = self.get_settings()
+        if not "jump_points" in settings.keys():
+            settings["jump_points"] = {}
+
+        if self.general_register:
+            settings["jump_points"][jumpkey] = self.general_register
+            self.clear_register()
+        else:
+            settings["jump_points"][jumpkey] = self.song_position
+
+        self.set_settings(settings, True)
+
     def __init__(self):
         Box.__init__(self)
         RegisteredInteractor.__init__(self)
@@ -44,7 +85,9 @@ class Player(Box, RegisteredInteractor):
         self.assign_sequence("j", self.next_state)
         self.assign_sequence("k", self.prev_state)
         self.assign_sequence("p", self.jump)
+        self.assign_sequence("P", self.point_jump)
         self.assign_sequence("q", self.quit)
+        self.assign_sequence("s", self.set_jump_point)
         self.assign_sequence("[", self.set_loop_start)
         self.assign_sequence("]", self.set_loop_end)
         self.assign_sequence("/", self.clear_loop)
@@ -59,7 +102,9 @@ class Player(Box, RegisteredInteractor):
         self.ignore = []
         self.song_position = 0
 
+        self.active_midi = None
         self.active_boxes = []
+        self.state_boxes = []
 
         self.key_boxes = []
         self.active_key_boxes = [] # for refresh call
@@ -94,13 +139,15 @@ class Player(Box, RegisteredInteractor):
     def play_along(self, midilike, controller):
         '''Display notes in console. Main function'''
         midi_interface = MIDIInterface(midilike, controller)
+        self.active_midi = midilike
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         self.resize(num_of_keys + 2, self.parent.height())
         squash_factor = 8 / midilike.tpqn
         space_buffer = 8
 
-        box_list = []
+
+        self.state_boxes = []
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
@@ -109,7 +156,7 @@ class Player(Box, RegisteredInteractor):
                     new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
                 except IndexError:
                     pass
-            box_list.append(new_box)
+            self.state_boxes.append(new_box)
 
         self.key_boxes = []
         self.active_key_boxes = []
@@ -149,7 +196,6 @@ class Player(Box, RegisteredInteractor):
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
                 call_refresh = True
-
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(midi_interface)
                 while self.song_position < len(midi_interface) and midi_interface.is_state_empty(self.song_position):
@@ -171,10 +217,10 @@ class Player(Box, RegisteredInteractor):
                 for c, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
 
-                self.active_boxes = box_list[max(0, self.song_position - space_buffer): min(len(box_list), self.song_position - space_buffer + self.height())]
+                self.active_boxes = self.state_boxes[max(0, self.song_position - space_buffer): min(len(self.state_boxes), self.song_position - space_buffer + self.height())]
 
                 y = len(self.active_boxes) - 1
-                y += max(0, (self.song_position - space_buffer + self.height()) - len(box_list))
+                y += max(0, (self.song_position - space_buffer + self.height()) - len(self.state_boxes))
                 for box in self.active_boxes:
                     self.move_box(box.id, 1, y)
                     y -= 1
