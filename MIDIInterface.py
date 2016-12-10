@@ -38,6 +38,9 @@ class MIDIInterface(object):
         '''Check that the controller is pressing the correct keys'''
         return len(given_state.intersection(self.state_map[tick])) == len(self.state_map[tick])
 
+    def get_matched(self, tick, given_state):
+        return given_state.intersection(self.state_map[tick])
+
     def states_unmatch(self, tick, given_state):
         '''Check that the controller is not pressing any keys at the given state in the midi'''
         return not (self.state_map[tick].intersection(given_state))

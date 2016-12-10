@@ -9,6 +9,7 @@ from MidiInterpreter import MIDIInterpreter
 from MIDIController import MIDIController
 from Box import BoxEnvironment
 from Interactor import RegisteredInteractor
+#from Recorder import Recorder
 
 class Interface(BoxEnvironment, RegisteredInteractor):
     '''Interface to Run the MidiPlayer'''
@@ -74,6 +75,17 @@ class Interface(BoxEnvironment, RegisteredInteractor):
           args=[selected_mlo, MIDIController(self.midi_controller_path)])
         thread.start()
         self.active_threads.append(thread)
+
+    # Record doesn't exist yet
+    #def record(self):
+    #    recorder = Recorder()
+    #    new_id = self.add_box(w=recorder.width(), h=player.height(), x = (self.width() - 90) // 2, y = 0)
+    #    self.boxes[new_id] = recorder
+    #    recorder.parent = self
+    #    recorder.id = new_id
+
+    #    self.interactorstack.append(new_id)
+    #    self.recorder = recorder
 
     def input_loop(self):
         '''Main loop, just handles computer keyboard input'''

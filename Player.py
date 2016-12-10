@@ -7,11 +7,12 @@ from localfuncs import read_character
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
-    NEXT_STATE = 1
-    PREV_STATE = 2
-    RAISE_QUIT = 4
-    RAISE_MIDI_INPUT_CHANGE = 8
-    RAISE_JUMP = 16
+    NEXT_STATE = 1 << 1
+    PREV_STATE = 1 << 2
+    RAISE_QUIT = 1 << 3
+    RAISE_MIDI_INPUT_CHANGE = 1 << 4
+    RAISE_JUMP = 1 << 5
+    RAISE_RECORD = 1 << 6
 
     SHARPS = (1, 3, 6, 8, 10)
 
@@ -42,6 +43,10 @@ class Player(Box, RegisteredInteractor):
             return self.parent.settings[self.active_midi.path]
         except KeyError:
             return {}
+
+    def toggle_recording(self):
+        self.set_flag(self.RAISE_RECORD, 1)
+        
 
     def set_settings(self, new_settings, do_save=False):
         '''Cache Settings in Interface'''
@@ -88,6 +93,7 @@ class Player(Box, RegisteredInteractor):
         self.assign_sequence("P", self.point_jump)
         self.assign_sequence("q", self.quit)
         self.assign_sequence("s", self.set_jump_point)
+        self.assign_sequence(chr(13), self.toggle_recording)
         self.assign_sequence("[", self.set_loop_start)
         self.assign_sequence("]", self.set_loop_end)
         self.assign_sequence("/", self.clear_loop)
@@ -127,11 +133,15 @@ class Player(Box, RegisteredInteractor):
         else:
             return "\033[3%dm%s\033[0m" % (color_trans[channel], display_character)
 
-    def update_pressed_line(self, pressed):
+    def update_pressed_line(self, pressed, matched=[]):
         '''Redraw Pressed Keys'''
         if pressed.symmetric_difference(self.last_pressed):
             self.active_key_boxes = []
             for index in pressed:
+                #if index in matched:
+                #    self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[43m" + str(index) + "\033[m")
+                #else:
+                #    self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[46m" + str(index) + "\033[m")
                 self.active_key_boxes.append(self.boxes[self.key_boxes[index - self.note_range[0]]])
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
@@ -145,7 +155,6 @@ class Player(Box, RegisteredInteractor):
         self.resize(num_of_keys + 2, self.parent.height())
         squash_factor = 8 / midilike.tpqn
         space_buffer = 8
-
 
         self.state_boxes = []
         for j, current_state in enumerate(midi_interface.event_map):
@@ -196,6 +205,8 @@ class Player(Box, RegisteredInteractor):
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
                 call_refresh = True
+            elif result == self.RAISE_RECORD:
+                controller.toggle_recording("test.mid")
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(midi_interface)
                 while self.song_position < len(midi_interface) and midi_interface.is_state_empty(self.song_position):
@@ -238,6 +249,9 @@ class Player(Box, RegisteredInteractor):
             pressed = midi_interface.get_pressed()
             if midi_interface.states_match(self.song_position, pressed):
                 input_given = self.NEXT_STATE
+            elif self.flag_isset(self.RAISE_RECORD):
+                self.flags[self.RAISE_RECORD] = 0
+                input_given = self.RAISE_RECORD
             elif self.flag_isset(self.PREV_STATE):
                 self.flags[self.PREV_STATE] = 0
                 input_given = self.PREV_STATE
@@ -250,7 +264,7 @@ class Player(Box, RegisteredInteractor):
             elif self.flag_isset(self.RAISE_JUMP):
                 self.flags[self.RAISE_JUMP] = 0
                 input_given = self.RAISE_JUMP
-            self.update_pressed_line(pressed)
+            self.update_pressed_line(pressed, midi_interface)
         return input_given
 
     def set_loop_start(self):

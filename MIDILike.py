@@ -61,8 +61,8 @@ class MIDILike(object):
             filepipe.write(bytes([self.midi_format]))
             filepipe.write(b"\x00")
             filepipe.write(bytes([len(track_reps)]))
-            filepipe.write(bytes([int(tpqn_bytes / 256)]))
-            filepipe.write(bytes([int(tpqn_bytes % 256)]))
+            filepipe.write(bytes([tpqn_bytes // 256]))
+            filepipe.write(bytes([tpqn_bytes % 256]))
             for track in track_reps:
                 filepipe.write(track)
 
