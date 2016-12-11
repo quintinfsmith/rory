@@ -137,11 +137,22 @@ class Player(Box, RegisteredInteractor):
         '''Redraw Pressed Keys'''
         if pressed.symmetric_difference(self.last_pressed):
             self.active_key_boxes = []
+            note_list = 'CCDDEFFGGAAB'
             for index in pressed:
-                #if index in matched:
-                #    self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[43m" + str(index) + "\033[m")
-                #else:
-                #    self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[46m" + str(index) + "\033[m")
+                rep = note_list[index % len(note_list)]
+                if index in matched:
+                    bg = 42
+                    if index % 12 in self.SHARPS:
+                        fg = 30
+                    else:
+                        fg = 37
+                else:
+                    bg = 41
+                    if index % 12 in self.SHARPS:
+                        fg = 30
+                    else:
+                        fg = 37
+                self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[%d;%dm%s\033[m" % (bg, fg, rep))
                 self.active_key_boxes.append(self.boxes[self.key_boxes[index - self.note_range[0]]])
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
@@ -155,11 +166,16 @@ class Player(Box, RegisteredInteractor):
         self.resize(num_of_keys + 2, self.parent.height())
         squash_factor = 8 / midilike.tpqn
         space_buffer = 8
+        states_per_measure = (midilike.tpqn * 4) * squash_factor
 
         self.state_boxes = []
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
+            if j % states_per_measure == 0:
+                for i in range(88):
+                    if i % 12 and not i % 4:
+                        new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
             for key, event in current_state.items():
                 try:
                     new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
@@ -173,11 +189,10 @@ class Player(Box, RegisteredInteractor):
             k = self.add_box(x=x + 1, y=self.height() - space_buffer - 1, width=1, height=1)
             self.key_boxes.append(k)
             new_box = self.boxes[k]
-            new_box.set(0, 0, "\033[44m%s\033[0m" % 'CCDDEFFGGAAB'[(x - 3) % 12])
             if x % 12 != 0:
                 self.set(x + 1, self.height() - space_buffer - 1, " ")
             else:
-                self.set(x + 1, self.height() - space_buffer - 1, chr(9474))
+                self.set(x + 1, self.height() - space_buffer - 1, "\033[1;30m%s\033[0m" % chr(9474))
 
         for y in range(self.height()):
             self.set(0,y, chr(9474))
@@ -264,7 +279,7 @@ class Player(Box, RegisteredInteractor):
             elif self.flag_isset(self.RAISE_JUMP):
                 self.flags[self.RAISE_JUMP] = 0
                 input_given = self.RAISE_JUMP
-            self.update_pressed_line(pressed, midi_interface)
+            self.update_pressed_line(pressed, midi_interface.get_state(self.song_position))
         return input_given
 
     def set_loop_start(self):
