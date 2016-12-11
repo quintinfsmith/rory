@@ -64,11 +64,11 @@ class Box(object):
     def get_display(self, offset=(0, 0)):
         '''Calculate which box contents to display'''
         if not self.active_box_list:
-            active_boxes = set(self.boxes.keys())
+            active_boxes = list(self.boxes.keys())
         else:
-            active_boxes = set()
+            active_boxes = []
             while self.active_box_list:
-                active_boxes.add(self.active_box_list.pop().id)
+                active_boxes.append(self.active_box_list.pop(0).id)
 
         subdisp = {}
         for box_id in active_boxes:
@@ -162,7 +162,6 @@ class Box(object):
         box.id = new_id
         self.boxes[new_id] = box
         self.box_positions[new_id] = (x, y)
-
         return new_id
 
     def move_box(self, box_id, x, y):
