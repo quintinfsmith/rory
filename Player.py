@@ -154,7 +154,7 @@ class Player(Box, RegisteredInteractor):
                         fg = 37
                 self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[%d;%dm%s\033[m" % (bg, fg, rep))
                 self.active_key_boxes.append(self.boxes[self.key_boxes[index - self.note_range[0]]])
-            self.refresh(self.active_boxes + self.active_key_boxes)
+            self.refresh(self.active_boxes + self.active_key_boxes + [self.position_display_box])
             self.last_pressed = pressed
 
     def play_along(self, midilike, controller):
@@ -198,6 +198,9 @@ class Player(Box, RegisteredInteractor):
             self.set(0,y, chr(9474))
             self.set(self.width() - 1,y, chr(9474))
 
+        tmp_id = self.add_box(x=0, y=self.height() - 1, width=self.width(), height=1)
+        self.position_display_box = self.boxes[tmp_id]
+
         self.song_position = 0
         self.playing = True
         first = True
@@ -239,9 +242,9 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
 
             if call_refresh:
-                strpos = "%9d/%d" % (self.song_position, len(midi_interface) - 1)
+                strpos = "%d/%d" % (self.song_position, len(midi_interface) - 1)
                 for c, character in enumerate(strpos):
-                    self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
+                    self.position_display_box.set(self.width() - len(strpos) - 1 + c, 0, character)
 
                 self.active_boxes = self.state_boxes[max(0, self.song_position - space_buffer): min(len(self.state_boxes), self.song_position - space_buffer + self.height())]
 
@@ -250,7 +253,7 @@ class Player(Box, RegisteredInteractor):
                 for box in self.active_boxes:
                     self.move_box(box.id, 1, y)
                     y -= 1
-                self.refresh(self.active_key_boxes + self.active_boxes)
+                self.refresh(self.active_key_boxes + self.active_boxes + [self.position_display_box])
         self.quit()
 
     def _wait_for_input(self, midi_interface):
