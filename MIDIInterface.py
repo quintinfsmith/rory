@@ -10,18 +10,23 @@ class MIDIInterface(object):
 
         self.state_map = [] # For quick access to which keys are pressed
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
+        self.event_pair_map = {}
         squash_factor = 8 / self.midilike.tpqn
+        collective_pressed_keys = {}
         for tick in range(len(self.midilike)):
             pressed_keys = {}
             for track in self.midilike.tracks:
                 for event in track.get_events(tick):
                     if event.eid == event.NOTE_ON and event.channel != 10:
-                        if event.velocity == 0 and event.note in pressed_keys.keys():
-                            del pressed_keys[event.note]
+                        if event.velocity == 0 and event.note in collective_pressed_keys.keys():
+                            self.event_pair_map[collective_pressed_keys[event.note].id] = event
+                            del collective_pressed_keys[event.note]
                         else:
                             pressed_keys[event.note] = event
-                    elif event.eid == event.NOTE_OFF and event.note in pressed_keys.keys():
-                        del pressed_keys[event.note]
+                            collective_pressed_keys[event.note] = event
+                    elif event.eid == event.NOTE_OFF and event.note in collective_pressed_keys.keys():
+                        self.event_pair_map[collective_pressed_keys[event.note].id] = event
+                        del collective_pressed_keys[event.note]
 
             if len(pressed_keys.keys()):
                 while len(self.state_map) <= tick * squash_factor:
@@ -30,6 +35,16 @@ class MIDIInterface(object):
                     self.event_map.append({})
                 self.event_map[int(tick * squash_factor)].update(pressed_keys.copy())
                 self.state_map[int(tick * squash_factor)] |= set(pressed_keys.keys())
+
+    def rechannel_event(self, note_on_event, channel):
+        '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
+        if note_on_event.id in self.event_pair_map.keys():
+            note_off_event = self.event_pair_map[note_on_event.id]
+            note_on_event.channel = channel
+            note_off_event.channel = channel
+
+    def save_as(self, path):
+        self.midilike.save_as(path)
 
     def is_state_empty(self, tick):
         return not bool(self.state_map[tick])

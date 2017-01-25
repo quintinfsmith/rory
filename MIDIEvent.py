@@ -1,6 +1,6 @@
 from localfuncs import to_variable_length
-
 class MIDIEvent(object):
+    id_gen = 0
     METAEVENT = 0
     SYSTEMREALTIMEEVENT = 1
     SYSTEMCOMMONEVENT = 2
@@ -48,6 +48,8 @@ class MIDIEvent(object):
     def __init__(self, eventtype):
         self.event_type = eventtype
         self.eid = 0
+        self.id = self.id_gen
+        MIDIEvent.id_gen += 1
 
     def get_type(self):
         return self.event_type
