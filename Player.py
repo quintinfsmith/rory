@@ -13,6 +13,8 @@ class Player(Box, RegisteredInteractor):
     RAISE_MIDI_INPUT_CHANGE = 1 << 4
     RAISE_JUMP = 1 << 5
     RAISE_RECORD = 1 << 6
+    RAISE_SAVE = 1 << 7
+    RECHANNEL = -1
 
     SHARPS = (1, 3, 6, 8, 10)
 
@@ -31,6 +33,12 @@ class Player(Box, RegisteredInteractor):
         '''set previous state flag'''
         self.set_flag(self.PREV_STATE)
 
+    def raise_save(self):
+        self.set_flag(self.RAISE_SAVE)
+
+    def save(self, midiinterface):
+        midiinterface.save_as("output.mid")
+
     def jump(self):
         '''set the song position as the value in the register'''
         self.set_flag(self.RAISE_JUMP)
@@ -46,7 +54,16 @@ class Player(Box, RegisteredInteractor):
 
     def toggle_recording(self):
         self.set_flag(self.RAISE_RECORD, 1)
-        
+
+    def set_rechannel(self):
+        '''start rechanneling events'''
+        if self.general_register:
+            self.RECHANNEL = self.general_register
+            self.clear_register()
+
+    def unset_rechannel(self):
+        '''stop rechanneling events'''
+        self.RECHANNEL = -1
 
     def set_settings(self, new_settings, do_save=False):
         '''Cache Settings in Interface'''
@@ -92,7 +109,10 @@ class Player(Box, RegisteredInteractor):
         self.assign_sequence("p", self.jump)
         self.assign_sequence("P", self.point_jump)
         self.assign_sequence("q", self.quit)
+        self.assign_sequence(":w", self.raise_save)
         self.assign_sequence("s", self.set_jump_point)
+        self.assign_sequence("c", self.set_rechannel)
+        self.assign_sequence("C", self.unset_rechannel)
         self.assign_sequence(chr(13), self.toggle_recording)
         self.assign_sequence("[", self.set_loop_start)
         self.assign_sequence("]", self.set_loop_end)
@@ -157,6 +177,15 @@ class Player(Box, RegisteredInteractor):
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
 
+    def redraw_row_box(self, midi_interface):
+        current_state = midi_interface.event_map[self.song_position]
+        current_box = self.state_boxes[self.song_position]
+        for key, event in current_state.items():
+            try:
+                current_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
+            except IndexError:
+                pass
+
     def play_along(self, midilike, controller):
         '''Display notes in console. Main function'''
         midi_interface = MIDIInterface(midilike, controller)
@@ -169,6 +198,9 @@ class Player(Box, RegisteredInteractor):
         states_per_measure = (midilike.tpqn * 4) * squash_factor
 
         self.state_boxes = []
+        measure_count = 0
+        measure_dict = {}
+
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
@@ -176,6 +208,8 @@ class Player(Box, RegisteredInteractor):
                 for i in range(88):
                     if i % 12 and not i % 4:
                         new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
+                measure_count += 1
+            measure_dict[j] = measure_count
             for key, event in current_state.items():
                 try:
                     new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
@@ -216,6 +250,16 @@ class Player(Box, RegisteredInteractor):
             else: # Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
+            if self.RECHANNEL > -1:
+                for k in midi_interface.get_pressed():
+                    if k in midi_interface.event_map[self.song_position].keys():
+                        on_event = midi_interface.event_map[self.song_position][k]
+                        midi_interface.rechannel_event(on_event, self.RECHANNEL)
+                self.redraw_row_box(midi_interface)
+
+            if self.flag_isset(self.RAISE_SAVE):
+                self.save(midi_interface)
+
             if result == self.RAISE_QUIT:
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
@@ -243,6 +287,10 @@ class Player(Box, RegisteredInteractor):
                 for c, character in enumerate(strpos):
                     self.set(self.width() - len(strpos) - 1 + c, self.height() - 1, character)
 
+                str_m_pos = "Bar: %d/%d" % (measure_dict[self.song_position], measure_count)
+                for c, character in enumerate(str_m_pos):
+                    self.set(1 + c, self.height() - 1, character)
+
                 self.active_boxes = self.state_boxes[max(0, self.song_position - space_buffer): min(len(self.state_boxes), self.song_position - space_buffer + self.height())]
 
                 y = len(self.active_boxes) - 1
@@ -250,6 +298,8 @@ class Player(Box, RegisteredInteractor):
                 for box in self.active_boxes:
                     self.move_box(box.id, 1, y)
                     y -= 1
+                if len(self.active_boxes) >= self.height():
+                    self.active_boxes.pop(0)
                 self.refresh(self.active_key_boxes + self.active_boxes)
         self.quit()
 
