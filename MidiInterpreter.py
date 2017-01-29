@@ -37,7 +37,8 @@ class MIDIInterpreter(SongInterpreter):
             0x04: TrackNameEvent,
             0x05: InstrumentNameEvent,
             0x58: TimeSignatureEvent,
-            0x59: KeySignatureEvent
+            0x59: KeySignatureEvent,
+            0x2F: EndOfTrackEvent
         }
         self.lastgoodbyte = None
 

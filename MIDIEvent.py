@@ -129,9 +129,11 @@ class ChannelPrefixEvent(MetaEvent):
         self.prefix = prefix
 
 class EndOfTrackEvent(MetaEvent):
-    def __init__(self):
+    def __init__(self, nul):
         MetaEvent.__init__(self)
         self.eid = 0x2F
+    def __repr__(self):
+        return chr(0xFF) + chr(0x2F) + chr(0x00)
 
 class SetTempoEvent(MetaEvent):
     def __init__(self, tempo):
