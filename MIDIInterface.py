@@ -29,12 +29,13 @@ class MIDIInterface(object):
                         del collective_pressed_keys[event.note]
 
             if len(pressed_keys.keys()):
-                while len(self.state_map) <= tick * squash_factor:
+                squashed_tick = int(round(tick * squash_factor, 0))
+                while len(self.state_map) <= squashed_tick:
                     self.state_map.append(set())
-                while len(self.event_map) <= tick * squash_factor:
+                while len(self.event_map) <= squashed_tick:
                     self.event_map.append({})
-                self.event_map[int(tick * squash_factor)].update(pressed_keys.copy())
-                self.state_map[int(tick * squash_factor)] |= set(pressed_keys.keys())
+                self.event_map[squashed_tick].update(pressed_keys.copy())
+                self.state_map[squashed_tick] |= set(pressed_keys.keys())
 
     def rechannel_event(self, note_on_event, channel):
         '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
