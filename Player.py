@@ -37,7 +37,11 @@ class Player(Box, RegisteredInteractor):
         self.set_flag(self.RAISE_SAVE)
 
     def save(self, midiinterface):
-        midiinterface.save_as("output.mid")
+        old_path = midiinterface.midilike.path
+        if "/" in old_path:
+            old_path = old_path[old_path.rfind("/") + 1:]
+        p = "editted-" + old_path
+        midiinterface.save_as(p)
 
     def jump(self):
         '''set the song position as the value in the register'''
