@@ -1,18 +1,9 @@
 import sys
-import math
-import os
 from localfuncs import get_terminal_size
 
 def log(msg):
     with open("testlog", "a") as filepipe:
         filepipe.write(msg + "\n")
-
-def do_collide(a, b):
-    ax = a[0] + (a[2] / 2)
-    bx = b[0] + (b[2] / 2)
-    ay = a[1] + (a[3] / 2)
-    by = b[1] + (b[3] / 2)
-    return (math.fabs(ax - bx) * 2) < (a[2] + b[2]) and (math.fabs(ay - by) * 2) < (a[3] + b[3])
 
 class Box(object):
     """Easily Mutable Bo to be displayed"""
