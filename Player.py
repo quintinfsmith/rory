@@ -2,8 +2,8 @@
 
 from Box import Box
 from Interactor import RegisteredInteractor
-from MIDIInterface import MIDIInterface
 from localfuncs import read_character
+from MidiLib.MIDIInterface import MIDIInterface
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''

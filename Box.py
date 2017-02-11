@@ -3,7 +3,6 @@ import math
 import os
 from localfuncs import get_terminal_size
 
-
 def log(msg):
     with open("testlog", "a") as filepipe:
         filepipe.write(msg + "\n")
