@@ -14,7 +14,8 @@ class Player(Box, RegisteredInteractor):
     RAISE_JUMP = 1 << 5
     RAISE_RECORD = 1 << 6
     RAISE_SAVE = 1 << 7
-    RECHANNEL = -1
+
+    rechannelling = -1
 
     SHARPS = (1, 3, 6, 8, 10)
 
@@ -34,14 +35,16 @@ class Player(Box, RegisteredInteractor):
         self.set_flag(self.PREV_STATE)
 
     def raise_save(self):
+        '''set save flag'''
         self.set_flag(self.RAISE_SAVE)
 
     def save(self, midiinterface):
+        '''save loaded midi file'''
         old_path = midiinterface.midilike.path
         if "/" in old_path:
             old_path = old_path[old_path.rfind("/") + 1:]
-        p = "editted-" + old_path
-        midiinterface.save_as(p)
+        path = "editted-" + old_path
+        midiinterface.save_as(path)
 
     def jump(self):
         '''set the song position as the value in the register'''
@@ -62,12 +65,12 @@ class Player(Box, RegisteredInteractor):
     def set_rechannel(self):
         '''start rechanneling events'''
         if self.general_register:
-            self.RECHANNEL = self.general_register
+            self.rechannelling = self.general_register
             self.clear_register()
 
     def unset_rechannel(self):
         '''stop rechanneling events'''
-        self.RECHANNEL = -1
+        self.rechannelling = -1
 
     def set_settings(self, new_settings, do_save=False):
         '''Cache Settings in Interface'''
@@ -145,7 +148,7 @@ class Player(Box, RegisteredInteractor):
     def _get_note_str(self, note, channel=10):
         '''Convert Midi Note byte to Legible Character'''
         note_list = 'CCDDEFFGGAAB'
-        color_trans = [7,3,6,2,5,4,1,3]
+        color_trans = [7, 3, 6, 2, 5, 4, 1, 3]
         if channel > 7:
             note_list = note_list.lower()
             channel %= 8
@@ -157,31 +160,35 @@ class Player(Box, RegisteredInteractor):
         else:
             return "\033[3%dm%s\033[0m" % (color_trans[channel], display_character)
 
-    def update_pressed_line(self, pressed, matched=[]):
+    def update_pressed_line(self, pressed, matched):
         '''Redraw Pressed Keys'''
+        if not matched:
+            matched = []
         if pressed.symmetric_difference(self.last_pressed):
             self.active_key_boxes = []
             note_list = 'CCDDEFFGGAAB'
             for index in pressed:
                 rep = note_list[index % len(note_list)]
                 if index in matched:
-                    bg = 42
+                    background = 42
                     if index % 12 in self.SHARPS:
-                        fg = 30
+                        foreground = 30
                     else:
-                        fg = 37
+                        foreground = 37
                 else:
-                    bg = 41
+                    background = 41
                     if index % 12 in self.SHARPS:
-                        fg = 30
+                        foreground = 30
                     else:
-                        fg = 37
-                self.boxes[self.key_boxes[index - self.note_range[0]]].set(0,0, "\033[%d;%dm%s\033[m" % (bg, fg, rep))
+                        foreground = 37
+                to_set = self.boxes[self.key_boxes[index - self.note_range[0]]]
+                to_set.set(0, 0, "\033[%d;%dm%s\033[m" % (background, foreground, rep))
                 self.active_key_boxes.append(self.boxes[self.key_boxes[index - self.note_range[0]]])
             self.refresh(self.active_boxes + self.active_key_boxes)
             self.last_pressed = pressed
 
     def redraw_row_box(self, midi_interface):
+        '''force redrawing of active row'''
         current_state = midi_interface.event_map[self.song_position]
         current_box = self.state_boxes[self.song_position]
         for key, event in current_state.items():
@@ -233,8 +240,8 @@ class Player(Box, RegisteredInteractor):
                 self.set(x + 1, self.height() - space_buffer - 1, "\033[1;30m%s\033[0m" % chr(9474))
 
         for y in range(self.height()):
-            self.set(0,y, chr(9474))
-            self.set(self.width() - 1,y, chr(9474))
+            self.set(0, y, chr(9474))
+            self.set(self.width() - 1, y, chr(9474))
 
         self.song_position = 0
         self.playing = True
@@ -246,7 +253,9 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
                 result = 0
 
-            elif self.loop[1] != 0 and (self.song_position == self.loop[1]) or (self.song_position == len(midi_interface)):
+            elif self.loop[1] != 0 \
+              and (self.song_position == self.loop[1]) \
+              or (self.song_position == len(midi_interface)):
                 self.song_position = self.loop[0]
                 result = self.RAISE_JUMP
             elif len(midi_interface) > self.song_position:
@@ -254,11 +263,11 @@ class Player(Box, RegisteredInteractor):
             else: # Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
-            if self.RECHANNEL > -1:
+            if self.rechannelling > -1:
                 for k in midi_interface.get_pressed():
                     if k in midi_interface.event_map[self.song_position].keys():
                         on_event = midi_interface.event_map[self.song_position][k]
-                        midi_interface.rechannel_event(on_event, self.RECHANNEL)
+                        midi_interface.rechannel_event(on_event, self.rechannelling)
                 self.redraw_row_box(midi_interface)
 
             if self.flag_isset(self.RAISE_SAVE):
@@ -272,13 +281,15 @@ class Player(Box, RegisteredInteractor):
                 controller.toggle_recording("test.mid")
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(midi_interface)
-                while self.song_position < len(midi_interface) and midi_interface.is_state_empty(self.song_position):
+                while self.song_position < len(midi_interface) \
+                  and midi_interface.is_state_empty(self.song_position):
                     self.song_position = (self.song_position + 1) % len(midi_interface)
 
                 call_refresh = True
             elif result == self.PREV_STATE:
                 first = True
-                while (first or midi_interface.is_state_empty(self.song_position)) and self.song_position > 0:
+                while (first or midi_interface.is_state_empty(self.song_position)) \
+                    and self.song_position > 0:
                     first = False
                     self.song_position = max(0, self.song_position - 1)
 
@@ -295,7 +306,10 @@ class Player(Box, RegisteredInteractor):
                 for c, character in enumerate(str_m_pos):
                     self.set(1 + c, self.height() - 1, character)
 
-                self.active_boxes = self.state_boxes[max(0, self.song_position - space_buffer): min(len(self.state_boxes), self.song_position - space_buffer + self.height())]
+                sb_i = max(0, self.song_position - space_buffer)
+                sb_f = min(len(self.state_boxes), self.song_position - space_buffer + self.height())
+
+                self.active_boxes = self.state_boxes[sb_i: sb_f]
 
                 y = len(self.active_boxes) - 1
                 y += max(0, (self.song_position - space_buffer + self.height()) - len(self.state_boxes))
