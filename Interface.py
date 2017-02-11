@@ -5,10 +5,10 @@ import sys
 import json
 import threading
 from Player import Player
-from MidiInterpreter import MIDIInterpreter
-from MIDIController import MIDIController
 from Box import BoxEnvironment
 from Interactor import RegisteredInteractor
+from MidiLib.MidiInterpreter import MIDIInterpreter
+from MidiLib.MIDIController import MIDIController
 #from Recorder import Recorder
 
 class Interface(BoxEnvironment, RegisteredInteractor):
