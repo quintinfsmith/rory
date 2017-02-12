@@ -3,7 +3,7 @@
 from Box import Box
 from Interactor import RegisteredInteractor
 from localfuncs import read_character
-from MidiLib.MIDIInterface import MIDIInterface
+from MIDIInterface import MIDIInterface
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
@@ -228,6 +228,13 @@ class Player(Box, RegisteredInteractor):
                     pass
             self.state_boxes.append(new_box)
 
+
+        # message Box
+        pos = self.parent.box_positions[self.id]
+        tk = self.add_box(x=0-pos[0], y=0, width=pos[0], height=self.height() // 2)
+        message_box = self.boxes[tk]
+        #########
+
         self.key_boxes = []
         self.active_key_boxes = []
         for x in range(88):
@@ -305,11 +312,15 @@ class Player(Box, RegisteredInteractor):
                 str_m_pos = "Bar: %d/%d" % (measure_dict[self.song_position], measure_count)
                 for c, character in enumerate(str_m_pos):
                     self.set(1 + c, self.height() - 1, character)
-
                 sb_i = max(0, self.song_position - space_buffer)
                 sb_f = min(len(self.state_boxes), self.song_position - space_buffer + self.height())
 
                 self.active_boxes = self.state_boxes[sb_i: sb_f]
+
+                message_box.clear()
+                if midi_interface.text_map[self.song_position]:
+                    for e in midi_interface.text_map[self.song_position]:
+                        message_box.set_string(0,0, e.text)
 
                 y = len(self.active_boxes) - 1
                 y += max(0, (self.song_position - space_buffer + self.height()) - len(self.state_boxes))
@@ -318,7 +329,7 @@ class Player(Box, RegisteredInteractor):
                     y -= 1
                 if len(self.active_boxes) >= self.height():
                     self.active_boxes.pop(0)
-                self.refresh(self.active_key_boxes + self.active_boxes)
+                self.refresh(self.active_key_boxes + self.active_boxes + [message_box])
         self.quit()
 
     def _wait_for_input(self, midi_interface):

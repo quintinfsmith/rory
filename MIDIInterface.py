@@ -9,12 +9,14 @@ class MIDIInterface(object):
             self.controller.listen()
 
         self.state_map = [] # For quick access to which keys are pressed
+        self.text_map = []
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
         squash_factor = 8 / self.midilike.tpqn
         collective_pressed_keys = {}
         for tick in range(len(self.midilike)):
             pressed_keys = {}
+            text_events = []
             for track in self.midilike.tracks:
                 for event in track.get_events(tick):
                     if event.eid == event.NOTE_ON and event.channel != 10:
@@ -27,13 +29,19 @@ class MIDIInterface(object):
                     elif event.eid == event.NOTE_OFF and event.note in collective_pressed_keys.keys():
                         self.event_pair_map[collective_pressed_keys[event.note].id] = event
                         del collective_pressed_keys[event.note]
-
+                    elif event.eid == event.TEXT:
+                        text_events.append(event)
+                        
             if len(pressed_keys.keys()):
                 squashed_tick = int(round(tick * squash_factor, 0))
                 while len(self.state_map) <= squashed_tick:
                     self.state_map.append(set())
                 while len(self.event_map) <= squashed_tick:
                     self.event_map.append({})
+                while len(self.text_map) <= squashed_tick:
+                    self.text_map.append([])
+
+                self.text_map[squashed_tick] = text_events
                 self.event_map[squashed_tick].update(pressed_keys.copy())
                 self.state_map[squashed_tick] |= set(pressed_keys.keys())
 
