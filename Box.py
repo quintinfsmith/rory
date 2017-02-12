@@ -42,6 +42,20 @@ class Box(object):
         '''Get height'''
         return len(self.grid)
 
+    def set_string(self, x, y, string):
+        '''Set String in box'''
+        for xx, c in enumerate(string):
+            Y = xx // len(string)
+            X = xx % len(string)
+            self.grid[y + Y][x + X] = c
+        self.set_refresh_flag()
+
+    def clear(self):
+        for y in range(len(self.grid)):
+            for x in range(len(self.grid[y])):
+                self.set(x,y, "")
+        self.set_refresh_flag()
+
     def set(self, x, y, c):
         '''Set Character in box'''
         self.grid[y][x] = c
