@@ -47,7 +47,10 @@ class Box(object):
         for xx, c in enumerate(string):
             Y = xx // len(string)
             X = xx % len(string)
-            self.grid[y + Y][x + X] = c
+            try:
+                self.grid[y + Y][x + X] = c
+            except IndexError:
+                pass
         self.set_refresh_flag()
 
     def clear(self):

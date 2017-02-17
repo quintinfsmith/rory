@@ -29,7 +29,7 @@ class MIDIInterface(object):
                     elif event.eid == event.NOTE_OFF and event.note in collective_pressed_keys.keys():
                         self.event_pair_map[collective_pressed_keys[event.note].id] = event
                         del collective_pressed_keys[event.note]
-                    elif event.eid == event.TEXT:
+                    elif event.eid == event.TEXT or event.eid == event.LYRIC:
                         text_events.append(event)
                         
             if len(pressed_keys.keys()):
