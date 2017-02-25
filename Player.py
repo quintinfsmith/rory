@@ -14,6 +14,7 @@ class Player(Box, RegisteredInteractor):
     RAISE_JUMP = 1 << 5
     RAISE_RECORD = 1 << 6
     RAISE_SAVE = 1 << 7
+    RAISE_IGNORE_CHANNEL = 1 << 8
 
     rechannelling = -1
 
@@ -66,17 +67,29 @@ class Player(Box, RegisteredInteractor):
         '''start rechanneling events'''
         if self.general_register:
             self.rechannelling = self.general_register
-            self.clear_register()
+        self.clear_register()
 
     def unset_rechannel(self):
         '''stop rechanneling events'''
         self.rechannelling = -1
+        self.clear_register()
 
     def set_settings(self, new_settings, do_save=False):
         '''Cache Settings in Interface'''
         self.parent.settings[self.active_midi.path] = new_settings
         if do_save:
             self.parent.save_settings()
+
+    def raise_ignore_channel(self):
+        self.set_flag(self.RAISE_IGNORE_CHANNEL)
+
+    def toggle_ignore_channel(self):
+        c = self.general_register
+        if c in self.ignored_channels:
+            self.ignored_channels.remove(c)
+        else:
+            self.ignored_channels.append(c)
+        self.clear_register()
 
     def point_jump(self):
         '''Jump to saved point'''
@@ -113,6 +126,7 @@ class Player(Box, RegisteredInteractor):
 
         self.assign_sequence("j", self.next_state)
         self.assign_sequence("k", self.prev_state)
+        self.assign_sequence("i", self.raise_ignore_channel)
         self.assign_sequence("p", self.jump)
         self.assign_sequence("P", self.point_jump)
         self.assign_sequence("q", self.quit)
@@ -132,7 +146,7 @@ class Player(Box, RegisteredInteractor):
         self.flags = {}
         self.previously_expected_set = set()
 
-        self.ignore = []
+        self.ignored_channels = []
         self.song_position = 0
 
         self.active_midi = None
@@ -149,16 +163,23 @@ class Player(Box, RegisteredInteractor):
         '''Convert Midi Note byte to Legible Character'''
         note_list = 'CCDDEFFGGAAB'
         color_trans = [7, 3, 6, 2, 5, 4, 1, 3]
-        if channel > 7:
+        ignoring = False
+        if channel in self.ignored_channels:
+            ignoring = True
+        elif channel > 7:
             note_list = note_list.lower()
             channel %= 8
 
         note %= 12
+        if ignoring:
+            color = 0    
+        else:
+            color = color_trans[channel]
         display_character = note_list[note]
         if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (color_trans[channel], display_character)
+            return "\033[7;3%dm%s\033[0m" % (color, display_character)
         else:
-            return "\033[3%dm%s\033[0m" % (color_trans[channel], display_character)
+            return "\033[3%dm%s\033[0m" % (color, display_character)
 
     def update_pressed_line(self, pressed, matched):
         '''Redraw Pressed Keys'''
@@ -197,6 +218,17 @@ class Player(Box, RegisteredInteractor):
             except IndexError:
                 pass
 
+    def insert_keychars(self, midi_interface):
+        '''Repopulate all the boxes with key characters'''
+        for j, current_state in enumerate(midi_interface.event_map):
+            box = self.state_boxes[j]
+            for key, event in current_state.items():
+                try:
+                    box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
+                except IndexError:
+                    pass
+            
+
     def play_along(self, midilike, controller):
         '''Display notes in console. Main function'''
         midi_interface = MIDIInterface(midilike, controller)
@@ -221,19 +253,9 @@ class Player(Box, RegisteredInteractor):
                         new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
                 measure_count += 1
             measure_dict[j] = measure_count
-            for key, event in current_state.items():
-                try:
-                    new_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
-                except IndexError:
-                    pass
             self.state_boxes.append(new_box)
 
-
-        # message Box
-        pos = self.parent.box_positions[self.id]
-        tk = self.add_box(x=0-pos[0], y=0, width=pos[0], height=self.height() // 2)
-        message_box = self.boxes[tk]
-        #########
+        self.insert_keychars(midi_interface)
 
         self.key_boxes = []
         self.active_key_boxes = []
@@ -317,10 +339,6 @@ class Player(Box, RegisteredInteractor):
 
                 self.active_boxes = self.state_boxes[sb_i: sb_f]
 
-                message_box.clear()
-                if midi_interface.text_map[self.song_position]:
-                    for e in midi_interface.text_map[self.song_position]:
-                        message_box.set_string(0,0, e.text)
 
                 y = len(self.active_boxes) - 1
                 y += max(0, (self.song_position - space_buffer + self.height()) - len(self.state_boxes))
@@ -329,7 +347,7 @@ class Player(Box, RegisteredInteractor):
                     y -= 1
                 if len(self.active_boxes) >= self.height():
                     self.active_boxes.pop(0)
-                self.refresh(self.active_key_boxes + self.active_boxes + [message_box])
+                self.refresh(self.active_key_boxes + self.active_boxes)
         self.quit()
 
     def _wait_for_input(self, midi_interface):
@@ -341,11 +359,17 @@ class Player(Box, RegisteredInteractor):
         input_given = 0
         while input_given == 0:
             pressed = midi_interface.get_pressed()
-            if midi_interface.states_match(self.song_position, pressed):
+            if midi_interface.states_match(self.song_position, pressed, self.ignored_channels):
                 input_given = self.NEXT_STATE
             elif self.flag_isset(self.RAISE_RECORD):
                 self.flags[self.RAISE_RECORD] = 0
                 input_given = self.RAISE_RECORD
+            elif self.flag_isset(self.RAISE_IGNORE_CHANNEL):
+                self.flags[self.RAISE_IGNORE_CHANNEL] = 0
+                self.toggle_ignore_channel()
+                self.insert_keychars(midi_interface)
+                self.general_register = self.song_position
+                input_given = self.RAISE_JUMP
             elif self.flag_isset(self.PREV_STATE):
                 self.flags[self.PREV_STATE] = 0
                 input_given = self.PREV_STATE
@@ -384,3 +408,4 @@ class Player(Box, RegisteredInteractor):
     def set_flag(self, flag, state=1):
         '''Set a Flag'''
         self.flags[flag] = state
+

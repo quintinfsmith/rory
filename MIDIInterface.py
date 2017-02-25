@@ -12,6 +12,7 @@ class MIDIInterface(object):
         self.text_map = []
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
+        self.active_notes_map = []
         squash_factor = 8 / self.midilike.tpqn
         collective_pressed_keys = {}
         for tick in range(len(self.midilike)):
@@ -40,6 +41,8 @@ class MIDIInterface(object):
                     self.event_map.append({})
                 while len(self.text_map) <= squashed_tick:
                     self.text_map.append([])
+                while len(self.active_notes_map) <= squashed_tick:
+                    self.active_notes_map.append(collective_pressed_keys.copy())
 
                 self.text_map[squashed_tick] = text_events
                 self.event_map[squashed_tick].update(pressed_keys.copy())
@@ -58,8 +61,13 @@ class MIDIInterface(object):
     def is_state_empty(self, tick):
         return not bool(self.state_map[tick])
 
-    def states_match(self, tick, given_state):
+    def states_match(self, tick, given_state, ignored_channels=[0]):
         '''Check that the controller is pressing the correct keys'''
+        given_state = given_state.copy()
+        for key, event in self.active_notes_map[tick].items():
+            if event.channel in ignored_channels:
+                given_state.add(key)
+
         return len(given_state.intersection(self.state_map[tick])) == len(self.state_map[tick])
 
     def get_state(self, tick):
