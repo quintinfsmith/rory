@@ -13,7 +13,7 @@ class MIDIInterface(object):
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
         self.active_notes_map = []
-        squash_factor = 8 / self.midilike.tpqn
+        squash_factor = 8 / self.midilike.ppqn
         collective_pressed_keys = {}
         for tick in range(len(self.midilike)):
             pressed_keys = {}

@@ -236,9 +236,9 @@ class Player(Box, RegisteredInteractor):
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         self.resize(num_of_keys + 2, self.parent.height())
-        squash_factor = 8 / midilike.tpqn
+        squash_factor = 8 / midilike.ppqn
         space_buffer = 8
-        states_per_measure = (midilike.tpqn * 4) * squash_factor
+        states_per_measure = (midilike.ppqn * 4) * squash_factor
 
         self.state_boxes = []
         measure_count = 0
