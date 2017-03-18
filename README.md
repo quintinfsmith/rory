@@ -20,21 +20,36 @@ Usage: 1: ensure your console is at least 90 chacters wide
 
 Controls:
     q - quit
-  
     j - Next State
-  
     k - Previous state
-  
     [ - set loop start
-  
     ] - set loop end
-  
-    / - clear loop
-
+    / - break loop
     p - jump to start
+    C - stop rechanneling  (see "#rechannel")
+    :w - save file to "editted-filename.mid"
+    s - quickjump (see "#quickjump")
 
-    [number] p - jump to state [number]
+    Register Commands ( type number, hit <cmd> )
+    i - toggle channel visibility
+    P - jump to state [number]
+    S - set quickjump position (see "#quickjump)
+    c - start rechanneling (see "#rechannel") 
 
+#quickjump
+    The user can save positions in the song to come back to later.
+    Start by inputting the quickjump command, then select a character to act as the key, 
+    example:
+        "S" -> "1" @ position 456 in a song
+        "s" -> "1" will jump me back to 456
+
+#rechannel
+    The User can rewrite the channel of notes to define left and right hands in a piece.
+    Example
+       1 -> "c"
+       hold the notes which you wish to rechannel and press "next state". the keys will now show up in the color of channel 1.
+        to stop. press "C"
+       save by typing ":w", will be saved into "editted-<filename>.mid"
 
 Notes:
 
