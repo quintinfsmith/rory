@@ -12,9 +12,8 @@ class Player(Box, RegisteredInteractor):
     RAISE_QUIT = 1 << 3
     RAISE_MIDI_INPUT_CHANGE = 1 << 4
     RAISE_JUMP = 1 << 5
-    RAISE_RECORD = 1 << 6
-    RAISE_SAVE = 1 << 7
-    RAISE_IGNORE_CHANNEL = 1 << 8
+    RAISE_SAVE = 1 << 6
+    RAISE_IGNORE_CHANNEL = 1 << 7
 
     rechannelling = -1
 
@@ -59,9 +58,6 @@ class Player(Box, RegisteredInteractor):
             return self.parent.settings[self.active_midi.path]
         except KeyError:
             return {}
-
-    def toggle_recording(self):
-        self.set_flag(self.RAISE_RECORD, 1)
 
     def set_rechannel(self):
         '''start rechanneling events'''
@@ -134,7 +130,6 @@ class Player(Box, RegisteredInteractor):
         self.assign_sequence("s", self.set_jump_point)
         self.assign_sequence("c", self.set_rechannel)
         self.assign_sequence("C", self.unset_rechannel)
-        self.assign_sequence(chr(13), self.toggle_recording)
         self.assign_sequence("[", self.set_loop_start)
         self.assign_sequence("]", self.set_loop_end)
         self.assign_sequence("/", self.clear_loop)
@@ -309,8 +304,6 @@ class Player(Box, RegisteredInteractor):
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
                 call_refresh = True
-            elif result == self.RAISE_RECORD:
-                controller.toggle_recording("test.mid")
             elif result == self.NEXT_STATE:
                 self.song_position = (self.song_position + 1) % len(midi_interface)
                 while self.song_position < len(midi_interface) \
@@ -364,9 +357,6 @@ class Player(Box, RegisteredInteractor):
             pressed = midi_interface.get_pressed()
             if midi_interface.states_match(self.song_position, pressed, self.ignored_channels):
                 input_given = self.NEXT_STATE
-            elif self.flag_isset(self.RAISE_RECORD):
-                self.flags[self.RAISE_RECORD] = 0
-                input_given = self.RAISE_RECORD
             elif self.flag_isset(self.RAISE_IGNORE_CHANNEL):
                 self.flags[self.RAISE_IGNORE_CHANNEL] = 0
                 self.toggle_ignore_channel()
