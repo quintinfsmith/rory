@@ -323,11 +323,11 @@ class Player(Box, RegisteredInteractor):
                 call_refresh = True
 
             if call_refresh:
-                strpos = "%d/%d" % (self.song_position, len(midi_interface) - 1)
+                strpos = "%8d/%d" % (self.song_position, len(midi_interface) - 1)
                 for c, character in enumerate(strpos):
                     self.position_display_box.set(self.width() - len(strpos) - 1 + c, 0, character)
 
-                str_m_pos = "Bar: %d/%d" % (measure_dict[self.song_position], measure_count)
+                str_m_pos = "Bar: %3d/%3d" % (measure_dict[self.song_position], measure_count)
                 for c, character in enumerate(str_m_pos):
                     self.set(1 + c, self.height() - 1, character)
                 sb_i = max(0, self.song_position - space_buffer)
