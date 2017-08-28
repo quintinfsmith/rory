@@ -25,7 +25,6 @@ class Box(object):
             for x in range(width):
                 self.grid[-1].append("")
 
-
     def hide(self):
         '''Hide from get_display()'''
         self.hidden = True
@@ -212,6 +211,11 @@ class BoxEnvironment(Box):
 
     def destroy(self):
         '''Reshow cursor and enable default text'''
+        self.boxes = {}
+        for y in range(self.height()):
+            for x in range(self.width()):
+                self.set(x,y, " ")
+
         sys.stdout.write("\033[1;1H")
         sys.stdout.write("\033[?25h")
 
@@ -226,3 +230,4 @@ class BoxEnvironment(Box):
                 c = " "
             sys.stdout.write("\033[%d;%dH%s" % (y + 1, x + 1, c))
         sys.stdout.write("\033[1;1H\n")
+
