@@ -20,9 +20,14 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         self.midi_interpreter = MIDIInterpreter()
         self.active_threads = []
         self.interactorstack = []
+        x_a = (self.width() - 90) // 2
+        x_b = (self.width() + 90) // 2
         for y in range(self.height()):
             for x in range(self.width()):
-                self.set(x, y, " ")
+                if x < x_a or x >= x_b:
+                    self.set(x, y, "\033[47m \033[40m")
+                else:
+                    self.set(x, y, " ")
 
         self.listening = False
         self.assign_sequence("q", self.quit)
@@ -76,17 +81,6 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         thread.start()
         self.active_threads.append(thread)
 
-    # Record doesn't exist yet
-    #def record(self):
-    #    recorder = Recorder()
-    #    new_id = self.add_box(w=recorder.width(), h=player.height(), x = (self.width() - 90) // 2, y = 0)
-    #    self.boxes[new_id] = recorder
-    #    recorder.parent = self
-    #    recorder.id = new_id
-
-    #    self.interactorstack.append(new_id)
-    #    self.recorder = recorder
-
     def input_loop(self):
         '''Main loop, just handles computer keyboard input'''
         self.listening = True
@@ -99,6 +93,6 @@ class Interface(BoxEnvironment, RegisteredInteractor):
                     break
 
             if not self.interactorstack:
-                active = self
+                #active = self
                 self.quit()
             active.get_input()
