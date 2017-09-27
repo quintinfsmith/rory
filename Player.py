@@ -231,9 +231,8 @@ class Player(Box, RegisteredInteractor):
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         self.resize(num_of_keys + 2, self.parent.height())
-        squash_factor = 8 / midilike.ppqn
         space_buffer = 8
-        states_per_measure = (midilike.ppqn * 4) * squash_factor
+        states_per_measure = (midilike.ppqn * 4)
 
         self.state_boxes = []
         measure_count = 0
@@ -242,7 +241,7 @@ class Player(Box, RegisteredInteractor):
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
-            if j % states_per_measure == 0:
+            if midi_interface.get_real_tick(j) % states_per_measure == 0:
                 for i in range(88):
                     if i % 12 and not i % 4:
                         new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
