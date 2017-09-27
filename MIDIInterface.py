@@ -13,8 +13,16 @@ class MIDIInterface(object):
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
         self.active_notes_map = []
-        squash_factor = 8 / self.midilike.ppqn
+
+        self.real_tick_map = {0: 0}
+
+        states_per_measure = (midilike.ppqn * 4)
+    
         collective_pressed_keys = {}
+
+        modded_tick = 0
+        insert_space = False
+
         for tick in range(len(self.midilike)):
             pressed_keys = {}
             text_events = []
@@ -32,21 +40,35 @@ class MIDIInterface(object):
                         del collective_pressed_keys[event.note]
                     elif event.eid == event.TEXT or event.eid == event.LYRIC:
                         text_events.append(event)
-                        
+ 
             if len(pressed_keys.keys()):
-                squashed_tick = int(round(tick * squash_factor, 0))
-                while len(self.state_map) <= squashed_tick:
+                #squashed_tick = int(round(tick * squash_factor, 0))
+                modded_tick += 1
+                self.real_tick_map[modded_tick] = tick
+
+                if insert_space:
+                    for i in range(2):
+                        modded_tick += 1
+                        self.real_tick_map[modded_tick] = tick
+                    
+                while len(self.state_map) <= modded_tick:
                     self.state_map.append(set())
-                while len(self.event_map) <= squashed_tick:
+                while len(self.event_map) <= modded_tick:
                     self.event_map.append({})
-                while len(self.text_map) <= squashed_tick:
+                while len(self.text_map) <= modded_tick:
                     self.text_map.append([])
-                while len(self.active_notes_map) <= squashed_tick:
+                while len(self.active_notes_map) <= modded_tick:
                     self.active_notes_map.append(collective_pressed_keys.copy())
 
-                self.text_map[squashed_tick] = text_events
-                self.event_map[squashed_tick].update(pressed_keys.copy())
-                self.state_map[squashed_tick] |= set(pressed_keys.keys())
+                self.text_map[modded_tick] = text_events
+                self.event_map[modded_tick].update(pressed_keys.copy())
+                self.state_map[modded_tick] |= set(pressed_keys.keys())
+
+                insert_space = (tick % (midilike.ppqn / 128)) == 0
+                
+
+    def get_real_tick(self, modded_tick):
+        return self.real_tick_map[modded_tick]
 
     def rechannel_event(self, note_on_event, channel):
         '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
