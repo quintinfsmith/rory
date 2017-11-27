@@ -8,6 +8,8 @@ class MIDIInterface(object):
         if self.controller.connected:
             self.controller.listen()
 
+        squeeze_in = {}
+
         self.state_map = [] # For quick access to which keys are pressed
         self.text_map = []
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
@@ -34,19 +36,41 @@ class MIDIInterface(object):
                         text_events.append(event)
                         
             if len(pressed_keys.keys()):
-                squashed_tick = int(round(tick * squash_factor, 0))
-                while len(self.state_map) <= squashed_tick:
-                    self.state_map.append(set())
-                while len(self.event_map) <= squashed_tick:
-                    self.event_map.append({})
-                while len(self.text_map) <= squashed_tick:
-                    self.text_map.append([])
-                while len(self.active_notes_map) <= squashed_tick:
-                    self.active_notes_map.append(collective_pressed_keys.copy())
+                squashed_tick = tick * squash_factor
 
-                self.text_map[squashed_tick] = text_events
-                self.event_map[squashed_tick].update(pressed_keys.copy())
-                self.state_map[squashed_tick] |= set(pressed_keys.keys())
+                if squashed_tick % 1: 
+                    squashed_tick = int(squashed_tick)
+                    if not int(squashed_tick) in squeeze_in.keys():
+                        squeeze_in[int(squashed_tick)]  = []
+                    squeeze_in[int(squashed_tick)].append((
+                        pressed_keys.copy(),
+                        set(pressed_keys.keys()),
+                        collective_pressed_keys.copy()
+                    ))
+                else:
+                    squashed_tick = int(squashed_tick)
+
+                    while len(self.state_map) <= squashed_tick:
+                        self.state_map.append(set())
+                    while len(self.event_map) <= squashed_tick:
+                        self.event_map.append({})
+                    while len(self.text_map) <= squashed_tick:
+                        self.text_map.append([])
+
+                    self.text_map[squashed_tick] = text_events
+                    self.event_map[squashed_tick].update(pressed_keys.copy())
+                    self.state_map[squashed_tick] |= set(pressed_keys.keys())
+                    while len(self.active_notes_map) <= squashed_tick:
+                        self.active_notes_map.append(collective_pressed_keys.copy())
+
+        ticks = list(squeeze_in.keys())
+        ticks.sort()
+        for tick in ticks[::-1]:
+            pairs = squeeze_in[tick]
+            for pair in pairs[::-1]:
+                self.event_map.insert(tick + 1, pair[0])
+                self.state_map.insert(tick + 1, pair[1])
+                self.active_notes_map.insert(tick + 1, pair[2])
 
     def rechannel_event(self, note_on_event, channel):
         '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
