@@ -15,8 +15,16 @@ class MIDIInterface(object):
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
         self.active_notes_map = []
-        squash_factor = 8 / self.midilike.ppqn
+
+        self.real_tick_map = {0: 0}
+
+        states_per_measure = (midilike.ppqn * 4)
+    
         collective_pressed_keys = {}
+
+        modded_tick = 0
+        insert_space = False
+
         for tick in range(len(self.midilike)):
             pressed_keys = {}
             text_events = []
@@ -34,7 +42,7 @@ class MIDIInterface(object):
                         del collective_pressed_keys[event.note]
                     elif event.eid == event.TEXT or event.eid == event.LYRIC:
                         text_events.append(event)
-                        
+ 
             if len(pressed_keys.keys()):
                 squashed_tick = tick * squash_factor
 
