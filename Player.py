@@ -242,12 +242,12 @@ class Player(Box, RegisteredInteractor):
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
-            if j % states_per_measure == 0:
-                for i in range(88):
-                    if i % 12 and not i % 4:
-                        new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
-                measure_count += 1
-            measure_dict[j] = measure_count
+            #if j % states_per_measure == 0:
+            #    for i in range(88):
+            #        if i % 12 and not i % 4:
+            #            new_box.set(i, 0, "\033[1;30m%s\033[0m" % ("-"))
+            #    measure_count += 1
+            #measure_dict[j] = measure_count
             self.state_boxes.append(new_box)
 
         self.insert_keychars(midi_interface)
@@ -327,9 +327,9 @@ class Player(Box, RegisteredInteractor):
                 for c, character in enumerate(strpos):
                     self.position_display_box.set(self.width() - len(strpos) - 1 + c, 0, character)
 
-                str_m_pos = "Bar: %3d/%3d" % (measure_dict[self.song_position], measure_count)
-                for c, character in enumerate(str_m_pos):
-                    self.set(1 + c, self.height() - 1, character)
+                #str_m_pos = "Bar: %3d/%3d" % (measure_dict[self.song_position], measure_count)
+                #for c, character in enumerate(str_m_pos):
+                #    self.set(1 + c, self.height() - 1, character)
                 sb_i = max(0, self.song_position - space_buffer)
                 sb_f = min(len(self.state_boxes), self.song_position - space_buffer + self.height())
 
