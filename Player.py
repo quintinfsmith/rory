@@ -81,11 +81,13 @@ class Player(Box, RegisteredInteractor):
 
     def toggle_ignore_channel(self):
         c = self.general_register
+        self.general_register = 0
+        dif = len(self.channels_used) - len(self.ignored_channels)
         if c in self.ignored_channels:
             self.ignored_channels.remove(c)
-        else:
+        # Don't removed the last channel
+        elif dif > 1:
             self.ignored_channels.append(c)
-        self.clear_register()
 
     def point_jump(self):
         '''Jump to saved point'''
@@ -141,6 +143,7 @@ class Player(Box, RegisteredInteractor):
         self.flags = {}
         self.previously_expected_set = set()
 
+        self.channels_used = set()
         self.ignored_channels = []
         self.song_position = 0
 
@@ -166,15 +169,20 @@ class Player(Box, RegisteredInteractor):
             channel %= 8
 
         note %= 12
+        display_character = note_list[note]
+
         if ignoring:
-            color = 0    
+            if note in self.SHARPS:
+                return "\033[1;30m%s\033[0m" % (display_character)
+            else:
+                return "\033[1;7;30m%s\033[0m" % (display_character)
         else:
             color = color_trans[channel]
-        display_character = note_list[note]
-        if note in self.SHARPS:
-            return "\033[7;3%dm%s\033[0m" % (color, display_character)
-        else:
-            return "\033[3%dm%s\033[0m" % (color, display_character)
+
+            if note in self.SHARPS:
+                return "\033[7;3%dm%s\033[0m" % (color, display_character)
+            else:
+                return "\033[3%dm%s\033[0m" % (color, display_character)
 
     def update_pressed_line(self, pressed, matched):
         '''Redraw Pressed Keys'''
@@ -228,6 +236,7 @@ class Player(Box, RegisteredInteractor):
         '''Display notes in console. Main function'''
         midi_interface = MIDIInterface(midilike, controller)
         self.active_midi = midilike
+        self.channels_used = midi_interface.channels_used
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         self.resize(num_of_keys + 2, self.parent.height())
@@ -355,6 +364,7 @@ class Player(Box, RegisteredInteractor):
                 self.insert_keychars(midi_interface)
                 self.general_register = self.song_position
                 input_given = self.RAISE_JUMP
+                self.clear_register()
             elif self.flag_isset(self.PREV_STATE):
                 self.flags[self.PREV_STATE] = 0
                 input_given = self.PREV_STATE

@@ -16,6 +16,7 @@ class MIDIInterface(object):
         self.event_pair_map = {}
         self.active_notes_map = []
         squash_factor = 8 / midilike.ppqn
+        self.channels_used = set()
     
         collective_pressed_keys = {}
 
@@ -25,7 +26,8 @@ class MIDIInterface(object):
             text_events = []
             for track in self.midilike.tracks:
                 for event in track.get_events(tick):
-                    if event.eid == event.NOTE_ON and event.channel != 10:
+                    if event.eid == event.NOTE_ON and event.channel != 9:
+                        self.channels_used.add(event.channel)
                         if event.velocity == 0 and event.note in collective_pressed_keys.keys():
                             self.event_pair_map[collective_pressed_keys[event.note].id] = event
                             del collective_pressed_keys[event.note]
