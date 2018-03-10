@@ -230,7 +230,6 @@ class Player(Box, RegisteredInteractor):
                     box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
                 except IndexError:
                     pass
-            
 
     def play_along(self, midilike, controller):
         '''Display notes in console. Main function'''
@@ -249,6 +248,10 @@ class Player(Box, RegisteredInteractor):
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
+            if j in midi_interface.quarternotes:
+                for i in range(3):
+                    new_box.set(87 - i, 0, "\033[1;30m%s\033[0m" % ".")
+                    new_box.set(i, 0, "\033[1;30m%s\033[0m" % ".")
             self.state_boxes.append(new_box)
 
         self.insert_keychars(midi_interface)

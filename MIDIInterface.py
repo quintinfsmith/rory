@@ -17,16 +17,28 @@ class MIDIInterface(object):
         self.active_notes_map = []
         squash_factor = 8 / midilike.ppqn
         self.channels_used = set()
-    
+        self.quarternotes = []
+
+        ppqn = midilike.ppqn
+        bpm = 120 # Default (in quarter notes)
+        ticks_per_second = (ppqn * bpm) / 60
+        seconds_per_tick = 1 / ticks_per_second
+
         collective_pressed_keys = {}
 
+        for i in range(len(midilike) // midilike.ppqn):
+            self.quarternotes.append((midilike.ppqn * i) * squash_factor)
 
         for tick in range(len(self.midilike)):
             pressed_keys = {}
             text_events = []
             for track in self.midilike.tracks:
                 for event in track.get_events(tick):
-                    if event.eid == event.NOTE_ON and event.channel != 9:
+                    if event.eid == event.SET_TEMPO:
+                        bpm = 60000000 / event.tempo
+                        ticks_per_second = (ppqn * bpm) / 60
+                        seconds_per_tick = 1 / ticks_per_second
+                    elif event.eid == event.NOTE_ON and event.channel != 9:
                         self.channels_used.add(event.channel)
                         if event.velocity == 0 and event.note in collective_pressed_keys.keys():
                             self.event_pair_map[collective_pressed_keys[event.note].id] = event
@@ -39,11 +51,11 @@ class MIDIInterface(object):
                         del collective_pressed_keys[event.note]
                     elif event.eid == event.TEXT or event.eid == event.LYRIC:
                         text_events.append(event)
- 
+
             if len(pressed_keys.keys()):
                 squashed_tick = tick * squash_factor
 
-                if squashed_tick % 1: 
+                if squashed_tick % 1:
                     squashed_tick = int(squashed_tick)
                     if not int(squashed_tick) in squeeze_in.keys():
                         squeeze_in[int(squashed_tick)]  = []
@@ -76,6 +88,9 @@ class MIDIInterface(object):
                 self.event_map.insert(tick + 1, pair[0])
                 self.state_map.insert(tick + 1, pair[1])
                 self.active_notes_map.insert(tick + 1, pair[2])
+                for i, t in enumerate(self.quarternotes):
+                    if tick < t:
+                        self.quarternotes[i] += 1
 
     def rechannel_event(self, note_on_event, channel):
         '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
