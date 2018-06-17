@@ -20,13 +20,16 @@ class MIDIInterface(object):
 
         self.channels_used = set()
 
+
         ppqn = midilike.ppqn
         bpm = 120 # Default (in quarter notes)
         ticks_per_second = (ppqn * bpm) / 60
         seconds_per_tick = 1 / ticks_per_second
 
-        collective_pressed_keys = {}
+        self.tps_map = []
 
+        collective_pressed_keys = {}
+        last_tps = ticks_per_second
         for tick in range(len(self.midilike)):
             pressed_keys = {}
             text_events = []
@@ -50,6 +53,11 @@ class MIDIInterface(object):
                     elif event.eid == event.TEXT or event.eid == event.LYRIC:
                         text_events.append(event)
 
+            if last_tps != ticks_per_second:
+                self.tps_map.append((tick, last_tps))
+
+            last_tps = ticks_per_second
+
             if len(pressed_keys.keys()):
                 squashed_tick = int(tick)
 
@@ -65,7 +73,14 @@ class MIDIInterface(object):
                 self.state_map[squashed_tick] |= set(pressed_keys.keys())
                 while len(self.active_notes_map) <= squashed_tick:
                     self.active_notes_map.append(collective_pressed_keys.copy())
+        self.tps_map.append((tick, last_tps))
 
+    def get_ticks_per_second(self, tick):
+        #Ticks BEFORE pair[0] are assigned to the tps: pair[1]
+        i = len(self.tps_map) - 1
+        while i and tick > self.tps_map[i][0]:
+            i -= 1
+        return self.tps_map[i][1]
 
     def get_state(self, tick):
         return self.state_map[tick]
