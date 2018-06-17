@@ -5,7 +5,7 @@ class MIDIInterface(object):
         self.controller = controller
         self.midilike = midilike
 
-        if self.controller.connected:
+        if self.controller and self.controller.connected:
             self.controller.listen()
 
         squeeze_in = {}
@@ -15,9 +15,10 @@ class MIDIInterface(object):
         self.event_map = [] # For access to extra information about the key press (velocity, channel)
         self.event_pair_map = {}
         self.active_notes_map = []
-        squash_factor = 8 / midilike.ppqn
+        if not midilike.ppqn:
+            midilike.ppqn = 120
+
         self.channels_used = set()
-        self.quarternotes = []
 
         ppqn = midilike.ppqn
         bpm = 120 # Default (in quarter notes)
@@ -25,9 +26,6 @@ class MIDIInterface(object):
         seconds_per_tick = 1 / ticks_per_second
 
         collective_pressed_keys = {}
-
-        for i in range(len(midilike) // midilike.ppqn):
-            self.quarternotes.append((midilike.ppqn * i) * squash_factor)
 
         for tick in range(len(self.midilike)):
             pressed_keys = {}
@@ -53,44 +51,24 @@ class MIDIInterface(object):
                         text_events.append(event)
 
             if len(pressed_keys.keys()):
-                squashed_tick = tick * squash_factor
+                squashed_tick = int(tick)
 
-                if squashed_tick % 1:
-                    squashed_tick = int(squashed_tick)
-                    if not int(squashed_tick) in squeeze_in.keys():
-                        squeeze_in[int(squashed_tick)]  = []
-                    squeeze_in[int(squashed_tick)].append((
-                        pressed_keys.copy(),
-                        set(pressed_keys.keys()),
-                        collective_pressed_keys.copy()
-                    ))
-                else:
-                    squashed_tick = int(squashed_tick)
+                while len(self.state_map) <= squashed_tick:
+                    self.state_map.append(set())
+                while len(self.event_map) <= squashed_tick:
+                    self.event_map.append({})
+                while len(self.text_map) <= squashed_tick:
+                    self.text_map.append([])
 
-                    while len(self.state_map) <= squashed_tick:
-                        self.state_map.append(set())
-                    while len(self.event_map) <= squashed_tick:
-                        self.event_map.append({})
-                    while len(self.text_map) <= squashed_tick:
-                        self.text_map.append([])
+                self.text_map[squashed_tick] = text_events
+                self.event_map[squashed_tick].update(pressed_keys.copy())
+                self.state_map[squashed_tick] |= set(pressed_keys.keys())
+                while len(self.active_notes_map) <= squashed_tick:
+                    self.active_notes_map.append(collective_pressed_keys.copy())
 
-                    self.text_map[squashed_tick] = text_events
-                    self.event_map[squashed_tick].update(pressed_keys.copy())
-                    self.state_map[squashed_tick] |= set(pressed_keys.keys())
-                    while len(self.active_notes_map) <= squashed_tick:
-                        self.active_notes_map.append(collective_pressed_keys.copy())
 
-        ticks = list(squeeze_in.keys())
-        ticks.sort()
-        for tick in ticks[::-1]:
-            pairs = squeeze_in[tick]
-            for pair in pairs[::-1]:
-                self.event_map.insert(tick + 1, pair[0])
-                self.state_map.insert(tick + 1, pair[1])
-                self.active_notes_map.insert(tick + 1, pair[2])
-                for i, t in enumerate(self.quarternotes):
-                    if tick < t:
-                        self.quarternotes[i] += 1
+    def get_state(self, tick):
+        return self.state_map[tick]
 
     def rechannel_event(self, note_on_event, channel):
         '''Change the channel of a midi NOTE_ON event and its corresponding NOTE_OFF event'''
@@ -107,6 +85,7 @@ class MIDIInterface(object):
 
     def states_match(self, tick, given_state, ignored_channels=[0]):
         '''Check that the controller is pressing the correct keys'''
+        return True
         given_state = given_state.copy()
         for key, event in self.active_notes_map[tick].items():
             if event.channel in ignored_channels:
@@ -114,8 +93,6 @@ class MIDIInterface(object):
 
         return len(given_state.intersection(self.state_map[tick])) == len(self.state_map[tick])
 
-    def get_state(self, tick):
-        return self.state_map[tick]
 
     def states_unmatch(self, tick, given_state):
         '''Check that the controller is not pressing any keys at the given state in the midi'''
