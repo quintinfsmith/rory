@@ -7,7 +7,6 @@ import threading
 from Player import Player
 from Box import BoxEnvironment
 from Interactor import RegisteredInteractor
-from MidiLib.MidiInterpreter import MIDIInterpreter
 from MidiLib.MIDIController import MIDIController
 #from Recorder import Recorder
 
@@ -17,7 +16,6 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         BoxEnvironment.__init__(self)
         RegisteredInteractor.__init__(self)
         self.init_screen()
-        self.midi_interpreter = MIDIInterpreter()
         self.active_threads = []
         self.interactorstack = []
         x_a = (self.width() - 90) // 2
@@ -60,10 +58,6 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         with open(self.settings_path, "w") as fp:
             fp.write(json.dumps(self.settings))
 
-    def load_midi(self, midi_path):
-        '''Load Midi Like Object from path'''
-        return self.midi_interpreter(midi_path)
-
     def quit(self):
         '''shut it all down'''
         self.listening = False
@@ -74,10 +68,8 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         if not hidden:
             hidden = list()
 
-        selected_mlo = self.load_midi(midi_path)
-
         thread = threading.Thread(target=self.player.play_along,\
-          args=[selected_mlo, MIDIController(self.midi_controller_path)])
+          args=[midi_path, MIDIController(self.midi_controller_path)])
         thread.start()
         self.active_threads.append(thread)
 
