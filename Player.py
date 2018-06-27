@@ -4,6 +4,7 @@ from Box import Box
 from Interactor import RegisteredInteractor
 from localfuncs import read_character
 from MIDIInterface import MIDIInterface
+from MidiLib.MidiInterpreter import MIDIInterpreter as MI
 
 class Player(Box, RegisteredInteractor):
     '''Plays MIDILike Objects'''
@@ -231,8 +232,9 @@ class Player(Box, RegisteredInteractor):
                 except IndexError:
                     pass
 
-    def play_along(self, midilike, controller):
+    def play_along(self, path, controller):
         '''Display notes in console. Main function'''
+        midilike = MI.parse_midi(path)
         midi_interface = MIDIInterface(midilike, controller)
         self.active_midi = midilike
         self.channels_used = midi_interface.channels_used
@@ -248,10 +250,6 @@ class Player(Box, RegisteredInteractor):
         for j, current_state in enumerate(midi_interface.event_map):
             new_bid = self.add_box(x=1, y=j, width=88, height=1)
             new_box = self.boxes[new_bid]
-            if j in midi_interface.quarternotes:
-                for i in range(3):
-                    new_box.set(87 - i, 0, "\033[1;30m%s\033[0m" % ".")
-                    new_box.set(i, 0, "\033[1;30m%s\033[0m" % ".")
             self.state_boxes.append(new_box)
 
         self.insert_keychars(midi_interface)
