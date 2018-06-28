@@ -24,12 +24,10 @@ note_width = 10
 note_space = 2
 
 note_color = [
-    (255,255,0),
-    (255,200,0),
-    (255,100,0),
-    (255,100,100),
-    (255,0,200),
-    (100,50,255)
+    (1, 1, 0),
+    (1, 1, 1),
+    (1, 0, 1),
+    (0, 1, 1),
 ]
 
 class IScreen(Widget):
@@ -77,6 +75,7 @@ class SongScreen(IScreen):
         self.loop_points = (0, len(self.midi_interface))
 
         self.register = 0
+        self.visuals_changed = True
 
     def add_to_register(self, n):
         self.register *= 10
@@ -137,13 +136,14 @@ class SongScreen(IScreen):
         return note % 12 in (1,4,6,9,11)
 
     def update(self, dt):
+        if not self.visuals_changed: return
         self.canvas.clear()
         width, height = self.get_root_window().size
         ticks_in_screen = (height / self.pixels_per_tick)
         active_i = max(0, int(self.current_tick - self.buffer_ticks))
         active_f = min(len(self.midi_interface), int(self.current_tick - self.buffer_ticks + ticks_in_screen))
         w = (width / 58)
-        size = [int(w), 25]
+        orig_size = [int(w), 25]
 
         tickcount = active_f - active_i
         yoff = max(0, self.buffer_ticks - self.current_tick)
@@ -157,13 +157,13 @@ class SongScreen(IScreen):
 
                 if (sharps[i % 7] == 1):
                     h = (self.buffer_ticks // 2) * self.pixels_per_tick
-                    Rectangle(pos=(w * (i + .666), h), size=(w * (2 / 3), h + size[1]))
+                    Rectangle(pos=(w * (i + .666), h), size=(w * (2 / 3), h + orig_size[1]))
                 y = 0
 
                 Line(points=(w * i, y, w * i, height), width=linewidth)
 
             Color(1, 0, 0, .5)
-            Rectangle(pos=(0, (self.pixels_per_tick * self.buffer_ticks)), size=(width, size[1]))
+            Rectangle(pos=(0, (self.pixels_per_tick * self.buffer_ticks)), size=(width, orig_size[1]))
         # ---------------------
 
         for Y in range(tickcount):
@@ -171,6 +171,7 @@ class SongScreen(IScreen):
             active = self.midi_interface.event_map[(active_i + tickcount) - 1 - Y]
             y = tickcount - 1 - Y
             for note, event in active.items():
+                size = orig_size
                 n = (event.note - 21)
                 if self.note_is_sharp(n):
                     size[0] = (w * 1.3) * 2 / 3
@@ -192,16 +193,44 @@ class SongScreen(IScreen):
                 pos = (xx + ((w - size[0]) / 2), yy)
 
                 with self.canvas:
+                    is_sharp = self.note_is_sharp(event.note - 21)
                     if (y + active_i) == self.current_tick:
-                        Color(0, .5, 0)
+                        Color(*(note_color[event.channel % len(note_color)]))
+                        if is_sharp:
+                            Rectangle(pos=pos, size=size)
+                        else:
+                            Ellipse(pos=pos, size=size)
+                        pos = (pos[0] + 2, pos[1] + 2)
+                        size = (size[0] - 4, size[1] - 4)
+                        Color(0, .8, 0)
+                        if is_sharp:
+                            Rectangle(pos=pos, size=size)
+                        else:
+                            Ellipse(pos=pos, size=size)
                     elif y + yoff <= self.buffer_ticks:
-                        Color(0, 0, .5, .5)
+                        Color(1, 1, 1, .1)
+                        Ellipse(pos=pos, size=size)
                     else:
-                        Color(1, 1, 1)
-                    Ellipse(pos=pos, size=size)
+                        Color(*(note_color[event.channel % len(note_color)]))
+                        if is_sharp:
+                            Rectangle(pos=pos, size=size)
+                        else:
+                            Ellipse(pos=pos, size=size)
+                        pos = (pos[0] + 2, pos[1] + 2)
+                        size = (size[0] - 4, size[1] - 4)
+                        Color(0,0,0)
+                        if is_sharp:
+                            Rectangle(pos=pos, size=size)
+                        else:
+                            Ellipse(pos=pos, size=size)
+
+        pressed = self.midi_interface.get_pressed()
         active = self.midi_interface.event_map[self.current_tick]
         with self.canvas:
-            Color(1, 1, 1, .1)
+            if n in pressed:
+                Color(1, 1, 0, .1)
+            else:
+                Color(1, 1, 1, .1)
             size_natural = (w, self.buffer_ticks * self.pixels_per_tick)
             size_sharp = (w * 2 / 3, (self.buffer_ticks // 2) * self.pixels_per_tick)
             for event in active.values():
@@ -216,6 +245,7 @@ class SongScreen(IScreen):
                 xx = size_natural[0] * self._get_keyposition(n)
                 pos = (xx + ((size_natural[0] - size[0]) / 2), yy)
                 Rectangle(pos=pos, size=size)
+        self.visuals_changed = False
 
     def background_update(self):
         control = self.wait_for_input()
@@ -228,6 +258,7 @@ class SongScreen(IScreen):
         elif control == self.JUMP_TO_TICK:
             self.jump_to_tick(self.register)
             self.set_register(0)
+        self.visuals_changed = True
 
     def _on_keyboard_down(self, keyboard, keycode, text, modifiers):
         k = keycode[1]
@@ -239,6 +270,8 @@ class SongScreen(IScreen):
             self.set_flag(self.JUMP_TO_TICK)
         elif k in "0123456789":
             self.add_to_register(int(k))
+        elif k == "q":
+            self.set_flag(self.RAISE_QUIT)
 
 class ControlWidget(Widget):
     def __init__(self):
@@ -299,7 +332,7 @@ class TheApp(App):
     def build(self):
         self._keyboard = Window.request_keyboard(self._keyboard_closed, self)
         self._keyboard.bind(on_key_down=self.control._on_keyboard_down)
-        Clock.schedule_interval(self.control.update, 1 / 24)
+        Clock.schedule_interval(self.control.update, 1 / 60)
         return self.control
 
     # Do not touch. There seems to be a bug in Kivy when resizing Windows. This is needed to workaround
