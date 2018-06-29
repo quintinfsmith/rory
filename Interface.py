@@ -17,7 +17,6 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         BoxEnvironment.__init__(self)
         RegisteredInteractor.__init__(self)
         self.init_screen()
-        self.midi_interpreter = MIDIInterpreter()
         self.active_threads = []
         self.interactorstack = []
         x_a = (self.width() - 90) // 2
@@ -62,7 +61,7 @@ class Interface(BoxEnvironment, RegisteredInteractor):
 
     def load_midi(self, midi_path):
         '''Load Midi Like Object from path'''
-        return self.midi_interpreter(midi_path)
+        return MIDIInterpreter.parse_midi(midi_path)
 
     def quit(self):
         '''shut it all down'''
