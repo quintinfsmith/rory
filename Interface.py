@@ -58,6 +58,10 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         with open(self.settings_path, "w") as fp:
             fp.write(json.dumps(self.settings))
 
+    def load_midi(self, midi_path):
+        '''Load Midi Like Object from path'''
+        return MIDIInterpreter.parse_midi(midi_path)
+
     def quit(self):
         '''shut it all down'''
         self.listening = False
