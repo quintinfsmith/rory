@@ -2,6 +2,7 @@ from kivy.app import App
 from kivy.core.window import Window
 from kivy.uix.widget import Widget
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.relativelayout import RelativeLayout
 from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
@@ -52,6 +53,25 @@ class IScreen(Widget):
     def stop(self):
         self.active = False
 
+class NoteBlock(RelativeLayout):
+    def __init__(self, event, **kwargs):
+        super().__init__(**kwargs)
+        self.event = event
+
+    def draw(self, is_sharp):
+        event = self.event
+        size = self.size
+        with self.canvas:
+            Color(*(note_color[event.channel % len(note_color)]))
+            if is_sharp:
+                Rectangle(pos=(0,0), size=size)
+            else:
+                Ellipse(pos=(0,0), size=size)
+
+            # TODO: Looks like there's a bug in kivy here
+            #Color(0,0,0)
+            #Label(text=str(event.note), pos=(0,0), size=size, text_size=size)
+
 
 class SongScreen(IScreen):
     NEXT_STATE = 1
@@ -76,6 +96,10 @@ class SongScreen(IScreen):
 
         self.register = 0
         self.visuals_changed = True
+        self.noteblocks = {}
+
+        self.background_drawn = False
+        self.last_updated_notes = []
 
     def add_to_register(self, n):
         self.register *= 10
@@ -88,7 +112,7 @@ class SongScreen(IScreen):
         input_given = 0
         while not input_given:
             pressed = self.midi_interface.get_pressed()
-            if False and self.midi_interface.states_match(self.current_tick, pressed, []):
+            if self.midi_interface.states_match(self.current_tick, pressed, []):
                 input_given = self.NEXT_STATE
             elif self.check_flag(self.NEXT_STATE):
                 input_given = self.NEXT_STATE
@@ -135,15 +159,13 @@ class SongScreen(IScreen):
     def note_is_sharp(self,note):
         return note % 12 in (1,4,6,9,11)
 
-    def update(self, dt):
-        if not self.visuals_changed: return
-        self.canvas.clear()
+    def _draw_background(self):
         width, height = self.get_root_window().size
         ticks_in_screen = (height / self.pixels_per_tick)
         active_i = max(0, int(self.current_tick - self.buffer_ticks))
         active_f = min(len(self.midi_interface), int(self.current_tick - self.buffer_ticks + ticks_in_screen))
-        w = (width / 58)
-        orig_size = [int(w), 25]
+        keywidth = (width / 58)
+        blockheight = 25
 
         tickcount = active_f - active_i
         yoff = max(0, self.buffer_ticks - self.current_tick)
@@ -157,28 +179,64 @@ class SongScreen(IScreen):
 
                 if (sharps[i % 7] == 1):
                     h = (self.buffer_ticks // 2) * self.pixels_per_tick
-                    Rectangle(pos=(w * (i + .666), h), size=(w * (2 / 3), h + orig_size[1]))
+                    Rectangle(pos=(keywidth * (i + .666), h), size=(keywidth * (2 / 3), h + blockheight))
                 y = 0
 
-                Line(points=(w * i, y, w * i, height), width=linewidth)
+                Line(points=(keywidth * i, y, keywidth * i, height), width=linewidth)
 
             Color(1, 0, 0, .5)
-            Rectangle(pos=(0, (self.pixels_per_tick * self.buffer_ticks)), size=(width, orig_size[1]))
+            Rectangle(pos=(0, (self.pixels_per_tick * self.buffer_ticks)), size=(width, blockheight))
         # ---------------------
+        self.background_drawn = True
 
+    def clear_last_updated_notes(self):
+        while self.last_updated_notes:
+            self.last_updated_notes.pop().pos = (-100, -100)
+
+    def update(self, dt):
+        self.clear_last_updated_notes()
+        if not self.background_drawn:
+            self._draw_background()
+        width, height = self.get_root_window().size
+        ticks_in_screen = (height / self.pixels_per_tick)
+        active_i = max(0, int(self.current_tick - self.buffer_ticks))
+        active_f = min(len(self.midi_interface), int(self.current_tick - self.buffer_ticks + ticks_in_screen))
+        keywidth = (width / 58)
+        blockheight = 25
+
+        tickcount = active_f - active_i
+        yoff = max(0, self.buffer_ticks - self.current_tick)
         for Y in range(tickcount):
             # Rendered in reverse order so the next notes to be played are rendered on top of the ones to follow
-            active = self.midi_interface.event_map[(active_i + tickcount) - 1 - Y]
-            y = tickcount - 1 - Y
-            for note, event in active.items():
-                size = orig_size
-                n = (event.note - 21)
-                if self.note_is_sharp(n):
-                    size[0] = (w * 1.3) * 2 / 3
-                else:
-                    size[0] = (w * 1.3)
+            index = (active_i + tickcount) - 1 - Y
+            active = self.midi_interface.event_map[index]
 
-                xx = w * self._get_keyposition(n)
+            if not index in self.noteblocks.keys():
+                self.noteblocks[index] = []
+                for event in active.values():
+                    note = event.note
+                    is_sharp = self.note_is_sharp(note)
+                    block_width = keywidth
+                    if is_sharp:
+                        block_width *= ( 2 / 3 )
+
+                    newblock = NoteBlock(event, size=(block_width, 25), pos=(250,250))
+                    size = newblock.size
+
+                    self.add_widget(newblock, 1)
+                    self.noteblocks[index].append(newblock)
+                    newblock.draw(is_sharp)
+
+
+            active_noteblocks = self.noteblocks[index]
+            y = tickcount - 1 - Y
+
+            for noteblock in active_noteblocks:
+                self.last_updated_notes.append(noteblock)
+                note = noteblock.event.note
+                size = noteblock.size
+
+                xx = size[0] * self._get_keyposition(note)
 
                 if y + yoff <= self.buffer_ticks:
                     ratio = (y + yoff) / self.buffer_ticks
@@ -190,62 +248,31 @@ class SongScreen(IScreen):
                     yy += self.buffer_ticks
                     yy *= self.pixels_per_tick
 
-                pos = (xx + ((w - size[0]) / 2), yy)
+                pos = (xx + ((keywidth - size[0]) / 2), yy)
+                noteblock.pos = pos
 
-                with self.canvas:
-                    is_sharp = self.note_is_sharp(event.note - 21)
-                    if (y + active_i) == self.current_tick:
-                        Color(*(note_color[event.channel % len(note_color)]))
-                        if is_sharp:
-                            Rectangle(pos=pos, size=size)
-                        else:
-                            Ellipse(pos=pos, size=size)
-                        pos = (pos[0] + 2, pos[1] + 2)
-                        size = (size[0] - 4, size[1] - 4)
-                        Color(0, .8, 0)
-                        if is_sharp:
-                            Rectangle(pos=pos, size=size)
-                        else:
-                            Ellipse(pos=pos, size=size)
-                    elif y + yoff <= self.buffer_ticks:
-                        Color(1, 1, 1, .1)
-                        Ellipse(pos=pos, size=size)
-                    else:
-                        Color(*(note_color[event.channel % len(note_color)]))
-                        if is_sharp:
-                            Rectangle(pos=pos, size=size)
-                        else:
-                            Ellipse(pos=pos, size=size)
-                        pos = (pos[0] + 2, pos[1] + 2)
-                        size = (size[0] - 4, size[1] - 4)
-                        Color(0,0,0)
-                        if is_sharp:
-                            Rectangle(pos=pos, size=size)
-                        else:
-                            Ellipse(pos=pos, size=size)
 
-        pressed = self.midi_interface.get_pressed()
-        active = self.midi_interface.event_map[self.current_tick]
-        with self.canvas:
-            if n in pressed:
-                Color(1, 1, 0, .1)
-            else:
-                Color(1, 1, 1, .1)
-            size_natural = (w, self.buffer_ticks * self.pixels_per_tick)
-            size_sharp = (w * 2 / 3, (self.buffer_ticks // 2) * self.pixels_per_tick)
-            for event in active.values():
-                n = (event.note - 21)
-                if self.note_is_sharp(n):
-                    size = size_sharp
-                    yy = size[1]
-                else:
-                    size = size_natural
-                    yy = 0
+        #pressed = self.midi_interface.get_pressed()
+        #active = self.midi_interface.event_map[self.current_tick]
+        #with self.canvas:
+        #    if n in pressed:
+        #        Color(1, 1, 0, .1)
+        #    else:
+        #        Color(1, 1, 1, .1)
+        #    size_natural = (w, self.buffer_ticks * self.pixels_per_tick)
+        #    size_sharp = (w * 2 / 3, (self.buffer_ticks // 2) * self.pixels_per_tick)
+        #    for event in active.values():
+        #        n = (event.note - 21)
+        #        if self.note_is_sharp(n):
+        #            size = size_sharp
+        #            yy = size[1]
+        #        else:
+        #            size = size_natural
+        #            yy = 0
 
-                xx = size_natural[0] * self._get_keyposition(n)
-                pos = (xx + ((size_natural[0] - size[0]) / 2), yy)
-                Rectangle(pos=pos, size=size)
-        self.visuals_changed = False
+        #        xx = size_natural[0] * self._get_keyposition(n)
+        #        pos = (xx + ((size_natural[0] - size[0]) / 2), yy)
+        #        Rectangle(pos=pos, size=size)
 
     def background_update(self):
         control = self.wait_for_input()
@@ -313,7 +340,7 @@ class ControlWidget(Widget):
         if screen:
             thread = threading.Thread(target=screen.background_daemon)
             thread.start()
-            self.add_widget(screen, 0, self.canvas)
+            self.add_widget(screen, 1)
 
 
 class TheApp(App):

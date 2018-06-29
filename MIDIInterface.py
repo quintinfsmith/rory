@@ -100,7 +100,6 @@ class MIDIInterface(object):
 
     def states_match(self, tick, given_state, ignored_channels=[0]):
         '''Check that the controller is pressing the correct keys'''
-        return True
         given_state = given_state.copy()
         for key, event in self.active_notes_map[tick].items():
             if event.channel in ignored_channels:
