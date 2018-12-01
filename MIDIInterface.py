@@ -20,6 +20,7 @@ class MIDIInterface(object):
 
         self.channels_used = set()
 
+        squash_factor = 64
 
         ppqn = midilike.ppqn
         bpm = 120 # Default (in quarter notes)
@@ -59,7 +60,7 @@ class MIDIInterface(object):
             last_tps = ticks_per_second
 
             if len(pressed_keys.keys()):
-                squashed_tick = int(tick)
+                squashed_tick = int(tick / squash_factor)
 
                 while len(self.state_map) <= squashed_tick:
                     self.state_map.append(set())
