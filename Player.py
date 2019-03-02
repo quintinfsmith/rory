@@ -6,7 +6,7 @@ from localfuncs import read_character
 from MIDIInterface import MIDIInterface
 from MidiLib.MidiInterpreter import MIDIInterpreter as MI
 
-class Player(Box, RegisteredInteractor):
+class Player(RegisteredInteractor):
     '''Plays MIDILike Objects'''
     NEXT_STATE = 1 << 1
     PREV_STATE = 1 << 2
@@ -21,6 +21,7 @@ class Player(Box, RegisteredInteractor):
     SHARPS = (1, 3, 6, 8, 10)
 
     sidebar = '|'
+    NOTELIST = 'CCDDEFFGGAAB'
 
     def quit(self):
         ''''shutdown the player Box'''
@@ -117,12 +118,16 @@ class Player(Box, RegisteredInteractor):
 
         self.set_settings(settings, True)
 
-    def __init__(self):
-        Box.__init__(self)
-        RegisteredInteractor.__init__(self)
+    def __init__(self, bleepsbox):
+        super().__init__()
+        self.bleepsbox = bleepsbox
+
+        # TODO: Use Fill function (not yet implemented)
+        #for y in range(self.bleepsbox.height):
+        #    for x in range(self.bleepsbox.width):
+        #        self.bleepsbox.setc(x, y, '')
 
         self.loop = [0, -1]
-
         self.assign_sequence("j", self.next_state)
         self.assign_sequence("k", self.prev_state)
         self.assign_sequence("i", self.raise_ignore_channel)
@@ -149,128 +154,100 @@ class Player(Box, RegisteredInteractor):
         self.song_position = 0
 
         self.active_midi = None
-        self.active_boxes = []
-        self.state_boxes = []
-
-        self.key_boxes = []
-        self.active_key_boxes = [] # for refresh call
+        self.active_box = None # Bleepsbox, Row where keypresses are displayed
 
     def width(self):
         return (self.note_range[1] - self.note_range[0]) + 2
 
-    def _get_note_str(self, note, channel=10):
-        '''Convert Midi Note byte to Legible Character'''
-        note_list = 'CCDDEFFGGAAB'
-        color_trans = [7, 3, 6, 2, 5, 4, 1, 3]
-        ignoring = False
-        if channel in self.ignored_channels:
-            ignoring = True
-        elif channel > 7:
-            note_list = note_list.lower()
-            channel %= 8
-
-        note %= 12
-        display_character = note_list[note]
-
-        if ignoring:
-            if note in self.SHARPS:
-                return "\033[1;30m%s\033[0m" % (display_character)
-            else:
-                return "\033[1;7;30m%s\033[0m" % (display_character)
-        else:
-            color = color_trans[channel]
-
-            if note in self.SHARPS:
-                return "\033[7;3%dm%s\033[0m" % (color, display_character)
-            else:
-                return "\033[3%dm%s\033[0m" % (color, display_character)
+    def get_channel_color(self, channel):
+        colors = [ 7, 3, 6, 2, 5, 4, 1, 3 ]
+        color = colors[channel]
+        if (channel > 8):
+            color += 8
+        return color
 
     def update_pressed_line(self, pressed, matched):
         '''Redraw Pressed Keys'''
         if not matched:
             matched = []
+
         if pressed.symmetric_difference(self.last_pressed):
-            self.active_key_boxes = []
-            note_list = 'CCDDEFFGGAAB'
             for index in pressed:
-                rep = note_list[index % len(note_list)]
+                rep = self.NOTELIST[index % len(note_list)]
+                keybox = self.active_box.boxes[index]
+                keybox.setc(0, 0, rep)
+
                 if index in matched:
-                    background = 42
-                    if index % 12 in self.SHARPS:
-                        foreground = 30
-                    else:
-                        foreground = 37
+                    keybox.set_bg_color(2)
                 else:
-                    background = 41
-                    if index % 12 in self.SHARPS:
-                        foreground = 30
-                    else:
-                        foreground = 37
-                to_set = self.boxes[self.key_boxes[index - self.note_range[0]]]
-                to_set.set(0, 0, "\033[%d;%dm%s\033[m" % (background, foreground, rep))
-                self.active_key_boxes.append(self.boxes[self.key_boxes[index - self.note_range[0]]])
-            self.refresh(self.active_boxes + self.active_key_boxes + [self.position_display_box])
+                    keybox.set_bg_color(1)
+
+                if index % 12 in self.SHARPS:
+                    keybox.set_fg_color(0)
+                else:
+                    keybox.set_fg_color(7)
+
+            self.refresh()
             self.last_pressed = pressed
-
-    def redraw_row_box(self, midi_interface):
-        '''force redrawing of active row'''
-        current_state = midi_interface.event_map[self.song_position]
-        current_box = self.state_boxes[self.song_position]
-        for key, event in current_state.items():
-            try:
-                current_box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
-            except IndexError:
-                pass
-
-    def insert_keychars(self, midi_interface):
-        '''Repopulate all the boxes with key characters'''
-        for j, current_state in enumerate(midi_interface.event_map):
-            box = self.state_boxes[j]
-            for key, event in current_state.items():
-                try:
-                    box.set(key - self.note_range[0], 0, self._get_note_str(key, event.channel))
-                except IndexError:
-                    pass
 
     def play_along(self, path, controller):
         '''Display notes in console. Main function'''
         midilike = MI.parse_midi(path)
         midi_interface = MIDIInterface(midilike, controller)
+        space_buffer = 8
+
         self.active_midi = midilike
         self.channels_used = midi_interface.channels_used
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
-        self.resize(num_of_keys + 2, self.parent.height())
-        space_buffer = 8
 
-        self.state_boxes = []
-        measure_count = 0
-        measure_dict = {}
+        self.state_box_box = self.bleepsbox.new_box(num_of_keys, len(midi_interface.event_map))
+        ssb_offset = (self.bleepsbox.width - self.state_box_box.width) // 2
+        self.state_box_box.move(ssb_offset, 0)
 
+        for y in range(self.bleepsbox.height):
+            for x in range(self.bleepsbox.width):
+                self.bleepsbox.setc(x, y, ' ')
+
+        # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
-            new_bid = self.add_box(x=1, y=j, width=88, height=1)
-            new_box = self.boxes[new_bid]
-            self.state_boxes.append(new_box)
+            new_box = self.state_box_box.new_box(num_of_keys, 1)
+            new_box.move(0, self.state_box_box.height - 1 - j) # Upside down
+            for event in current_state.values():
+                n = event.note - self.note_range[0]
 
-        self.insert_keychars(midi_interface)
+                # Testing
+                #self.state_box_box.setc(n, self.state_box_box.height - 1 - j, self.NOTELIST[event.note % 12])
 
-        self.key_boxes = []
-        self.active_key_boxes = []
-        for x in range(88):
-            k = self.add_box(x=x + 1, y=self.height() - space_buffer - 1, width=1, height=1)
-            self.key_boxes.append(k)
-            new_box = self.boxes[k]
-            if x % 12 != 0:
-                self.set(x + 1, self.height() - space_buffer - 1, " ")
-            else:
-                self.set(x + 1, self.height() - space_buffer - 1, "\033[1;30m%s\033[0m" % chr(9474))
 
-        for y in range(self.height()):
-            self.set(0, y, chr(9474))
-            self.set(self.width() - 1, y, chr(9474))
+                key_box = new_box.new_box(1, 1)
+                key_box.move(n, 0)
+                key_box.setc(0, 0, self.NOTELIST[event.note % 12])
+                if event.note % 12 in self.SHARPS:
+                    key_box.set_bg_color(self.get_channel_color(event.channel))
+                    key_box.set_fg_color(0)
+                else:
+                    key_box.set_fg_color(self.get_channel_color(event.channel))
 
-        tmp_id = self.add_box(x=0, y=self.height() - 1, width=self.width(), height=1)
-        self.position_display_box = self.boxes[tmp_id]
+
+        # Populate row where active keys are displayed
+        self.active_box = self.bleepsbox.new_box(88, 1)
+        self.active_box.move(ssb_offset + 1, self.bleepsbox.height - space_buffer - 1)
+
+        # Draw '|' and '-' on background as guides
+        self.bleepsbox.set_fg_color(8 + 0)
+        for x in range(num_of_keys):
+            ypos = self.bleepsbox.height - space_buffer - 1
+            if x % 12 == 0:
+                self.bleepsbox.setc(x + ssb_offset, ypos, chr(9474))
+
+        for y in range(self.bleepsbox.height):
+            self.bleepsbox.setc(ssb_offset, y, chr(9474))
+            self.bleepsbox.setc(ssb_offset + self.state_box_box.width, y, chr(9474))
+
+
+        self.position_display_box = self.bleepsbox.new_box(self.bleepsbox.width, 1)
+        self.position_display_box.move(0, self.bleepsbox.height - 1)
 
         self.song_position = 0
         self.playing = True
@@ -297,7 +274,6 @@ class Player(Box, RegisteredInteractor):
                     if k in midi_interface.event_map[self.song_position].keys():
                         on_event = midi_interface.event_map[self.song_position][k]
                         midi_interface.rechannel_event(on_event, self.rechannelling)
-                self.redraw_row_box(midi_interface)
 
             if self.flag_isset(self.RAISE_SAVE):
                 self.save(midi_interface)
@@ -327,25 +303,14 @@ class Player(Box, RegisteredInteractor):
             if call_refresh:
                 strpos = "%8d/%d" % (self.song_position, len(midi_interface) - 1)
                 for c, character in enumerate(strpos):
-                    self.position_display_box.set(self.width() - len(strpos) - 1 + c, 0, character)
+                    x = self.position_display_box.width - len(strpos) - 1 + c
+                    self.position_display_box.setc(x, 0, character)
 
-                #str_m_pos = "Bar: %3d/%3d" % (measure_dict[self.song_position], measure_count)
-                #for c, character in enumerate(str_m_pos):
-                #    self.set(1 + c, self.height() - 1, character)
-                sb_i = max(0, self.song_position - space_buffer)
-                sb_f = min(len(self.state_boxes), self.song_position - space_buffer + self.height())
+                new_y = self.bleepsbox.height - self.state_box_box.height + self.song_position - space_buffer
+                self.state_box_box.move(ssb_offset, new_y)
 
-                self.active_boxes = self.state_boxes[sb_i: sb_f]
+                self.refresh()
 
-
-                y = len(self.active_boxes) - 1
-                y += max(0, (self.song_position - space_buffer + self.height()) - len(self.state_boxes))
-                for box in self.active_boxes:
-                    self.move_box(box.id, 1, y)
-                    y -= 1
-                if len(self.active_boxes) >= self.height():
-                    self.active_boxes.pop(0)
-                self.refresh(self.active_key_boxes + self.active_boxes + [self.position_display_box])
         self.quit()
 
     def _wait_for_input(self, midi_interface):
@@ -362,7 +327,6 @@ class Player(Box, RegisteredInteractor):
             elif self.flag_isset(self.RAISE_IGNORE_CHANNEL):
                 self.flags[self.RAISE_IGNORE_CHANNEL] = 0
                 self.toggle_ignore_channel()
-                self.insert_keychars(midi_interface)
                 self.general_register = self.song_position
                 input_given = self.RAISE_JUMP
                 self.clear_register()
@@ -378,7 +342,9 @@ class Player(Box, RegisteredInteractor):
             elif self.flag_isset(self.RAISE_JUMP):
                 self.flags[self.RAISE_JUMP] = 0
                 input_given = self.RAISE_JUMP
+
             self.update_pressed_line(pressed, midi_interface.get_state(self.song_position))
+
         return input_given
 
     def set_loop_start(self):
@@ -405,3 +371,5 @@ class Player(Box, RegisteredInteractor):
         '''Set a Flag'''
         self.flags[flag] = state
 
+    def refresh(self):
+        self.bleepsbox.refresh()
