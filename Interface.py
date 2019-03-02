@@ -6,26 +6,19 @@ import json
 import threading
 from Player import Player
 from Box import BoxEnvironment
+from Bleeps import BleepsScreen, BleepsBox
 from Interactor import RegisteredInteractor
 from MidiLib.MIDIController import MIDIController
 #from Recorder import Recorder
 
-class Interface(BoxEnvironment, RegisteredInteractor):
+class Interface(BleepsScreen, RegisteredInteractor):
     '''Interface to Run the MidiPlayer'''
     def __init__(self):
-        BoxEnvironment.__init__(self)
+        BleepsScreen.__init__(self)
         RegisteredInteractor.__init__(self)
-        self.init_screen()
         self.active_threads = []
         self.interactorstack = []
-        x_a = (self.width() - 90) // 2
-        x_b = (self.width() + 90) // 2
-        for y in range(self.height()):
-            for x in range(self.width()):
-                if x < x_a or x >= x_b:
-                    self.set(x, y, "\033[47m \033[40m")
-                else:
-                    self.set(x, y, " ")
+
 
         self.listening = False
         self.assign_sequence("q", self.quit)
@@ -44,13 +37,10 @@ class Interface(BoxEnvironment, RegisteredInteractor):
 
     def show_player(self):
         '''Displays MidiPlayer Box'''
-        player = Player()
-        new_id = self.add_box(w=player.width(), h=player.height(), x=(self.width() - 90) // 2, y=0)
-        self.boxes[new_id] = player
-        player.parent = self
-        player.id = new_id
+        player_box = self.new_box(self.width, self.height)
+        player = Player(player_box)
 
-        self.interactorstack.append(new_id)
+        self.interactorstack.append(player)
         self.player = player
 
     def save_settings(self):
@@ -65,7 +55,7 @@ class Interface(BoxEnvironment, RegisteredInteractor):
     def quit(self):
         '''shut it all down'''
         self.listening = False
-        self.destroy()
+        self.kill()
 
     def play_along(self, midi_path, hidden=None):
         '''Run the Player with the loaded MidiLike Object'''
@@ -81,12 +71,8 @@ class Interface(BoxEnvironment, RegisteredInteractor):
         '''Main loop, just handles computer keyboard input'''
         self.listening = True
         while self.listening:
-            while self.interactorstack:
-                c = self.interactorstack.pop()
-                if c in self.boxes.keys():
-                    self.interactorstack.append(c)
-                    active = self.boxes[c]
-                    break
+            if self.interactorstack:
+                active = self.interactorstack[-1]
 
             if not self.interactorstack:
                 #active = self
