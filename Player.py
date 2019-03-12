@@ -26,7 +26,7 @@ class Player(RegisteredInteractor):
     def quit(self):
         ''''shutdown the player Box'''
         self.set_flag(self.RAISE_QUIT)
-        self.kill()
+        self.is_active = False;
 
     def next_state(self):
         '''set Next state flag'''
@@ -121,11 +121,14 @@ class Player(RegisteredInteractor):
     def __init__(self, bleepsbox):
         super().__init__()
         self.bleepsbox = bleepsbox
+        bleepsbox.set_bg_color(2)
 
         # TODO: Use Fill function (not yet implemented)
         #for y in range(self.bleepsbox.height):
         #    for x in range(self.bleepsbox.width):
         #        self.bleepsbox.setc(x, y, '')
+
+        self.is_active = True
 
         self.loop = [0, -1]
         self.assign_sequence("j", self.next_state)
@@ -171,10 +174,16 @@ class Player(RegisteredInteractor):
         if not matched:
             matched = []
 
+        for index in range(self.note_range[1] - self.note_range[0]):
+            keybox = self.active_boxes[index]
+            keybox.unset_color()
+            keybox.unsetc(index, 0)
+
         if pressed.symmetric_difference(self.last_pressed):
+
             for index in pressed:
-                rep = self.NOTELIST[index % len(note_list)]
-                keybox = self.active_box.boxes[index]
+                rep = self.NOTELIST[index % len(self.NOTELIST)]
+                keybox = self.active_boxes[index]
                 keybox.setc(0, 0, rep)
 
                 if index in matched:
@@ -209,16 +218,13 @@ class Player(RegisteredInteractor):
             for x in range(self.bleepsbox.width):
                 self.bleepsbox.setc(x, y, ' ')
 
+
         # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
             new_box = self.state_box_box.new_box(num_of_keys, 1)
             new_box.move(0, self.state_box_box.height - 1 - j) # Upside down
             for event in current_state.values():
                 n = event.note - self.note_range[0]
-
-                # Testing
-                #self.state_box_box.setc(n, self.state_box_box.height - 1 - j, self.NOTELIST[event.note % 12])
-
 
                 key_box = new_box.new_box(1, 1)
                 key_box.move(n, 0)
@@ -233,10 +239,15 @@ class Player(RegisteredInteractor):
         # Populate row where active keys are displayed
         self.active_box = self.bleepsbox.new_box(88, 1)
         self.active_box.move(ssb_offset + 1, self.bleepsbox.height - space_buffer - 1)
+        self.active_boxes = []
 
-        # Draw '|' and '-' on background as guides
+        # Draw '|' and '-' on background as guides, and populate active_boxes
         self.bleepsbox.set_fg_color(8 + 0)
         for x in range(num_of_keys):
+            new_box = self.active_box.new_box(1, 1)
+            new_box.move(x, 0)
+            self.active_boxes.append(new_box)
+
             ypos = self.bleepsbox.height - space_buffer - 1
             if x % 12 == 0:
                 self.bleepsbox.setc(x + ssb_offset, ypos, chr(9474))
