@@ -73,8 +73,12 @@ class Interface(BleepsScreen, RegisteredInteractor):
         while self.listening:
             if self.interactorstack:
                 active = self.interactorstack[-1]
+                if not active.is_active:
+                    self.interactorstack.pop()
 
             if not self.interactorstack:
-                #active = self
                 self.quit()
-            active.get_input()
+
+            if active.is_active:
+                active.get_input()
+
