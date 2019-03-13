@@ -6,7 +6,7 @@ import json
 import threading
 from Player import Player
 from Box import BoxEnvironment
-from Bleeps import BleepsScreen, BleepsBox
+from AsciiBox.src.Bleeps import BleepsScreen, BleepsBox
 from Interactor import RegisteredInteractor
 from MidiLib.MIDIController import MIDIController
 #from Recorder import Recorder

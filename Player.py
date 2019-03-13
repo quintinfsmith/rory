@@ -121,7 +121,6 @@ class Player(RegisteredInteractor):
     def __init__(self, bleepsbox):
         super().__init__()
         self.bleepsbox = bleepsbox
-        bleepsbox.set_bg_color(2)
 
         # TODO: Use Fill function (not yet implemented)
         #for y in range(self.bleepsbox.height):
