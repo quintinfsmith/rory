@@ -1,6 +1,5 @@
 '''Plays MIDILike Objects'''
 
-from Box import Box
 from Interactor import RegisteredInteractor
 from localfuncs import read_character
 from MIDIInterface import MIDIInterface
@@ -209,19 +208,21 @@ class Player(RegisteredInteractor):
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
 
-        self.state_box_box = self.bleepsbox.new_box(num_of_keys, len(midi_interface.event_map))
-        ssb_offset = (self.bleepsbox.width - self.state_box_box.width) // 2
-        self.state_box_box.move(ssb_offset, 0)
+        self.displayed_box_box = self.bleepsbox.new_box(num_of_keys, self.bleepsbox.height)
+        ssb_offset = (self.bleepsbox.width - self.displayed_box_box.width) // 2
+        self.displayed_box_box.move(ssb_offset, 0)
+        self.state_boxes = []
 
         for y in range(self.bleepsbox.height):
             for x in range(self.bleepsbox.width):
                 self.bleepsbox.setc(x, y, ' ')
 
-
         # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
-            new_box = self.state_box_box.new_box(num_of_keys, 1)
-            new_box.move(0, self.state_box_box.height - 1 - j) # Upside down
+            new_box = self.displayed_box_box.new_box(num_of_keys, 1)
+            new_box.detach()
+            self.state_boxes.append(new_box)
+
             for event in current_state.values():
                 n = event.note - self.note_range[0]
 
@@ -253,7 +254,7 @@ class Player(RegisteredInteractor):
 
         for y in range(self.bleepsbox.height):
             self.bleepsbox.setc(ssb_offset, y, chr(9474))
-            self.bleepsbox.setc(ssb_offset + self.state_box_box.width, y, chr(9474))
+            self.bleepsbox.setc(ssb_offset + self.displayed_box_box.width, y, chr(9474))
 
 
         self.position_display_box = self.bleepsbox.new_box(self.bleepsbox.width, 1)
@@ -316,8 +317,21 @@ class Player(RegisteredInteractor):
                     x = self.position_display_box.width - len(strpos) - 1 + c
                     self.position_display_box.setc(x, 0, character)
 
-                new_y = self.bleepsbox.height - self.state_box_box.height + self.song_position - space_buffer
-                self.state_box_box.move(ssb_offset, new_y)
+                to_detach = []
+                for key, box in self.displayed_box_box.boxes.items():
+                    to_detach.append(box)
+
+                while to_detach:
+                    to_detach.pop().detach()
+
+                try:
+                    for i in range(self.displayed_box_box.height):
+                        box_to_use = self.state_boxes[max(0, i + self.song_position - space_buffer)]
+                        self.displayed_box_box.attach(box_to_use)
+                        box_to_use.move(0, self.displayed_box_box.height - 1 - i)
+                except IndexError:
+                    pass
+
 
                 self.refresh()
 
