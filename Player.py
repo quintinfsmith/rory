@@ -172,29 +172,30 @@ class Player(RegisteredInteractor):
         if not matched:
             matched = []
 
-        for index in range(self.note_range[1] - self.note_range[0]):
-            keybox = self.active_boxes[index]
+        for index in self.last_pressed:
+            keybox = self.active_boxes[index - self.note_range[0]]
             keybox.unset_color()
-            keybox.unsetc(index, 0)
+            keybox.unsetc(0, 0)
 
         if pressed.symmetric_difference(self.last_pressed):
 
-            for index in pressed:
-                rep = self.NOTELIST[index % len(self.NOTELIST)]
-                keybox = self.active_boxes[index]
+            for piano_index in pressed:
+                midi_index = piano_index + self.note_range[0]
+                rep = self.NOTELIST[midi_index % len(self.NOTELIST)]
+                keybox = self.active_boxes[piano_index]
                 keybox.setc(0, 0, rep)
 
-                if index in matched:
+                if piano_index in matched:
                     keybox.set_bg_color(2)
                 else:
                     keybox.set_bg_color(1)
 
-                if index % 12 in self.SHARPS:
+                if midi_index % 12 in self.SHARPS:
                     keybox.set_fg_color(0)
                 else:
                     keybox.set_fg_color(7)
 
-            self.refresh()
+            self.active_box.draw()
             self.last_pressed = pressed
 
     def play_along(self, path, controller):
@@ -211,35 +212,36 @@ class Player(RegisteredInteractor):
         self.displayed_box_box = self.bleepsbox.new_box(num_of_keys, self.bleepsbox.height)
         ssb_offset = (self.bleepsbox.width - self.displayed_box_box.width) // 2
         self.displayed_box_box.move(ssb_offset, 0)
-        self.state_boxes = []
+        self.state_boxes = {}
 
         for y in range(self.bleepsbox.height):
             for x in range(self.bleepsbox.width):
                 self.bleepsbox.setc(x, y, ' ')
 
+
         # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
-            new_box = self.displayed_box_box.new_box(num_of_keys, 1)
-            new_box.detach()
-            self.state_boxes.append(new_box)
+            if len(current_state.values()):
+                new_box = self.displayed_box_box.new_box(num_of_keys, 1)
+                new_box.detach()
+                self.state_boxes[j] = new_box
+                for event in current_state.values():
+                    n = event.note - self.note_range[0]
 
-            for event in current_state.values():
-                n = event.note - self.note_range[0]
-
-                key_box = new_box.new_box(1, 1)
-                key_box.move(n, 0)
-                key_box.setc(0, 0, self.NOTELIST[event.note % 12])
-                if event.note % 12 in self.SHARPS:
-                    key_box.set_bg_color(self.get_channel_color(event.channel))
-                    key_box.set_fg_color(0)
-                else:
-                    key_box.set_fg_color(self.get_channel_color(event.channel))
-
+                    key_box = new_box.new_box(1, 1)
+                    key_box.move(n, 0)
+                    key_box.setc(0, 0, self.NOTELIST[event.note % 12])
+                    if event.note % 12 in self.SHARPS:
+                        key_box.set_bg_color(self.get_channel_color(event.channel))
+                        key_box.set_fg_color(0)
+                    else:
+                        key_box.set_fg_color(self.get_channel_color(event.channel))
 
         # Populate row where active keys are displayed
         self.active_box = self.bleepsbox.new_box(88, 1)
-        self.active_box.move(ssb_offset + 1, self.bleepsbox.height - space_buffer - 1)
+        self.active_box.move(ssb_offset, self.bleepsbox.height - space_buffer - 1)
         self.active_boxes = []
+
 
         # Draw '|' and '-' on background as guides, and populate active_boxes
         self.bleepsbox.set_fg_color(8 + 0)
@@ -253,8 +255,8 @@ class Player(RegisteredInteractor):
                 self.bleepsbox.setc(x + ssb_offset, ypos, chr(9474))
 
         for y in range(self.bleepsbox.height):
-            self.bleepsbox.setc(ssb_offset, y, chr(9474))
-            self.bleepsbox.setc(ssb_offset + self.displayed_box_box.width, y, chr(9474))
+            self.bleepsbox.setc(ssb_offset - 1, y, chr(9474))
+            self.bleepsbox.setc(ssb_offset - 1 + self.displayed_box_box.width, y, chr(9474))
 
 
         self.position_display_box = self.bleepsbox.new_box(self.bleepsbox.width, 1)
@@ -277,7 +279,7 @@ class Player(RegisteredInteractor):
                 result = self.RAISE_JUMP
             elif len(midi_interface) > self.song_position:
                 result = self._wait_for_input(midi_interface)
-            else: # Can't Happen. will loop to start before this happens
+            else:# Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
             if self.rechannelling > -1:
@@ -326,12 +328,14 @@ class Player(RegisteredInteractor):
 
                 try:
                     for i in range(self.displayed_box_box.height):
-                        box_to_use = self.state_boxes[max(0, i + self.song_position - space_buffer)]
+                        try:
+                            box_to_use = self.state_boxes[max(0, i + self.song_position - space_buffer)]
+                        except KeyError:
+                            continue
                         self.displayed_box_box.attach(box_to_use)
                         box_to_use.move(0, self.displayed_box_box.height - 1 - i)
                 except IndexError:
                     pass
-
 
                 self.refresh()
 
