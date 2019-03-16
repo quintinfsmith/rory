@@ -195,7 +195,8 @@ class Player(RegisteredInteractor):
                 else:
                     keybox.set_fg_color(7)
 
-            self.active_box.draw()
+            #self.active_box.draw()
+            self.refresh()
             self.last_pressed = pressed
 
     def play_along(self, path, controller):
