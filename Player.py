@@ -10,7 +10,7 @@ class Player(RegisteredInteractor):
     NEXT_STATE = 1 << 1
     PREV_STATE = 1 << 2
     RAISE_QUIT = 1 << 3
-    RAISE_MIDI_INPUT_CHANGE = 1 << 4
+    RAISE_MIDI_INPUT_CHANGE = 1 << 4 # TODO: Possibly does nothing?
     RAISE_JUMP = 1 << 5
     RAISE_SAVE = 1 << 6
     RAISE_IGNORE_CHANNEL = 1 << 7
@@ -25,7 +25,7 @@ class Player(RegisteredInteractor):
     def quit(self):
         ''''shutdown the player Box'''
         self.set_flag(self.RAISE_QUIT)
-        self.is_active = False;
+        self.is_active = False
 
     def next_state(self):
         '''set Next state flag'''
@@ -35,30 +35,11 @@ class Player(RegisteredInteractor):
         '''set previous state flag'''
         self.set_flag(self.PREV_STATE)
 
-    def raise_save(self):
-        '''set save flag'''
-        self.set_flag(self.RAISE_SAVE)
-
-    def save(self, midiinterface):
-        '''save loaded midi file'''
-        old_path = midiinterface.midilike.path
-        if "/" in old_path:
-            old_path = old_path[old_path.rfind("/") + 1:]
-        path = "editted-" + old_path
-        midiinterface.save_as(path)
-
     def jump(self):
         '''set the song position as the value in the register'''
         self.set_flag(self.RAISE_JUMP)
         self.song_position = self.general_register
         self.clear_register()
-
-    def get_settings(self):
-        '''Get cached settings from Interface'''
-        try:
-            return self.parent.settings[self.active_midi.path]
-        except KeyError:
-            return {}
 
     def set_rechannel(self):
         '''start rechanneling events'''
@@ -70,12 +51,6 @@ class Player(RegisteredInteractor):
         '''stop rechanneling events'''
         self.rechannelling = -1
         self.clear_register()
-
-    def set_settings(self, new_settings, do_save=False):
-        '''Cache Settings in Interface'''
-        self.parent.settings[self.active_midi.path] = new_settings
-        if do_save:
-            self.parent.save_settings()
 
     def raise_ignore_channel(self):
         self.set_flag(self.RAISE_IGNORE_CHANNEL)
@@ -90,41 +65,10 @@ class Player(RegisteredInteractor):
         elif dif > 1:
             self.ignored_channels.append(c)
 
-    def point_jump(self):
-        '''Jump to saved point'''
-        jumpkey = read_character()
-        settings = self.get_settings()
-        if not "jump_points" in settings.keys():
-            return None
-
-        jump_points = settings["jump_points"]
-        if jumpkey in jump_points.keys():
-            self.set_flag(self.RAISE_JUMP)
-            self.song_position = jump_points[jumpkey]
-
-    def set_jump_point(self):
-        '''Save a point to be jumped to'''
-        jumpkey = read_character()
-        settings = self.get_settings()
-        if not "jump_points" in settings.keys():
-            settings["jump_points"] = {}
-
-        if self.general_register:
-            settings["jump_points"][jumpkey] = self.general_register
-            self.clear_register()
-        else:
-            settings["jump_points"][jumpkey] = self.song_position
-
-        self.set_settings(settings, True)
 
     def __init__(self, bleepsbox):
         super().__init__()
         self.bleepsbox = bleepsbox
-
-        # TODO: Use Fill function (not yet implemented)
-        #for y in range(self.bleepsbox.height):
-        #    for x in range(self.bleepsbox.width):
-        #        self.bleepsbox.setc(x, y, '')
 
         self.is_active = True
 
@@ -133,10 +77,7 @@ class Player(RegisteredInteractor):
         self.assign_sequence("k", self.prev_state)
         self.assign_sequence("i", self.raise_ignore_channel)
         self.assign_sequence("p", self.jump)
-        self.assign_sequence("P", self.point_jump)
         self.assign_sequence("q", self.quit)
-        self.assign_sequence(":w", self.raise_save)
-        self.assign_sequence("s", self.set_jump_point)
         self.assign_sequence("c", self.set_rechannel)
         self.assign_sequence("C", self.unset_rechannel)
         self.assign_sequence("[", self.set_loop_start)
@@ -157,14 +98,21 @@ class Player(RegisteredInteractor):
         self.active_midi = None
         self.active_box = None # Bleepsbox, Row where keypresses are displayed
 
+        self.displayed_box_box = None
+        self.state_boxes = None
+        self.active_boxes = None
+        self.position_display_box = None
+
     def width(self):
         return (self.note_range[1] - self.note_range[0]) + 2
 
     def get_channel_color(self, channel):
-        colors = [ 7, 3, 6, 2, 5, 4, 1, 3 ]
+        colors = [7, 3, 6, 2, 5, 4, 1, 3]
         color = colors[channel]
-        if (channel > 8):
+
+        if channel > 8:
             color += 8
+
         return color
 
     def update_pressed_line(self, pressed, matched):
@@ -172,15 +120,15 @@ class Player(RegisteredInteractor):
         if not matched:
             matched = []
 
-        for index in self.last_pressed:
-            keybox = self.active_boxes[index - self.note_range[0]]
+        for midi_index in self.last_pressed:
+            piano_index = midi_index - self.note_range[0]
+            keybox = self.active_boxes[piano_index]
             keybox.unset_color()
             keybox.unsetc(0, 0)
 
         if pressed.symmetric_difference(self.last_pressed):
-
-            for piano_index in pressed:
-                midi_index = piano_index + self.note_range[0]
+            for midi_index in pressed:
+                piano_index = midi_index - self.note_range[0]
                 rep = self.NOTELIST[midi_index % len(self.NOTELIST)]
                 keybox = self.active_boxes[piano_index]
                 keybox.setc(0, 0, rep)
@@ -195,8 +143,8 @@ class Player(RegisteredInteractor):
                 else:
                     keybox.set_fg_color(7)
 
-            #self.active_box.draw()
-            self.refresh()
+            self.active_box.draw()
+            #self.refresh()
             self.last_pressed = pressed
 
     def play_along(self, path, controller):
@@ -222,7 +170,7 @@ class Player(RegisteredInteractor):
 
         # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
-            if len(current_state.values()):
+            if current_state.values():
                 new_box = self.displayed_box_box.new_box(num_of_keys, 1)
                 new_box.detach()
                 self.state_boxes[j] = new_box
@@ -249,6 +197,7 @@ class Player(RegisteredInteractor):
         for x in range(num_of_keys):
             new_box = self.active_box.new_box(1, 1)
             new_box.move(x, 0)
+            new_box.set_bg_color(3)
             self.active_boxes.append(new_box)
 
             ypos = self.bleepsbox.height - space_buffer - 1
@@ -289,9 +238,6 @@ class Player(RegisteredInteractor):
                         on_event = midi_interface.event_map[self.song_position][k]
                         midi_interface.rechannel_event(on_event, self.rechannelling)
 
-            if self.flag_isset(self.RAISE_SAVE):
-                self.save(midi_interface)
-
             if result == self.RAISE_QUIT:
                 self.playing = False
             elif result == self.RAISE_MIDI_INPUT_CHANGE:
@@ -321,7 +267,7 @@ class Player(RegisteredInteractor):
                     self.position_display_box.setc(x, 0, character)
 
                 to_detach = []
-                for key, box in self.displayed_box_box.boxes.items():
+                for box in self.displayed_box_box.boxes.values():
                     to_detach.append(box)
 
                 while to_detach:
