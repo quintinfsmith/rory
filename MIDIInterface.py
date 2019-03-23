@@ -53,7 +53,11 @@ class MIDIInterface(object):
                 break
 
         if smallest_gap:
-            squash_factor = 1 / smallest_gap 
+            # If the piece is largely small gaps, stretch the squash factor a bit
+            if (smallest_gap * gap_counts[smallest_gap]) / len(self.midilike) > .3: # TODO: Set Constant Threshold
+                squash_factor = 2 / smallest_gap
+            else:
+                squash_factor = 1 / smallest_gap
         else:
             squash_factor = 1 / 64
 
