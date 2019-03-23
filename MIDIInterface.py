@@ -48,7 +48,7 @@ class MIDIInterface(object):
         for gap_size in sorted_gaps:
             count = gap_counts[gap_size]
             # Account for grace notes
-            if count > 10: # TODO: Set constant threshold
+            if count > 30: # TODO: Set constant threshold
                 smallest_gap = gap_size
                 break
 
