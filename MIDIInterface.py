@@ -21,7 +21,7 @@ class MIDIInterface(object):
         self.channels_used = set()
 
         # Get Squash Factor
-        smallest_gap = 100000
+        gap_counts = {}
         current_gap_start = 0
         in_gap = False
         for tick in range(len(self.midilike)):
@@ -34,17 +34,26 @@ class MIDIInterface(object):
                 if has_events:
                     break
 
-            if not has_events:
-                if not in_gap: # Start the Gap
-                    current_gap_start = tick
-                    in_gap = True
-            else:
-                if in_gap: # Calculate the Gap
-                    smallest_gap = min(max(0, tick - current_gap_start - 1, 0), smallest_gap)
-                    in_gap = False
+            if has_events:
+                current_gap = tick - current_gap_start
+                try:
+                    gap_counts[current_gap] += 1
+                except KeyError:
+                    gap_counts[current_gap] = 1
+
+                current_gap_start = tick
+
+        sorted_gaps = list(gap_counts.keys())
+        sorted_gaps.sort()
+        for gap_size in sorted_gaps:
+            count = gap_counts[gap_size]
+            # Account for grace notes
+            if count > 10: # TODO: Set constant threshold
+                smallest_gap = gap_size
+                break
 
         if smallest_gap:
-            squash_factor = 2 / smallest_gap
+            squash_factor = 1 / smallest_gap 
         else:
             squash_factor = 1 / 64
 
