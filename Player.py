@@ -4,6 +4,7 @@ from Interactor import RegisteredInteractor
 from localfuncs import read_character
 from MIDIInterface import MIDIInterface
 from MidiLib.MidiInterpreter import MIDIInterpreter as MI
+import threading
 
 class Player(RegisteredInteractor):
     '''Plays MIDILike Objects'''
@@ -69,6 +70,8 @@ class Player(RegisteredInteractor):
     def __init__(self, bleepsbox):
         super().__init__()
         self.bleepsbox = bleepsbox
+        self.redrawing = False
+        self.redraw_queue = []
 
         self.is_active = True
 
@@ -143,8 +146,8 @@ class Player(RegisteredInteractor):
                 else:
                     keybox.set_fg_color(7)
 
-            self.active_box.draw()
-            #self.refresh()
+            #self.active_box.draw()
+            self.refresh(1)
             self.last_pressed = pressed
 
     def play_along(self, path, controller):
@@ -284,7 +287,7 @@ class Player(RegisteredInteractor):
                 except IndexError:
                     pass
 
-                self.refresh()
+                self.refresh(2)
 
         self.quit()
 
@@ -346,5 +349,18 @@ class Player(RegisteredInteractor):
         '''Set a Flag'''
         self.flags[flag] = state
 
-    def refresh(self):
-        self.bleepsbox.refresh()
+    def _refresh(self, key):
+        if self.redrawing == 0:
+            self.redraw_queue.append(key)
+            while self.redraw_queue:
+                self.redrawing = self.redraw_queue.pop(0)
+                self.bleepsbox.refresh()
+            self.redrawing = 0
+        elif self.redrawing != key:
+            self.redraw_queue.append(key)
+
+    def refresh(self, key=1):
+        if not self.redrawing:
+            thread = threading.Thread(target=self._refresh, args=(key, ))
+            thread.start()
+
