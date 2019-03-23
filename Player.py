@@ -123,20 +123,20 @@ class Player(RegisteredInteractor):
         if not matched:
             matched = []
 
-        for midi_index in self.last_pressed:
-            piano_index = midi_index - self.note_range[0]
-            keybox = self.active_boxes[piano_index]
-            keybox.unset_color()
-            keybox.unsetc(0, 0)
-
         if pressed.symmetric_difference(self.last_pressed):
+            for midi_index in self.last_pressed:
+                piano_index = midi_index - self.note_range[0]
+                keybox = self.active_boxes[piano_index]
+                keybox.unset_color()
+                keybox.unsetc(0, 0)
+
             for midi_index in pressed:
                 piano_index = midi_index - self.note_range[0]
                 rep = self.NOTELIST[midi_index % len(self.NOTELIST)]
                 keybox = self.active_boxes[piano_index]
                 keybox.setc(0, 0, rep)
 
-                if piano_index in matched:
+                if midi_index in matched:
                     keybox.set_bg_color(2)
                 else:
                     keybox.set_bg_color(1)
@@ -145,10 +145,8 @@ class Player(RegisteredInteractor):
                     keybox.set_fg_color(0)
                 else:
                     keybox.set_fg_color(7)
-
-            #self.active_box.draw()
-            self.refresh(1)
             self.last_pressed = pressed
+            self.refresh()
 
     def play_along(self, path, controller):
         '''Display notes in console. Main function'''
@@ -166,9 +164,7 @@ class Player(RegisteredInteractor):
         self.displayed_box_box.move(ssb_offset, 0)
         self.state_boxes = {}
 
-        for y in range(self.bleepsbox.height):
-            for x in range(self.bleepsbox.width):
-                self.bleepsbox.setc(x, y, ' ')
+        self.bleepsbox.fill(' ')
 
 
         # Populate state_boxes
@@ -211,7 +207,6 @@ class Player(RegisteredInteractor):
             self.bleepsbox.setc(ssb_offset - 1, y, chr(9474))
             self.bleepsbox.setc(ssb_offset - 1 + self.displayed_box_box.width, y, chr(9474))
 
-
         self.position_display_box = self.bleepsbox.new_box(self.bleepsbox.width, 1)
         self.position_display_box.move(0, self.bleepsbox.height - 1)
 
@@ -235,11 +230,6 @@ class Player(RegisteredInteractor):
             else:# Can't Happen. will loop to start before this happens
                 result = self.RAISE_QUIT
 
-            if self.rechannelling > -1:
-                for k in midi_interface.get_pressed():
-                    if k in midi_interface.event_map[self.song_position].keys():
-                        on_event = midi_interface.event_map[self.song_position][k]
-                        midi_interface.rechannel_event(on_event, self.rechannelling)
 
             if result == self.RAISE_QUIT:
                 self.playing = False
@@ -354,9 +344,9 @@ class Player(RegisteredInteractor):
             self.redraw_queue.append(key)
             while self.redraw_queue:
                 self.redrawing = self.redraw_queue.pop(0)
-                self.bleepsbox.refresh()
+                self.bleepsbox.draw()
             self.redrawing = 0
-        elif self.redrawing != key:
+        elif self.redrawing != key and key not in self.redraw_queue:
             self.redraw_queue.append(key)
 
     def refresh(self, key=1):
