@@ -20,7 +20,36 @@ class MIDIInterface(object):
 
         self.channels_used = set()
 
-        squash_factor = 64
+        # Get Squash Factor
+        smallest_gap = 100000
+        current_gap_start = 0
+        in_gap = False
+        for tick in range(len(self.midilike)):
+            has_events = False
+            for track in self.midilike.tracks:
+                for event in track.get_events(tick):
+                    if event.eid == event.NOTE_ON and event.velocity > 0:
+                        has_events = True
+                        break
+                if has_events:
+                    break
+
+            if not has_events:
+                if not in_gap: # Start the Gap
+                    current_gap_start = tick
+                    in_gap = True
+            else:
+                if in_gap: # Calculate the Gap
+                    smallest_gap = min(max(0, tick - current_gap_start - 1, 0), smallest_gap)
+                    in_gap = False
+
+        if smallest_gap:
+            squash_factor = 2 / smallest_gap
+        else:
+            squash_factor = 1 / 64
+
+        with open("testlog", 'w') as fp:
+            fp.write(str(smallest_gap))
 
         ppqn = midilike.ppqn
         bpm = 120 # Default (in quarter notes)
@@ -60,7 +89,7 @@ class MIDIInterface(object):
             last_tps = ticks_per_second
 
             if len(pressed_keys.keys()):
-                squashed_tick = int(tick / squash_factor)
+                squashed_tick = int(tick * squash_factor)
 
                 while len(self.state_map) <= squashed_tick:
                     self.state_map.append(set())
