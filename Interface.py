@@ -5,15 +5,15 @@ import sys
 import json
 import threading
 from Player import Player
-from AsciiBox.src.Bleeps import BleepsScreen, BleepsBox
+from Rect import RectManager, Rect
 from Interactor import RegisteredInteractor
 from MidiLib.MIDIController import MIDIController
 #from Recorder import Recorder
 
-class Interface(BleepsScreen, RegisteredInteractor):
+class Interface(RectManager, RegisteredInteractor):
     '''Interface to Run the MidiPlayer'''
     def __init__(self):
-        BleepsScreen.__init__(self)
+        RectManager.__init__(self)
         RegisteredInteractor.__init__(self)
         self.active_threads = []
         self.interactorstack = []
@@ -36,7 +36,10 @@ class Interface(BleepsScreen, RegisteredInteractor):
 
     def show_player(self):
         '''Displays MidiPlayer Box'''
-        player_box = self.new_box(self.width, self.height)
+        player_box = self.new_rect(
+            width=self.width,
+            height=self.height
+        )
         player = Player(player_box)
 
         self.interactorstack.append(player)

@@ -4,7 +4,7 @@ from Interactor import RegisteredInteractor
 from localfuncs import read_character
 from MIDIInterface import MIDIInterface
 from MidiLib.MidiInterpreter import MIDIInterpreter as MI
-from AsciiBox.src.Bleeps import BleepsBox
+from Rect import Rect
 import threading
 import math
 
@@ -70,9 +70,9 @@ class Player(RegisteredInteractor):
             self.ignored_channels.append(c)
 
 
-    def __init__(self, bleepsbox):
+    def __init__(self, rect):
         super().__init__()
-        self.bleepsbox = bleepsbox
+        self.rect = rect
         self.redrawing = False
         self.redraw_queue = []
 
@@ -114,19 +114,19 @@ class Player(RegisteredInteractor):
 
     def get_channel_color(self, channel):
         colors = [
-            BleepsBox.BRIGHTYELLOW,
-            BleepsBox.WHITE,
-            BleepsBox.CYAN,
-            BleepsBox.GREEN,
-            BleepsBox.MAGENTA,
-            BleepsBox.BLUE,
-            BleepsBox.BRIGHTBLACK, # i *think* it's channel 7 that is drums... if so, this is just a placeholder
-            BleepsBox.RED
+            Rect.BRIGHTYELLOW,
+            Rect.WHITE,
+            Rect.CYAN,
+            Rect.GREEN,
+            Rect.MAGENTA,
+            Rect.BLUE,
+            Rect.BRIGHTBLACK, # i *think* it's channel 7 that is drums... if so, this is just a placeholder
+            Rect.RED
         ]
         color = colors[channel % 8]
 
         if channel > 8:
-            color ^= BleepsBox.BRIGHT
+            color ^= Rect.BRIGHT
 
         return color
 
@@ -154,15 +154,15 @@ class Player(RegisteredInteractor):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
             keybox.unset_color()
-            keybox.unsetc(0, 0)
+            keybox.unset_character(0, 0)
 
         # Newly Pressed
         for midi_index in pressed.difference(self.last_pressed):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
             #character = self.NOTELIST[midi_index % len(self.NOTELIST)]
-            keybox.setc(0, 0, chr(0x1F831))
-            keybox.set_fg_color(BleepsBox.BRIGHTWHITE)
+            keybox.set_character(0, 0, chr(0x1F831))
+            keybox.set_fg_color(Rect.BRIGHTWHITE)
 
 
         self.last_pressed = pressed
@@ -180,75 +180,86 @@ class Player(RegisteredInteractor):
 
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
 
-        self.displayed_box_box = self.bleepsbox.new_box(self.get_displayed_key_position(self.note_range[1]), self.bleepsbox.height)
-        ssb_offset = (self.bleepsbox.width - self.displayed_box_box.width) // 2
+        self.displayed_box_box = self.rect.new_rect(
+            width=self.get_displayed_key_position(self.note_range[1]),
+            height=self.rect.height
+        )
+        ssb_offset = (self.rect.width - self.displayed_box_box.width) // 2
         self.displayed_box_box.move(ssb_offset, 0)
         self.state_boxes = {}
 
-        self.bleepsbox.fill(' ')
 
 
         # Populate state_boxes
         for j, current_state in enumerate(midi_interface.event_map):
             if current_state.values():
-                new_box = self.displayed_box_box.new_box(self.displayed_box_box.width, 1)
+                new_box = self.displayed_box_box.new_rect(
+                    width=self.displayed_box_box.width,
+                    height=1
+                )
                 new_box.detach()
                 self.state_boxes[j] = new_box
                 for event in current_state.values():
                     n = event.note - self.note_range[0]
                     xposition = self.get_displayed_key_position(event.note)
 
-                    key_box = new_box.new_box(1, 1)
+                    key_box = new_box.new_rect()
                     key_box.move(xposition, 0)
-                    key_box.setc(0, 0, self.NOTELIST[event.note % 12])
+                    key_box.set_character(0, 0, self.NOTELIST[event.note % 12])
                     if event.note % 12 in self.SHARPS:
                         key_box.set_bg_color(self.get_channel_color(event.channel))
-                        key_box.set_fg_color(BleepsBox.BLACK)
+                        key_box.set_fg_color(Rect.BLACK)
                     else:
                         key_box.set_fg_color(self.get_channel_color(event.channel))
 
         # Populate row where active keys are displayed
-        self.active_box = self.bleepsbox.new_box(self.displayed_box_box.width, 1)
-        self.active_box.move(ssb_offset, self.bleepsbox.height - space_buffer)
+        self.active_box = self.rect.new_rect(
+            width=self.displayed_box_box.width,
+            height=1
+        )
+        self.active_box.move(ssb_offset, self.rect.height - space_buffer)
         self.active_boxes = []
 
 
         # Draw guides, and populate active_boxes
-        self.bleepsbox.set_fg_color(BleepsBox.BRIGHTBLACK)
-        ypos = self.bleepsbox.height - space_buffer - 1
+        self.rect.set_fg_color(Rect.BRIGHTBLACK)
+        ypos = self.rect.height - space_buffer - 1
         for n in range(num_of_keys):
             midi_note = n + self.note_range[0]
             x = self.get_displayed_key_position(midi_note)
-            new_box = self.active_box.new_box(1, 1)
+            new_box = self.active_box.new_rect()
             new_box.move(x, 0)
-            new_box.set_bg_color(BleepsBox.BLACK)
+            new_box.set_bg_color(Rect.BLACK)
             self.active_boxes.append(new_box)
 
             if midi_note % 12 in self.SHARPS:
-                self.bleepsbox.setc(x + ssb_offset, ypos, chr(9607))
-                self.bleepsbox.setc(x + ssb_offset, ypos + 1, chr(9524))
+                self.rect.set_character(x + ssb_offset, ypos, chr(9607))
+                self.rect.set_character(x + ssb_offset, ypos + 1, chr(9524))
             else:
-                self.bleepsbox.setc(x + ssb_offset, ypos + 1, chr(9472))
+                self.rect.set_character(x + ssb_offset, ypos + 1, chr(9472))
 
             if not (x % 14):
-                self.bleepsbox.setc(x + ssb_offset, ypos + 2, chr(9474))
-                self.bleepsbox.setc(x + ssb_offset, ypos - 1, chr(9474))
+                self.rect.set_character(x + ssb_offset, ypos + 2, chr(9474))
+                self.rect.set_character(x + ssb_offset, ypos - 1, chr(9474))
 
         for i in range(math.ceil(num_of_keys / 12)):
             x = (i * 14) + 3
-            self.bleepsbox.setc(x + ssb_offset, ypos + 1, chr(9524))
-            self.bleepsbox.setc(x + ssb_offset, ypos, chr(9591))
+            self.rect.set_character(x + ssb_offset, ypos + 1, chr(9524))
+            self.rect.set_character(x + ssb_offset, ypos, chr(9591))
             if i + 1 < math.ceil(num_of_keys / 12):
                 x = (i * 14) + 9
-                self.bleepsbox.setc(x + ssb_offset, ypos + 1, chr(9524))
-                self.bleepsbox.setc(x + ssb_offset, ypos, chr(9591))
+                self.rect.set_character(x + ssb_offset, ypos + 1, chr(9524))
+                self.rect.set_character(x + ssb_offset, ypos, chr(9591))
 
-        for y in range(self.bleepsbox.height):
-            self.bleepsbox.setc(ssb_offset - 1, y, chr(9474))
-            self.bleepsbox.setc(ssb_offset + self.displayed_box_box.width, y, chr(9474))
+        for y in range(self.rect.height):
+            self.rect.set_character(ssb_offset - 1, y, chr(9474))
+            self.rect.set_character(ssb_offset + self.displayed_box_box.width, y, chr(9474))
 
-        self.position_display_box = self.bleepsbox.new_box(self.bleepsbox.width, 1)
-        self.position_display_box.move(0, self.bleepsbox.height - 1)
+        self.position_display_box = self.rect.new_rect(
+            width=self.rect.width,
+            height=1
+        )
+        self.position_display_box.move(0, self.rect.height - 1)
 
         self.song_position = 0
         self.playing = True
@@ -297,10 +308,10 @@ class Player(RegisteredInteractor):
                 strpos = "%8d/%d" % (self.song_position, len(midi_interface) - 1)
                 for c, character in enumerate(strpos):
                     x = self.position_display_box.width - len(strpos) - 1 + c
-                    self.position_display_box.setc(x, 0, character)
+                    self.position_display_box.set_character(x, 0, character)
 
                 to_detach = []
-                for box in self.displayed_box_box.boxes.values():
+                for box in self.displayed_box_box.rects.values():
                     to_detach.append(box)
 
                 while to_detach:
@@ -385,7 +396,7 @@ class Player(RegisteredInteractor):
             self.redraw_queue.append(key)
             while self.redraw_queue:
                 self.redrawing = self.redraw_queue.pop(0)
-                self.bleepsbox.draw()
+                self.rect.draw()
             self.redrawing = 0
         elif self.redrawing != key and key not in self.redraw_queue:
             self.redraw_queue.append(key)
