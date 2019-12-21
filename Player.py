@@ -106,7 +106,6 @@ class Player(RegisteredInteractor):
         self.song_position = 0
 
         self.active_midi = None
-        self.active_box = None # Bleepsbox, Row where keypresses are displayed
 
         self.displayed_box_box = None
         self.state_boxes = None
@@ -157,16 +156,20 @@ class Player(RegisteredInteractor):
         for midi_index in self.last_pressed.difference(pressed):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
-            keybox.unset_color()
-            keybox.unset_character(0, 0)
+            keybox.detach()
+            #keybox.unset_color()
+            #keybox.unset_character(0, 0)
 
         # Newly Pressed
         for midi_index in pressed.difference(self.last_pressed):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
+            self.displayed_box_box.attach(keybox)
             #character = self.NOTELIST[midi_index % len(self.NOTELIST)]
             keybox.set_character(0, 0, chr(0x1F831))
             keybox.set_fg_color(Rect.BRIGHTWHITE)
+            keybox.unset_color()
+            keybox.unset_character(0, 0)
 
         self.last_pressed = pressed
 
@@ -185,7 +188,8 @@ class Player(RegisteredInteractor):
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
 
         self.displayed_box_box = self.rect.new_rect(
-            width=self.get_displayed_key_position(self.note_range[1]),
+            #width=self.get_displayed_key_position(self.note_range[1]),
+            width=self.rect.width,
             height=self.rect.height
         )
 
@@ -217,49 +221,45 @@ class Player(RegisteredInteractor):
 
 
 
-
         # Populate row where active keys are displayed
-        self.active_box = self.displayed_box_box.new_rect(
-            width=self.displayed_box_box.width,
-            height=1
-        )
-        self.active_box.move(ssb_offset, self.rect.height - space_buffer)
         self.active_boxes = []
 
 
         # Draw guides, and populate active_boxes
         self.displayed_box_box.set_fg_color(Rect.BRIGHTBLACK)
+        self.displayed_box_box.set_bg_color(Rect.BRIGHTRED)
         ypos = self.displayed_box_box.height - space_buffer - 1
         for n in range(num_of_keys):
             midi_note = n + self.note_range[0]
             x = self.get_displayed_key_position(midi_note)
-            new_box = self.active_box.new_rect()
-            new_box.move(x, 0)
-            new_box.set_bg_color(Rect.BLACK)
+            new_box = self.displayed_box_box.new_rect()
+            new_box.move(x, self.displayed_box_box.height - space_buffer)
+            new_box.set_bg_color(Rect.YELLOW)
             self.active_boxes.append(new_box)
 
             if midi_note % 12 in self.SHARPS:
-                self.displayed_box_box.set_character(x + ssb_offset, ypos, chr(9607))
-                self.displayed_box_box.set_character(x + ssb_offset, ypos + 1, chr(9524))
+                self.displayed_box_box.set_character(x, ypos, chr(9607))
+                self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
             else:
-                self.displayed_box_box.set_character(x + ssb_offset, ypos + 1, chr(9472))
+                self.displayed_box_box.set_character(x, ypos + 1, chr(9472))
 
             if not (x % 14):
-                self.displayed_box_box.set_character(x + ssb_offset, ypos + 2, chr(9474))
-                self.displayed_box_box.set_character(x + ssb_offset, ypos - 1, chr(9474))
+                self.displayed_box_box.set_character(x, ypos + 2, chr(9474))
+                self.displayed_box_box.set_character(x, ypos - 1, chr(9474))
 
-        for i in range(math.ceil(num_of_keys / 12)):
-            x = (i * 14) + 3
-            self.displayed_box_box.set_character(x + ssb_offset, ypos + 1, chr(9524))
-            self.displayed_box_box.set_character(x + ssb_offset, ypos, chr(9591))
-            if i + 1 < math.ceil(num_of_keys / 12):
-                x = (i * 14) + 9
-                self.displayed_box_box.set_character(x + ssb_offset, ypos + 1, chr(9524))
-                self.displayed_box_box.set_character(x + ssb_offset, ypos, chr(9591))
+        #for i in range(math.ceil(num_of_keys / 12)):
+        #    x = (i * 14) + 3
+        #    self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
+        #    self.displayed_box_box.set_character(x, ypos, chr(9591))
+        #    if i + 1 < math.ceil(num_of_keys / 12):
+        #        x = (i * 14) + 9
+        #        self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
+        #        self.displayed_box_box.set_character(x, ypos, chr(9591))
 
         for y in range(self.displayed_box_box.height):
-            self.displayed_box_box.set_character(ssb_offset - 1, y, chr(9474))
-            self.displayed_box_box.set_character(ssb_offset + self.displayed_box_box.width, y, chr(9474))
+            self.displayed_box_box.set_character(0, y, chr(9474))
+            self.displayed_box_box.set_character(self.displayed_box_box.width, y, chr(9474))
+        self.displayed_box_box.draw()
 
         self.position_display_box = self.displayed_box_box.new_rect(
             width=self.displayed_box_box.width,
@@ -325,14 +325,14 @@ class Player(RegisteredInteractor):
 
                 for i in range(self.displayed_box_box.height):
                     try:
-                        boxes_to_use = self.state_boxes[max(0, i + self.song_position)]
+                        boxes_to_use = self.state_boxes[max(0, (self.song_position - space_buffer) + i)]
                     except KeyError:
                         continue
 
                     for note, box in boxes_to_use.items():
                         self.displayed_box_box.attach(box)
 
-                        box.move(note, self.displayed_box_box.height - space_buffer - i)
+                        box.move(note, self.displayed_box_box.height - i)
                         box.draw()
         self.quit()
 
