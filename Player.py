@@ -225,7 +225,7 @@ class Player(RegisteredInteractor):
 
         # Draw guides, and populate active_boxes
         self.displayed_box_box.set_fg_color(Rect.BRIGHTBLACK)
-        self.displayed_box_box.set_bg_color(Rect.BRIGHTRED)
+        #self.displayed_box_box.set_bg_color(Rect.BRIGHTRED)
         ypos = self.displayed_box_box.height - space_buffer - 1
         for n in range(num_of_keys):
             midi_note = n + self.note_range[0]
@@ -316,7 +316,8 @@ class Player(RegisteredInteractor):
 
                 to_detach = []
                 for box in self.displayed_box_box.rects.values():
-                    to_detach.append(box)
+                    if box != self.position_display_box:
+                        to_detach.append(box)
 
                 while to_detach:
                     to_detach.pop().detach()
