@@ -1,4 +1,5 @@
 '''Compare MIDI Device input to .mid'''
+import random, time
 
 class MIDIInterface(object):
     def __init__(self, midilike, controller):
@@ -156,6 +157,14 @@ class MIDIInterface(object):
         return not (self.state_map[tick].intersection(given_state))
 
     def get_pressed(self):
+        # Test
+        #options = list(range(40, 100))
+        #output = set()
+        #for i in range(random.randint(1, 6)):
+        #    output.add(options.pop(random.randint(0, len(options) - 1)))
+        #time.sleep(.3)
+        #return output
+
         return self.controller.get_pressed()
 
     def __len__(self):
