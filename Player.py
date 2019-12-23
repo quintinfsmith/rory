@@ -166,13 +166,18 @@ class Player(RegisteredInteractor):
             keybox = self.active_boxes[piano_index]
             self.displayed_box_box.attach(keybox)
             #character = self.NOTELIST[midi_index % len(self.NOTELIST)]
-            keybox.set_character(0, 0, chr(0x1F831))
+            keybox.set_character(0, 0, ' ')
+            #keybox.unset_color()
+            #keybox.unset_character(0, 0)
             keybox.set_fg_color(Rect.BRIGHTWHITE)
-            keybox.unset_color()
-            keybox.unset_character(0, 0)
+            if matched.intersection(set([midi_index])):
+                keybox.set_bg_color(Rect.BRIGHTGREEN)
+            else:
+                keybox.set_bg_color(Rect.BRIGHTRED)
+
 
         self.last_pressed = pressed
-
+        self.displayed_box_box.draw()
         #self.refresh()
         #self.rect.draw()
 
@@ -217,7 +222,9 @@ class Player(RegisteredInteractor):
                         key_box.set_fg_color(self.get_channel_color(event.channel))
 
                     key_box.detach()
-                    self.state_boxes[j][event.note] = key_box
+
+                    x = self.get_displayed_key_position(event.note)
+                    self.state_boxes[j][event.note] = (x, key_box)
 
 
         # Populate row where active keys are displayed
@@ -328,9 +335,9 @@ class Player(RegisteredInteractor):
                     except KeyError:
                         continue
 
-                    for note, box in boxes_to_use.items():
+                    for note, (keypos, box) in boxes_to_use.items():
                         self.displayed_box_box.attach(box)
-                        box.move(note, self.displayed_box_box.height - i)
+                        box.move(keypos, self.displayed_box_box.height - i)
                         #box.draw()
 
                 self.displayed_box_box.draw()
