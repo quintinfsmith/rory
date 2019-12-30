@@ -18,7 +18,6 @@ class Interface(RectManager, RegisteredInteractor):
         self.active_threads = []
         self.interactorstack = []
 
-
         self.listening = False
         self.assign_sequence("q", self.quit)
         self.player = None
@@ -30,13 +29,14 @@ class Interface(RectManager, RegisteredInteractor):
         else:
             self.settings = {}
 
+
     def set_midicontroller_path(self, path):
         '''Use a different Midi Input Device'''
         self.midi_controller_path = path
 
     def show_player(self):
         '''Displays MidiPlayer Box'''
-        player_box = self.new_rect(
+        player_box = self.root.new_rect(
             width=self.width,
             height=self.height
         )
