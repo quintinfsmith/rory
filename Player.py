@@ -250,7 +250,8 @@ class Player(RegisteredInteractor):
 
             if not (x % 14):
                 self.displayed_box_box.set_character(x, ypos + 2, chr(9474))
-                self.displayed_box_box.set_character(x, ypos - 1, chr(9474))
+                for i in range((ypos + 1) // 4):
+                    self.displayed_box_box.set_character(x, ypos - 1 - (i * 4), chr(9474))
 
         for i in range(math.ceil(num_of_keys / 12)):
             x = (i * 14) + 3
