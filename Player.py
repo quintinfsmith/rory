@@ -6,7 +6,7 @@ from MIDIInterface import MIDIInterface
 from MidiLib.MidiInterpreter import MIDIInterpreter as MI
 from Rect import Rect
 import threading
-import math
+import math, time
 
 def logg(msg):
     with open('logg', 'a') as fp:
@@ -77,8 +77,6 @@ class Player(RegisteredInteractor):
     def __init__(self, rect):
         super().__init__()
         self.rect = rect
-        self.redrawing = False
-        self.redraw_queue = []
 
         self.is_active = True
 
@@ -111,6 +109,8 @@ class Player(RegisteredInteractor):
         self.state_boxes = None
         self.active_boxes = None
         self.position_display_box = None
+
+        self.flag_refresh = True
 
     def width(self):
         return (self.note_range[1] - self.note_range[0]) + 2
@@ -159,6 +159,8 @@ class Player(RegisteredInteractor):
             keybox.detach()
             #keybox.unset_color()
             #keybox.unset_character(0, 0)
+            self.displayed_box_box.queue_draw()
+            self.flag_refresh = True
 
         # Newly Pressed
         for midi_index in pressed.difference(self.last_pressed):
@@ -167,19 +169,16 @@ class Player(RegisteredInteractor):
             self.displayed_box_box.attach(keybox)
             #character = self.NOTELIST[midi_index % len(self.NOTELIST)]
             keybox.set_character(0, 0, ' ')
-            #keybox.unset_color()
-            #keybox.unset_character(0, 0)
             keybox.set_fg_color(Rect.BRIGHTWHITE)
             if matched.intersection(set([midi_index])):
                 keybox.set_bg_color(Rect.BRIGHTGREEN)
             else:
                 keybox.set_bg_color(Rect.BRIGHTRED)
+            self.displayed_box_box.queue_draw()
+            self.flag_refresh = True
 
 
         self.last_pressed = pressed
-        self.displayed_box_box.draw()
-        #self.refresh()
-        #self.rect.draw()
 
     def play_along(self, path, controller):
         '''Display notes in console. Main function'''
@@ -198,6 +197,11 @@ class Player(RegisteredInteractor):
             height=self.rect.height
         )
 
+        buffer_rect = self.displayed_box_box.new_rect(
+            width=box_width,
+            height=self.rect.height
+        )
+
         ssb_offset = (self.rect.width - self.displayed_box_box.width) // 2
         self.displayed_box_box.move(ssb_offset, 0)
         self.state_boxes = {}
@@ -209,7 +213,7 @@ class Player(RegisteredInteractor):
                 self.state_boxes[j] = {}
 
                 for event in current_state.values():
-                    key_box = self.displayed_box_box.new_rect(
+                    key_box = buffer_rect.new_rect(
                         width=1,
                         height=1
                     )
@@ -226,52 +230,53 @@ class Player(RegisteredInteractor):
                     x = self.get_displayed_key_position(event.note)
                     self.state_boxes[j][event.note] = (x, key_box)
 
-
         # Populate row where active keys are displayed
         self.active_boxes = []
 
         # Draw guides, and populate active_boxes
-        self.displayed_box_box.set_fg_color(Rect.BRIGHTBLACK)
+        buffer_rect.set_fg_color(Rect.BRIGHTBLACK)
         #self.displayed_box_box.set_bg_color(Rect.BRIGHTRED)
         ypos = self.displayed_box_box.height - space_buffer - 1
         for n in range(num_of_keys):
             midi_note = n + self.note_range[0]
             x = self.get_displayed_key_position(midi_note)
-            new_box = self.displayed_box_box.new_rect()
-            new_box.move(x, self.displayed_box_box.height - space_buffer)
+            new_box = buffer_rect.new_rect()
+            new_box.move(x, buffer_rect.height - space_buffer)
             new_box.set_bg_color(Rect.YELLOW)
             self.active_boxes.append(new_box)
 
             if midi_note % 12 in self.SHARPS:
-                self.displayed_box_box.set_character(x, ypos, chr(9607))
-                self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
+                buffer_rect.set_character(x, ypos, chr(9607))
+                buffer_rect.set_character(x, ypos + 1, chr(9524))
             else:
-                self.displayed_box_box.set_character(x, ypos + 1, chr(9472))
+                buffer_rect.set_character(x, ypos + 1, chr(9472))
 
             if not (x % 14):
-                self.displayed_box_box.set_character(x, ypos + 2, chr(9474))
+                buffer_rect.set_character(x, ypos + 2, chr(9474))
                 for i in range((ypos + 1) // 4):
-                    self.displayed_box_box.set_character(x, ypos - 1 - (i * 4), chr(9474))
+                    buffer_rect.set_character(x, ypos - 1 - (i * 4), chr(9474))
 
         for i in range(math.ceil(num_of_keys / 12)):
             x = (i * 14) + 3
-            self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
-            self.displayed_box_box.set_character(x, ypos, chr(9591))
+            buffer_rect.set_character(x, ypos + 1, chr(9524))
+            buffer_rect.set_character(x, ypos, chr(9591))
             if i + 1 < math.ceil(num_of_keys / 12):
                 x = (i * 14) + 9
-                self.displayed_box_box.set_character(x, ypos + 1, chr(9524))
-                self.displayed_box_box.set_character(x, ypos, chr(9591))
+                buffer_rect.set_character(x, ypos + 1, chr(9524))
+                buffer_rect.set_character(x, ypos, chr(9591))
 
-        for y in range(self.displayed_box_box.height):
-            self.displayed_box_box.set_character(0, y, chr(9474))
-            self.displayed_box_box.set_character(self.displayed_box_box.width - 1, y, chr(9474))
+        for y in range(buffer_rect.height):
+            buffer_rect.set_character(0, y, chr(9474))
+            buffer_rect.set_character(buffer_rect.width - 1, y, chr(9474))
 
         self.position_display_box = self.displayed_box_box.new_rect(
             width=self.displayed_box_box.width,
             height=1
         )
 
-        self.position_display_box.move(1, self.displayed_box_box.height - 1)
+        self.position_display_box.move(1, buffer_rect.height - 1)
+
+        self.start_display_daemon()
 
         self.song_position = 0
         self.playing = True
@@ -323,26 +328,28 @@ class Player(RegisteredInteractor):
                     self.position_display_box.set_character(x, 0, character)
 
                 to_detach = []
-                for box in self.displayed_box_box.rects.values():
+                for box in buffer_rect.rects.values():
                     if box != self.position_display_box:
                         to_detach.append(box)
 
                 while to_detach:
                     to_detach.pop().detach()
 
-                for i in range(self.displayed_box_box.height):
+                for i in range(buffer_rect.height):
                     try:
                         boxes_to_use = self.state_boxes[max(0, (self.song_position - space_buffer) + i)]
                     except KeyError:
                         continue
 
                     for note, (keypos, box) in boxes_to_use.items():
-                        self.displayed_box_box.attach(box)
-                        box.move(keypos, self.displayed_box_box.height - i)
-                        #box.draw()
+                        buffer_rect.attach(box)
+                        box.move(keypos, buffer_rect.height - i)
+                        box.queue_draw()
 
-                self.displayed_box_box.draw()
-                #self.position_display_box.draw()
+                buffer_rect.queue_draw()
+                self.position_display_box.queue_draw()
+                self.flag_refresh = True
+
         self.quit()
 
     def _wait_for_input(self, midi_interface):
@@ -404,18 +411,16 @@ class Player(RegisteredInteractor):
         '''Set a Flag'''
         self.flags[flag] = state
 
-    def _refresh(self, key):
-        if self.redrawing == 0:
-            self.redraw_queue.append(key)
-            while self.redraw_queue:
-                self.redrawing = self.redraw_queue.pop(0)
-                self.rect.draw()
-            self.redrawing = 0
-        elif self.redrawing != key and key not in self.redraw_queue:
-            self.redraw_queue.append(key)
+    def display_daemon(self):
+        delay = 1 / 60
+        while self.is_active:
+            if self.flag_refresh:
+                self.flag_refresh = False
+                self.rect.draw_queued()
+            time.sleep(delay)
 
-    def refresh(self, key=1):
-        if not self.redrawing:
-            thread = threading.Thread(target=self._refresh, args=(key, ))
-            thread.start()
+    def start_display_daemon(self):
+        thread = threading.Thread(target=self.display_daemon)
+        thread.start()
+
 
