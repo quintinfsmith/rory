@@ -29,6 +29,9 @@ class Interface(RectManager, RegisteredInteractor):
         else:
             self.settings = {}
 
+        self.root.set_bg_color(Rect.BRIGHTBLACK)
+        self.root.draw()
+
 
     def set_midicontroller_path(self, path):
         '''Use a different Midi Input Device'''
