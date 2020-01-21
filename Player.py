@@ -167,8 +167,8 @@ class Player(RegisteredInteractor):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
             self.displayed_box_box.attach(keybox)
-            #character = self.NOTELIST[midi_index % len(self.NOTELIST)]
-            keybox.set_character(0, 0, ' ')
+            character = self.NOTELIST[midi_index % len(self.NOTELIST)]
+            keybox.set_character(0, 0, character)
             keybox.set_fg_color(Rect.BRIGHTWHITE)
             if matched.intersection(set([midi_index])):
                 keybox.set_bg_color(Rect.BRIGHTGREEN)
@@ -270,11 +270,10 @@ class Player(RegisteredInteractor):
             buffer_rect.set_character(buffer_rect.width - 1, y, chr(9474))
 
         self.position_display_box = self.displayed_box_box.new_rect(
-            width=self.displayed_box_box.width,
+            width=self.displayed_box_box.width - 1,
             height=1
         )
 
-        self.position_display_box.move(1, buffer_rect.height - 1)
 
         self.start_display_daemon()
 
@@ -323,9 +322,12 @@ class Player(RegisteredInteractor):
 
             if call_refresh:
                 strpos = "%8d/%d" % (self.song_position, len(midi_interface) - 1)
+                self.position_display_box.resize(len(strpos), 1)
+                xpos = self.displayed_box_box.width - self.position_display_box.width - 1
+                self.position_display_box.move(xpos, buffer_rect.height - 1)
+
                 for c, character in enumerate(strpos):
-                    x = self.position_display_box.width - len(strpos) - 1 + c
-                    self.position_display_box.set_character(x, 0, character)
+                    self.position_display_box.set_character(c, 0, character)
 
                 to_detach = []
                 for box in buffer_rect.rects.values():
