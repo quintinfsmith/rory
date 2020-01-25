@@ -164,6 +164,8 @@ class MIDIInterface(object):
         #    output.add(options.pop(random.randint(0, len(options) - 1)))
         #time.sleep(.3)
         #return output
+        if not self.controller.connected:
+            time.sleep(.05)
 
         return self.controller.get_pressed()
 

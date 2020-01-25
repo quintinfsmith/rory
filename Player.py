@@ -105,7 +105,7 @@ class Player(RegisteredInteractor):
 
         self.active_midi = None
 
-        self.displayed_box_box = None
+        self.roll_field = None # Box where incoming notes are contained
         self.state_boxes = None
         self.active_boxes = None
         self.position_display_box = None
@@ -153,20 +153,25 @@ class Player(RegisteredInteractor):
             matched = []
 
         # No Longer Pressed
+        keys_released = False
         for midi_index in self.last_pressed.difference(pressed):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
             keybox.detach()
             #keybox.unset_color()
             #keybox.unset_character(0, 0)
-            self.displayed_box_box.queue_draw()
             self.flag_refresh = True
+            keys_released = True
+
+        if keys_released:
+            self.rect.queue_draw()
+
 
         # Newly Pressed
         for midi_index in pressed.difference(self.last_pressed):
             piano_index = midi_index - self.note_range[0]
             keybox = self.active_boxes[piano_index]
-            self.displayed_box_box.attach(keybox)
+            self.roll_field.attach(keybox)
             character = self.NOTELIST[midi_index % len(self.NOTELIST)]
             keybox.set_character(0, 0, character)
             keybox.set_fg_color(Rect.BRIGHTWHITE)
@@ -174,8 +179,8 @@ class Player(RegisteredInteractor):
                 keybox.set_bg_color(Rect.BRIGHTGREEN)
             else:
                 keybox.set_bg_color(Rect.BRIGHTRED)
-            self.displayed_box_box.queue_draw()
             self.flag_refresh = True
+            keybox.queue_draw()
 
 
         self.last_pressed = pressed
@@ -192,18 +197,16 @@ class Player(RegisteredInteractor):
         num_of_keys = self.note_range[1] - self.note_range[0] + 1
         box_width = self.get_displayed_key_position(self.note_range[1] + 1) - self.get_displayed_key_position(self.note_range[0])
 
-        self.displayed_box_box = self.rect.new_rect(
-            width=box_width,
-            height=self.rect.height
-        )
+        self.rect.resize(box_width + 2, self.rect.height)
+        ssb_offset = (self.rect._screen.root.width - box_width) // 2
+        self.rect.move(ssb_offset, 0)
 
-        buffer_rect = self.displayed_box_box.new_rect(
+        self.roll_field = self.rect.new_rect(
             width=box_width,
-            height=self.rect.height
+            height=self.rect.height - 1
         )
+        self.roll_field.move(1, 0)
 
-        ssb_offset = (self.rect.width - self.displayed_box_box.width) // 2
-        self.displayed_box_box.move(ssb_offset, 0)
         self.state_boxes = {}
 
 
@@ -213,7 +216,7 @@ class Player(RegisteredInteractor):
                 self.state_boxes[j] = {}
 
                 for event in current_state.values():
-                    key_box = buffer_rect.new_rect(
+                    key_box = self.rect.new_rect(
                         width=1,
                         height=1
                     )
@@ -234,48 +237,49 @@ class Player(RegisteredInteractor):
         self.active_boxes = []
 
         # Draw guides, and populate active_boxes
-        buffer_rect.set_fg_color(Rect.BRIGHTBLACK)
-        #self.displayed_box_box.set_bg_color(Rect.BRIGHTRED)
-        ypos = self.displayed_box_box.height - space_buffer - 1
+        self.roll_field.set_fg_color(Rect.BRIGHTBLACK)
+        #self.roll_field.set_bg_color(Rect.BRIGHTRED)
+        ypos = self.roll_field.height - space_buffer - 1
         for n in range(num_of_keys):
             midi_note = n + self.note_range[0]
             x = self.get_displayed_key_position(midi_note)
-            new_box = buffer_rect.new_rect()
-            new_box.move(x, buffer_rect.height - space_buffer)
+            new_box = self.roll_field.new_rect()
+            new_box.move(x, self.roll_field.height - space_buffer)
             new_box.set_bg_color(Rect.YELLOW)
             self.active_boxes.append(new_box)
 
             if midi_note % 12 in self.SHARPS:
-                buffer_rect.set_character(x, ypos, chr(9607))
-                buffer_rect.set_character(x, ypos + 1, chr(9524))
+                self.roll_field.set_character(x, ypos, chr(9607))
+                self.roll_field.set_character(x, ypos + 1, chr(9524))
             else:
-                buffer_rect.set_character(x, ypos + 1, chr(9472))
+                self.roll_field.set_character(x, ypos + 1, chr(9472))
 
             if not (x % 14):
-                buffer_rect.set_character(x, ypos + 2, chr(9474))
+                self.roll_field.set_character(x, ypos + 2, chr(9474))
                 for i in range((ypos + 1) // 4):
-                    buffer_rect.set_character(x, ypos - 1 - (i * 4), chr(9474))
+                    self.roll_field.set_character(x, ypos - 1 - (i * 4), chr(9474))
 
         for i in range(math.ceil(num_of_keys / 12)):
             x = (i * 14) + 3
-            buffer_rect.set_character(x, ypos + 1, chr(9524))
-            buffer_rect.set_character(x, ypos, chr(9591))
+            self.roll_field.set_character(x, ypos + 1, chr(9524))
+            self.roll_field.set_character(x, ypos, chr(9591))
             if i + 1 < math.ceil(num_of_keys / 12):
                 x = (i * 14) + 9
-                buffer_rect.set_character(x, ypos + 1, chr(9524))
-                buffer_rect.set_character(x, ypos, chr(9591))
+                self.roll_field.set_character(x, ypos + 1, chr(9524))
+                self.roll_field.set_character(x, ypos, chr(9591))
 
-        for y in range(buffer_rect.height):
-            buffer_rect.set_character(0, y, chr(9474))
-            buffer_rect.set_character(buffer_rect.width - 1, y, chr(9474))
+        for y in range(self.rect.height):
+            self.rect.set_character(0, y, chr(9474))
+            self.rect.set_character(self.rect.width - 1, y, chr(9474))
 
-        self.position_display_box = self.displayed_box_box.new_rect(
-            width=self.displayed_box_box.width - 1,
+        self.position_display_box = self.rect.new_rect(
+            width=self.roll_field.width - 1,
             height=1
         )
 
 
         self.start_display_daemon()
+        self.rect.queue_draw()
 
         self.song_position = 0
         self.playing = True
@@ -321,35 +325,34 @@ class Player(RegisteredInteractor):
                 call_refresh = True
 
             if call_refresh:
-                strpos = "%8d/%d" % (self.song_position, len(midi_interface) - 1)
+                strpos = "%d/%d" % (self.song_position, len(midi_interface) - 1)
                 self.position_display_box.resize(len(strpos), 1)
-                xpos = self.displayed_box_box.width - self.position_display_box.width - 1
-                self.position_display_box.move(xpos, buffer_rect.height - 1)
+                xpos = self.rect.width - self.position_display_box.width
+                self.position_display_box.move(xpos, self.rect.height - 1)
 
                 for c, character in enumerate(strpos):
                     self.position_display_box.set_character(c, 0, character)
 
                 to_detach = []
-                for box in buffer_rect.rects.values():
+                for box in self.roll_field.rects.values():
                     if box != self.position_display_box:
                         to_detach.append(box)
 
                 while to_detach:
-                    to_detach.pop().detach()
+                    current = to_detach.pop()
+                    current.detach()
 
-                for i in range(buffer_rect.height):
+                for i in range(self.roll_field.height):
                     try:
                         boxes_to_use = self.state_boxes[max(0, (self.song_position - space_buffer) + i)]
                     except KeyError:
                         continue
 
                     for note, (keypos, box) in boxes_to_use.items():
-                        buffer_rect.attach(box)
-                        box.move(keypos, buffer_rect.height - i)
-                        box.queue_draw()
+                        self.roll_field.attach(box)
+                        box.move(keypos, self.roll_field.height - i)
 
-                buffer_rect.queue_draw()
-                self.position_display_box.queue_draw()
+                self.rect.queue_draw()
                 self.flag_refresh = True
 
         self.quit()
