@@ -1,89 +1,73 @@
 '''Interface between user and player'''
-
 import os
 import sys
-import json
 import threading
+import time
 from Player import Player
-from Rect import RectManager, Rect
-from Interactor import RegisteredInteractor
-from MidiLib.MIDIController import MIDIController
-#from Recorder import Recorder
+from Rect import RectStage
+from Interactor import Interactor
+from MIDIController import MIDIController
 
-class Interface(RectManager, RegisteredInteractor):
+
+class Top(RectStage):
     '''Interface to Run the MidiPlayer'''
+    CONTEXT_DEFAULT = 0
+    CONTEXT_PLAYER = 1
     def __init__(self):
-        RectManager.__init__(self)
-        RegisteredInteractor.__init__(self)
-        self.active_threads = []
-        self.interactorstack = []
-
-        self.listening = False
-        self.assign_sequence("q", self.quit)
-        self.player = None
+        super().__init__()
+        self.interactor = Interactor()
         self.midi_controller_path = "/dev/midi1"
-        self.settings_path = "./settings.json"
-        if os.path.isfile(self.settings_path):
-            with open(self.settings_path, "r") as fp:
-                self.settings = json.loads(fp.read())
-        else:
-            self.settings = {}
-
-        self.root.set_bg_color(Rect.BRIGHTBLACK)
-        self.root.draw()
-
-
-    def set_midicontroller_path(self, path):
-        '''Use a different Midi Input Device'''
-        self.midi_controller_path = path
-
-    def show_player(self):
-        '''Displays MidiPlayer Box'''
-        player_box = self.root.new_rect(
-            width=self.width,
-            height=self.height
+        self.midi_controller = MIDIController(self.midi_controller_path)
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_DEFAULT,
+            'q',
+            self.kill
         )
-        player = Player(player_box)
 
-        self.interactorstack.append(player)
-        self.player = player
+        self.running = True
+        self.player = None
 
-    def save_settings(self):
-        '''Save settings...'''
-        with open(self.settings_path, "w") as fp:
-            fp.write(json.dumps(self.settings))
-
-    def load_midi(self, midi_path):
-        '''Load Midi Like Object from path'''
-        return MIDIInterpreter.parse_midi(midi_path)
-
-    def quit(self):
-        '''shut it all down'''
-        self.listening = False
-        self.kill()
-
-    def play_along(self, midi_path, hidden=None):
-        '''Run the Player with the loaded MidiLike Object'''
-        if not hidden:
-            hidden = list()
-
-        thread = threading.Thread(target=self.player.play_along,\
-          args=[midi_path, MIDIController(self.midi_controller_path)])
+        thread = threading.Thread(target=self._input_daemon)
         thread.start()
-        self.active_threads.append(thread)
 
-    def input_loop(self):
+    def play_along(self, midi_path):
+        '''Run the Player with the loaded MidiLike Object'''
+
+        if not self.player:
+            self.player = self.create_scene(self.CONTEXT_PLAYER, Player,
+                path=midi_path,
+                controller=self.midi_controller
+            )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'j',
+            self.player.next_state
+        )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'k',
+            self.player.prev_state
+        )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'q',
+            self.kill
+        )
+
+        self.interactor.set_context(self.CONTEXT_PLAYER)
+
+        self.start_scene(self.CONTEXT_PLAYER)
+
+
+    def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''
-        self.listening = True
-        while self.listening:
-            if self.interactorstack:
-                active = self.interactorstack[-1]
-                if not active.is_active:
-                    self.interactorstack.pop()
+        while self.running:
+            self.interactor.get_input()
 
-            if not self.interactorstack:
-                self.quit()
-
-            if active.is_active:
-                active.get_input()
+    def kill(self):
+        '''shut it all down'''
+        self.running = False
+        self.midi_controller.close()
+        super().kill()
 

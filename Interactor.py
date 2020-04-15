@@ -1,24 +1,49 @@
 '''Allow subclasses to listen for keyboard input'''
 from localfuncs import read_character
+import threading
+import time
 
-class InputNode(object):
+class FunctionTreeNode(object):
     '''tree-like node to determine input-sequence'''
     def __init__(self):
         self.children = {}
         self.action = None
         self.args = None
 
-    def set(self, path, action, args=None):
+    def get_spread(self):
+        output = 0
+        if self.action:
+            output += 1
+        else:
+            for child in self.children.values():
+                output += child.get_spread()
+
+        return output
+
+    def unset(self, path):
+        if path:
+            node = path[0]
+            path = path[1:]
+            if node in self.children.keys():
+                self.children[node].unset(path)
+                if self.children[node].get_spread() <= 1:
+                    del self.children[node]
+        else:
+            self.action = None
+            self.args = None
+
+    def set(self, path, action, *args):
         '''Assign a function to an end-node in node-tree'''
         if path:
             node = path[0]
             path = path[1:]
             if not node in self.children.keys():
-                self.children[node] = InputNode()
-            self.children[node].set(path, action, args)
+                self.children[node] = FunctionTreeNode()
+            self.children[node].set(path, action, *args)
         else:
             self.action = action
             self.args = args
+
 
     def get(self, path):
         '''Return sequence at current node in sequence, if any'''
@@ -35,26 +60,41 @@ class InputNode(object):
 class Interactor(object):
     '''Allows for interaction with keyboard input'''
     def __init__(self):
-        self.cmd_node = InputNode()
+        self.active_context = 0
+        self.cmd_nodes = { self.active_context: FunctionTreeNode() }
 
-        self.active_node = self.cmd_node
+        self.active_node = self.cmd_nodes[self.active_context]
+
+        self.backup = []
+        self.checking_cmds = False
+
+        self.ignoring_input = 0
+        self.downtime = 1 / 60
+
 
     def get_input(self):
         '''Send keypress to be handled'''
-        self.check_cmd(read_character())
+        new_chr = read_character()
+
+        if time.time() - self.ignoring_input < self.downtime:
+            pass
+        else:
+            self.check_cmd(new_chr)
+
 
     def check_cmd(self, char):
         '''Add key-press to key-sequence, call function if any'''
         node = self.active_node.get(char)
-        top = self.active_node == self.cmd_node
+        top = self.active_node == self.cmd_nodes[self.active_context]
 
         if node:
             if node.action:
-                if not node.args is None:
-                    node.action(node.args)
+                self.ignoring_input = time.time()
+                if node.args:
+                    node.action(*(node.args))
                 else:
                     node.action()
-                self.active_node = self.cmd_node
+                self.active_node = self.cmd_nodes[self.active_context]
             else:
                 self.active_node = node
         else:
@@ -62,38 +102,23 @@ class Interactor(object):
             # will check if the last given character is in
             # a path of its own and either call that function
             # or just get the input sequence started
-            self.active_node = self.cmd_node
+            self.active_node = self.cmd_nodes[self.active_context]
             if not top:
                 self.check_cmd(char)
 
-    def assign_sequence(self, string_seq, func, arg=None):
+    def assign_sequence(self, string_seq, func, *args):
         '''associate key-sequence with a function'''
-        self.cmd_node.set(string_seq, func, arg)
+        self.assign_context_sequence(
+            self.active_context,
+            string_seq,
+            func,
+            *args
+        )
 
+    def assign_context_sequence(self, context_key, string_seq, func, *args):
+        if context_key not in self.cmd_nodes.keys():
+            self.cmd_nodes[context_key] = FunctionTreeNode()
+        self.cmd_nodes[context_key].set(string_seq, func, *args)
 
-class RegisteredInteractor(Interactor):
-    '''Interactor with number register built in'''
-    def __init__(self):
-        Interactor.__init__(self)
-
-        self.general_register = 0
-        self.cmd_node.set('0', self.input_to_register, 0)
-        self.cmd_node.set('1', self.input_to_register, 1)
-        self.cmd_node.set('2', self.input_to_register, 2)
-        self.cmd_node.set('3', self.input_to_register, 3)
-        self.cmd_node.set('4', self.input_to_register, 4)
-        self.cmd_node.set('5', self.input_to_register, 5)
-        self.cmd_node.set('6', self.input_to_register, 6)
-        self.cmd_node.set('7', self.input_to_register, 7)
-        self.cmd_node.set('8', self.input_to_register, 8)
-        self.cmd_node.set('9', self.input_to_register, 9)
-        self.cmd_node.set(chr(27), self.clear_register)
-
-    def input_to_register(self, digit): # Might remove
-        '''general number register input, base 10'''
-        self.general_register *= 10
-        self.general_register += digit
-
-    def clear_register(self):
-        '''Clear Register'''
-        self.general_register = 0
+    def set_context(self, context_key):
+        self.active_context = context_key
