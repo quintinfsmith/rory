@@ -26,6 +26,7 @@ class Top(RectStage):
 
         self.running = True
         self.player = None
+        self.set_fps(24)
 
         thread = threading.Thread(target=self._input_daemon)
         thread.start()

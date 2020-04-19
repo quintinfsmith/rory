@@ -32,9 +32,14 @@ class Player(RectScene):
 
     def next_state(self):
         self.song_position += 1
-        while self.song_position < len(self.midi_interface.state_map) and not self.midi_interface.get_state(self.song_position):
+        while self.song_position < self.loop[1] and not self.midi_interface.get_state(self.song_position):
             self.song_position += 1
-        self.song_position = min(len(self.midi_interface.state_map) - 1, self.song_position)
+
+        self.song_position = min(self.loop[1], self.song_position)
+
+        if (self.song_position == self.loop[1]):
+            self.song_position = self.loop[0]
+
         self.disp_flags[self.FLAG_POSITION] = True
 
     def prev_state(self):
@@ -49,9 +54,13 @@ class Player(RectScene):
         '''set the song position as the value in the register'''
         self.song_position = max(0, self.register)
 
-        while self.song_position < len(self.midi_interface.state_map) and not self.midi_interface.get_state(self.song_position):
+        while self.song_position < self.loop[1] and not self.midi_interface.get_state(self.song_position):
             self.song_position += 1
-        self.song_position = min(len(self.midi_interface.state_map) - 1, self.song_position)
+
+        self.song_position = min(self.loop[1], self.song_position)
+
+        if (self.song_position == self.loop[1]):
+            self.song_position = self.loop[0]
 
         self.disp_flags[self.FLAG_POSITION] = True
 
@@ -64,12 +73,14 @@ class Player(RectScene):
         self.is_active = True
 
         self.register = 0
+        self.loop = [0, 0]
 
         self.note_range = [21, 21 + 88]
 
         self.active_midi = mido.MidiFile(kwargs['path'])
         self.midi_controller = kwargs['controller']
         self.midi_interface = MIDIInterface(self.active_midi)
+        self.clear_loop()
 
         self.pressed_notes = set()
         self.need_to_release = set()
@@ -209,7 +220,8 @@ class Player(RectScene):
             width = width
         )
 
-        self.rect_background.move((self.width - width) // 2, 0)
+        background_pos = (self.width - width) // 2
+        self.rect_background.move(background_pos, 0)
 
         y = self.height - self.active_row_position
         for i in range(self.note_range[0], self.note_range[1]):
@@ -222,7 +234,12 @@ class Player(RectScene):
 
             if (i + 3) % 12 == 0:
                 for j in range(0, y):
-                    self.rect_background.set_character(x, j, chr(9474))
+                    self.rect_background.set_character(x, j, chr(9550))
+                for j in range(y + 1, self.rect_background.height):
+                    self.rect_background.set_character(x, j, chr(9550))
+        for y in range(self.height):
+            self.set_character(background_pos - 1, y, chr(9475))
+            self.set_character(background_pos + width, y, chr(9475))
 
         self.rect_background.draw()
 
@@ -261,17 +278,17 @@ class Player(RectScene):
 
         return position
 
-    def set_loop_start(self):
+    def set_loop_start(self, position):
         '''set current positions as loop start'''
-        pass
+        self.loop[0] = min(max(0, position), len(self.midi_interface.state_map) - 1)
 
-    def set_loop_end(self):
+    def set_loop_end(self, position):
         '''set current positions as loop end'''
-        pass
+        self.loop[1] = min(max(0, position), len(self.midi_interface.state_map) - 1)
 
     def clear_loop(self):
         '''Stop Looping'''
-        pass
+        self.loop = [0, len(self.midi_interface.state_map) - 1]
 
     def set_register_digit(self, n):
         self.register *= 10
@@ -283,6 +300,7 @@ class Player(RectScene):
     def jump_to_register_position(self):
         self.set_state(self.register)
         self.clear_register()
+
 
 
 class MIDIInterface(object):
