@@ -67,6 +67,17 @@ class Top(RectStage):
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
+            '[',
+            self.player.set_loop_start_to_position,
+        )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            ']',
+            self.player.set_loop_end_to_position,
+        )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
             'q',
             self.kill
         )
