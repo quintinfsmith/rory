@@ -27,6 +27,7 @@ class Player(RectScene):
     def kill(self):
         ''''shutdown the player Box'''
         self.is_active = False
+        self.midi_controller.close()
         super().kill()
 
     def next_state(self):
@@ -44,18 +45,25 @@ class Player(RectScene):
         self.disp_flags[self.FLAG_POSITION] = True
 
 
-    def jump(self):
+    def set_state(self, song_position):
         '''set the song position as the value in the register'''
-        pass
+        self.song_position = max(0, self.register)
+
+        while self.song_position < len(self.midi_interface.state_map) and not self.midi_interface.get_state(self.song_position):
+            self.song_position += 1
+        self.song_position = min(len(self.midi_interface.state_map) - 1, self.song_position)
+
+        self.disp_flags[self.FLAG_POSITION] = True
 
     def toggle_ignore_channel(self):
         pass
-
 
     def __init__(self, rect_id, rectmanager, **kwargs):
         super().__init__(rect_id, rectmanager, **kwargs)
 
         self.is_active = True
+
+        self.register = 0
 
         self.note_range = [21, 21 + 88]
 
@@ -64,9 +72,9 @@ class Player(RectScene):
         self.midi_interface = MIDIInterface(self.active_midi)
 
         self.pressed_notes = set()
+        self.need_to_release = set()
 
         self.song_position = -1
-
 
         self.disp_flags = {
             self.FLAG_PRESSED: True, # Pressed notes have changed,
@@ -76,28 +84,37 @@ class Player(RectScene):
 
         self.active_row_position = 8
         self.rect_background = self.new_rect()
-        self.set_bg_color(Rect.BLUE)
-        self.visible_rect_notes = []
+        #self.set_bg_color(Rect.BLUE)
+        self.visible_note_rects = []
+        self.pressed_note_rects = []
 
+        self.rect_position_display = self.new_rect()
 
-        thread = threading.Thread(
+        self.midi_input_thread = threading.Thread(
             target=self.midi_input_daemon
         )
 
-        thread.start()
-
+        self.midi_input_thread.start()
         self.next_state()
 
     def midi_input_daemon(self):
-        while self.is_active:
+        while self.is_active and self.midi_controller.connected:
             message = self.midi_controller.read()
-            if message.type == 'note_on':
-                self.pressed_notes.add(message.note)
-            elif message.type == 'note_off':
-                self.pressed_notes.remove(message.note)
-            song_state = self.midi_interface.get_state(self.song_position)
+            if message:
+                if message.type == 'note_on':
+                    self.pressed_notes.add(message.note)
+                    self.disp_flags[self.FLAG_PRESSED] = True
+                elif message.type == 'note_off':
+                    self.pressed_notes.remove(message.note)
+                    try:
+                        self.need_to_release.remove(message.note)
+                    except KeyError:
+                        pass
+                    self.disp_flags[self.FLAG_PRESSED] = True
+                song_state = self.midi_interface.get_state(self.song_position)
 
-            if song_state.intersection(self.pressed_notes) == song_state:
+            if song_state.intersection(self.pressed_notes) == song_state and not self.need_to_release.intersection(song_state):
+                self.need_to_release = self.need_to_release.union(song_state)
                 self.next_state()
 
     def tick(self):
@@ -110,6 +127,7 @@ class Player(RectScene):
         if self.disp_flags[self.FLAG_POSITION]:
             self.draw_visible_notes()
             self.disp_flags[self.FLAG_POSITION] = False
+            self.disp_flags[self.FLAG_PRESSED] = True
             was_flagged = True
 
         if self.disp_flags[self.FLAG_PRESSED]:
@@ -122,8 +140,8 @@ class Player(RectScene):
 
 
     def draw_visible_notes(self):
-        while self.visible_rect_notes:
-            self.visible_rect_notes.pop().detach()
+        while self.visible_note_rects:
+            self.visible_note_rects.pop().detach()
 
         for _y in range(self.rect_background.height):
             tick = self.song_position - self.active_row_position + _y
@@ -131,7 +149,10 @@ class Player(RectScene):
             if tick < 0 or tick >= len(self.midi_interface.state_map):
                 continue
 
-            y = self.rect_background.height - _y
+            if (_y <= self.active_row_position):
+                y = self.rect_background.height - _y
+            else:
+                y = self.rect_background.height - ((_y * 2) - self.active_row_position)
 
             row = self.midi_interface.active_notes_map[tick]
             for note, message in row.items():
@@ -147,12 +168,37 @@ class Player(RectScene):
                 else:
                     note_rect.set_fg_color(color)
 
-                self.visible_rect_notes.append(note_rect)
+                self.visible_note_rects.append(note_rect)
+
+        position_string = "%s / %s" % (self.song_position, len(self.midi_interface.state_map))
+        self.rect_position_display.resize(len(position_string), 1)
+        self.rect_position_display.move(self.width - len(position_string) - 1, self.height - 1)
+        self.rect_position_display.set_string(0, 0, position_string)
 
 
 
     def draw_pressed_row(self):
-        pass
+        while self.pressed_note_rects:
+            self.pressed_note_rects.pop().detach()
+
+        active_state = self.midi_interface.get_state(self.song_position)
+        y = self.rect_background.height - self.active_row_position
+
+        for note in self.pressed_notes:
+            x = self.get_displayed_key_position(note)
+
+            note_rect = self.rect_background.new_rect()
+            note_rect.set_character(0, 0, self.NOTELIST[note % 12])
+            note_rect.move(x, y)
+
+            if note in active_state:
+                note_rect.set_bg_color(Rect.GREEN)
+                note_rect.set_fg_color(Rect.BLACK)
+            else:
+                note_rect.set_bg_color(Rect.RED)
+                note_rect.set_fg_color(Rect.BLACK)
+
+            self.pressed_note_rects.append(note_rect)
 
     def draw_background(self):
         width = self.get_displayed_key_position(self.note_range[1] + 1)
@@ -227,6 +273,16 @@ class Player(RectScene):
         '''Stop Looping'''
         pass
 
+    def set_register_digit(self, n):
+        self.register *= 10
+        self.register += n
+
+    def clear_register(self):
+        self.register = 0
+
+    def jump_to_register_position(self):
+        self.set_state(self.register)
+        self.clear_register()
 
 
 class MIDIInterface(object):
@@ -245,7 +301,7 @@ class MIDIInterface(object):
         current_tempo = 0
         tick = 0
         tmp_states = []
-        measure_sizes = {0: (1, current_time_signature)}
+        measure_sizes = []
 
         for i, event in enumerate(mido.merge_tracks(self.midi.tracks)):
             tick += event.time
@@ -269,13 +325,11 @@ class MIDIInterface(object):
 
                     tmp_states[measure][beat_in_measure].append((subbeat, event))
 
-                    if measure not in measure_sizes.keys():
-                        measure_sizes[measure] = (0, current_time_signature)
+                    while len(measure_sizes) <= measure:
+                        measure_sizes.append((0, current_time_signature))
 
                     new_size = max(measure_sizes[measure][0], subbeat[1])
                     measure_sizes[measure] = (new_size, measure_sizes[measure][1])
-
-
             elif event.type == 'note_off':
                 pass
 
@@ -283,20 +337,26 @@ class MIDIInterface(object):
             pivot_a = len(self.state_map)
 
             prec, time_sig = measure_sizes[m]
-            for i in range(prec * time_sig):
-                self.state_map.append(set())
-                self.active_notes_map.append({})
-
+            minimum_new_states = prec * time_sig
             for b, beat in enumerate(measure):
                 pivot_b = b * prec
                 for subbeat, event in beat:
-                    offset = int(subbeat[0] * prec / subbeat[1])
-                    self.state_map[pivot_a + pivot_b + offset].add(event.note)
-                    self.active_notes_map[pivot_a + pivot_b + offset][event.note] = event
+                    offset = int(subbeat[0] * prec / subbeat[1]) + pivot_a + pivot_b
+                    while len(self.state_map) <= offset:
+                        self.state_map.append(set())
+                        self.active_notes_map.append({})
+                        minimum_new_states -= 1
+
+                    self.state_map[offset].add(event.note)
+                    self.active_notes_map[offset][event.note] = event
+
+            for i in range(max(0, minimum_new_states)):
+                self.state_map.append(set())
+                self.active_notes_map.append({})
 
 
     def get_state(self, tick):
-        return self.state_map[tick]
+        return self.state_map[tick].copy()
 
 
     def get_beat_and_measure(self, tick):

@@ -6,18 +6,23 @@ import mido
 class MIDIController(object):
     '''Read Input from Midi Device'''
     def __init__(self, midipath="/dev/midi1"):
+        self.midipath = midipath
         self.connected = os.path.exists(midipath)
         if not self.connected:
-            self.pipe = open('/dev/null', 'rb')
+            self.pipe = None
         else:
             self.pipe = open(midipath, 'rb')
 
+        self.flag_close = False
+
     def close(self):
-        self.pipe.close()
+        if self.connected:
+            self.pipe.close()
+
 
     def read(self):
         output = None
-        while not output:
+        while not output and not self.flag_close:
             byte = self.pipe.read(1)[0]
             if byte & 0xF0 == 0x90:
                 note = self.pipe.read(1)[0]
@@ -30,5 +35,6 @@ class MIDIController(object):
                 note = self.pipe.read(1)[0]
                 velocity = self.pipe.read(1)[0]
                 output = mido.Message('note_off', note=note, velocity=velocity)
+
         return output
 
