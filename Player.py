@@ -278,6 +278,12 @@ class Player(RectScene):
 
         return position
 
+    def set_loop_start_to_position(self):
+        self.set_loop_start(self.song_position)
+
+    def set_loop_end_to_position(self):
+        self.set_loop_end(self.song_position)
+
     def set_loop_start(self, position):
         '''set current positions as loop start'''
         self.loop[0] = min(max(0, position), len(self.midi_interface.state_map) - 1)
@@ -300,6 +306,7 @@ class Player(RectScene):
     def jump_to_register_position(self):
         self.set_state(self.register)
         self.clear_register()
+
 
 
 
