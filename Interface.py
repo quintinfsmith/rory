@@ -49,6 +49,21 @@ class Top(RectStage):
             'k',
             self.player.prev_state
         )
+
+        for n in range(10):
+            self.interactor.assign_context_sequence(
+                self.CONTEXT_PLAYER,
+                str(n),
+                self.player.set_register_digit,
+                n
+            )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'p',
+            self.player.jump_to_register_position,
+        )
+
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'q',
