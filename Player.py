@@ -165,9 +165,13 @@ class Player(RectScene):
             else:
                 y = self.rect_background.height - ((_y * 2) - self.active_row_position)
 
+
+
             row = self.midi_interface.active_notes_map[tick]
+            blocked_xs = set()
             for note, message in row.items():
                 x = self.get_displayed_key_position(message.note)
+                blocked_xs.add(x)
                 note_rect = self.rect_background.new_rect()
                 note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
                 note_rect.move(x, y)
@@ -180,6 +184,19 @@ class Player(RectScene):
                     note_rect.set_fg_color(color)
 
                 self.visible_note_rects.append(note_rect)
+
+            # Draw Measure Lines
+            if tick in self.midi_interface.measure_map.keys() and _y != self.active_row_position:
+                for x in range(0, self.rect_background.width, 3):
+                    if x in blocked_xs:
+                        continue
+
+                    line_rect = self.rect_background.new_rect()
+                    line_rect.set_character(0, 0, '-')
+                    line_rect.move(x, y)
+                    line_rect.set_fg_color(Rect.BRIGHTBLACK)
+
+                    self.visible_note_rects.append(line_rect)
 
         position_string = "%s / %s" % (self.song_position, len(self.midi_interface.state_map))
         self.rect_position_display.resize(len(position_string), 1)
@@ -196,6 +213,9 @@ class Player(RectScene):
         y = self.rect_background.height - self.active_row_position
 
         for note in self.pressed_notes:
+            if note in self.need_to_release:
+                continue
+
             x = self.get_displayed_key_position(note)
 
             note_rect = self.rect_background.new_rect()
@@ -224,19 +244,24 @@ class Player(RectScene):
         self.rect_background.move(background_pos, 0)
 
         y = self.height - self.active_row_position
+        for x in range(width):
+            self.rect_background.set_character(x, y, chr(9473))
+
         for i in range(self.note_range[0], self.note_range[1]):
             x = self.get_displayed_key_position(i)
             if i % 12 in self.SHARPS:
                 self.rect_background.set_character(x, y - 1, chr(9608))
-                self.rect_background.set_character(x, y, chr(9474))
+                #self.rect_background.set_character(x, y, chr(9474))
             else:
-                self.rect_background.set_character(x, y, chr(9601))
+                self.rect_background.set_character(x, y + 1, chr(9620))
+
 
             if (i + 3) % 12 == 0:
-                for j in range(0, y):
+                for j in range(0, y - 1):
                     self.rect_background.set_character(x, j, chr(9550))
-                for j in range(y + 1, self.rect_background.height):
+                for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
+
         for y in range(self.height):
             self.set_character(background_pos - 1, y, chr(9475))
             self.set_character(background_pos + width, y, chr(9475))
@@ -358,8 +383,11 @@ class MIDIInterface(object):
             elif event.type == 'note_off':
                 pass
 
+        self.measure_map = {} # { state_position: measure_number }
         for m, measure in enumerate(tmp_states):
             pivot_a = len(self.state_map)
+
+            self.measure_map[pivot_a] = m
 
             prec, time_sig = measure_sizes[m]
             minimum_new_states = prec * time_sig
@@ -371,14 +399,14 @@ class MIDIInterface(object):
                         self.state_map.append(set())
                         self.active_notes_map.append({})
                         minimum_new_states -= 1
-
                     self.state_map[offset].add(event.note)
                     self.active_notes_map[offset][event.note] = event
+
+
 
             for i in range(max(0, minimum_new_states)):
                 self.state_map.append(set())
                 self.active_notes_map.append({})
-
 
     def get_state(self, tick):
         return self.state_map[tick].copy()
@@ -394,6 +422,7 @@ class MIDIInterface(object):
             total_beats = 0
             prev_beats = 4
             measure_count = 0
+
             sorted_ticks = list(self.time_signature_map.keys())
             sorted_ticks.sort()
             for key_tick in sorted_ticks:
@@ -405,10 +434,11 @@ class MIDIInterface(object):
                 total_beats += delta_beats
 
                 prev_beats = beats
+                current_tick = key_tick
 
             delta_ticks = tick - current_tick
             delta_beats = delta_ticks / tpb
-            total_beats = delta_beats
+            total_beats += delta_beats
             measure_count += delta_beats // prev_beats
 
             beat_in_measure = delta_beats % prev_beats
