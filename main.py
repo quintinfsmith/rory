@@ -10,8 +10,9 @@ if len(sys.argv) < 2:
 
 interface = Top()
 interface.play_along(sys.argv[1])
-try:
-    interface.play()
-except KeyboardInterrupt:
-    pass
+interface.play()
+
+while interface.running:
+    time.sleep(.4)
+
 interface.kill()
