@@ -2,6 +2,7 @@
 # coding=utf-8
 '''main file of Misophonia'''
 import sys
+import time
 from Interface import Top
 
 if len(sys.argv) < 2:

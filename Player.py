@@ -109,6 +109,7 @@ class Player(RectScene):
         self.next_state()
 
     def midi_input_daemon(self):
+        song_state = set()
         while self.is_active and self.midi_controller.connected:
             message = self.midi_controller.read()
             if message:
@@ -116,7 +117,10 @@ class Player(RectScene):
                     self.pressed_notes.add(message.note)
                     self.disp_flags[self.FLAG_PRESSED] = True
                 elif message.type == 'note_off':
-                    self.pressed_notes.remove(message.note)
+                    try:
+                        self.pressed_notes.remove(message.note)
+                    except KeyError:
+                        pass
                     try:
                         self.need_to_release.remove(message.note)
                     except KeyError:
@@ -212,7 +216,8 @@ class Player(RectScene):
         active_state = self.midi_interface.get_state(self.song_position)
         y = self.rect_background.height - self.active_row_position
 
-        for note in self.pressed_notes:
+        pressed_notes = self.pressed_notes.copy()
+        for note in pressed_notes:
             if note in self.need_to_release:
                 continue
 
