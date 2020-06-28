@@ -51,7 +51,7 @@ class MIDIController:
             elif byte & 0xF0 == 0x80:
                 note = self.check_byte()
                 velocity = self.check_byte()
-                output = mido.Message('note_off', note=note, velocity=velocity)
+                output = mido.Message('note_off', note=note, velocity=0)
         except PipeClosed:
             output = mido.Message('stop')
 
