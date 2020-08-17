@@ -4,11 +4,12 @@ from localfuncs import read_character
 from Rect import RectScene, Rect
 import threading
 import math, time
-import mido
+from midas import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent
 
-def logg(msg):
+def logg(*msg):
     with open('logg', 'a') as fp:
-        fp.write(str(msg) + "\n")
+        for m in msg:
+            fp.write(str(m) + "\n")
 
 class Player(RectScene):
     '''Plays MIDILike Objects'''
@@ -77,7 +78,7 @@ class Player(RectScene):
 
         self.note_range = [21, 21 + 88]
 
-        self.active_midi = mido.MidiFile(kwargs['path'])
+        self.active_midi = MIDI(kwargs['path'])
         self.midi_controller = kwargs['controller']
         self.midi_interface = MIDIInterface(self.active_midi)
         self.clear_loop()
@@ -354,20 +355,16 @@ class MIDIInterface(object):
         current_time_signature = 4
 
         current_tempo = 0
-        tick = 0
         tmp_states = []
         measure_sizes = []
-
-        for i, event in enumerate(mido.merge_tracks(self.midi.tracks)):
-            tick += event.time
-            #tick += mido.tick2second(event.time, self.midi.ticks_per_beat, current_tempo)
+        for i, (tick, event) in enumerate(self.midi.get_all_events()):
             beat_in_measure, subbeat, abs_beat, measure = self.get_beat_and_measure(tick)
 
-            if event.type == 'time_signature':
+            if event.__class__ == TimeSignatureEvent:
                 self.time_signature_map[tick] = event.numerator
                 current_time_signature = event.numerator
 
-            elif event.type == 'note_on' and event.channel != 9:
+            elif event.__class__ == NoteOnEvent and event.channel != 9:
                 if event.velocity == 0:
                     pass
                 else:
@@ -385,7 +382,7 @@ class MIDIInterface(object):
 
                     new_size = max(measure_sizes[measure][0], subbeat[1])
                     measure_sizes[measure] = (new_size, measure_sizes[measure][1])
-            elif event.type == 'note_off':
+            elif event.__class__ == NoteOffEvent:
                 pass
 
         self.measure_map = {} # { state_position: measure_number }
@@ -422,7 +419,7 @@ class MIDIInterface(object):
         try:
             output = self._calculated_beatmeasures[tick]
         except KeyError:
-            tpb = self.midi.ticks_per_beat
+            tpb = self.midi.ppqn
             current_tick = 0
             total_beats = 0
             prev_beats = 4
@@ -473,6 +470,5 @@ class MIDIInterface(object):
 
             output = (int(beat_in_measure), subbeat, int(total_beats), int(measure_count))
             self._calculated_beatmeasures[tick] = output
-
         return output
 

@@ -22,26 +22,23 @@ class MIDIInterface(object):
 
 
         current_tempo = 0
-        tick = 0
         pressed_keys = {}
-        for i, event in enumerate(mido.merge_tracks(self.midi.tracks)):
-            tick += event.time
-            #tick += mido.tick2second(event.time, self.midi.ticks_per_beat, current_tempo)
+        for i, (event,tick) in enumerate(self.midi.get_all_events()):
 
-            if event.type == 'set_tempo':
+            if event.__class__ == SetTempoEvent:
                 current_tempo = event.tempo
 
-            elif event.type == 'time_signature':
+            elif event.__class__ == TimeSignatureEvent:
                 time_signature_map[tick] = (event.numerator, event.denominator)
 
-            elif event.type == 'note_on' and event.channel != 9:
+            elif event.__class__ == NoteOnEvent and event.channel != 9:
                 self.channels_used.add(event.channel)
                 if event.velocity == 0 and event.note in pressed_keys.keys():
                     del pressed_keys[event.note]
                 else:
                     pressed_keys[event.note] = event
 
-            elif event.type == 'note_off' and event.note in pressed_keys.keys():
+            elif event.__class__ == NoteOffEvent and event.note in pressed_keys.keys():
                 del pressed_keys[event.note]
 
 
