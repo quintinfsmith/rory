@@ -1,6 +1,5 @@
 '''Plays MIDILike Objects'''
 
-from localfuncs import read_character
 from wrecked import RectScene, Rect
 import threading
 import math, time
