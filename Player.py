@@ -1,7 +1,7 @@
 '''Plays MIDILike Objects'''
 
 from localfuncs import read_character
-from Rect import RectScene, Rect
+from wrecked import RectScene, Rect
 import threading
 import math, time
 from midas import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent

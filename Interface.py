@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from Player import Player
-from Rect import RectStage
+from wrecked import RectStage
 from Interactor import Interactor
 from MIDIController import MIDIController
 
