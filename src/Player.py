@@ -3,7 +3,7 @@
 from wrecked import RectScene, Rect
 import threading
 import math, time
-from midas import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent
+from apres import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent
 
 def logg(*msg):
     with open('logg', 'a') as fp:
