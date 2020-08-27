@@ -5,6 +5,14 @@ import threading
 import math, time
 from apres import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent
 
+
+def gcd(a, b):
+    while b:
+        t = b
+        b = a % b
+        a = t
+    return int(a)
+
 def logg(*msg):
     with open('logg', 'a') as fp:
         for m in msg:
@@ -348,126 +356,60 @@ class MIDIInterface(object):
         self.state_map = []
         self.active_notes_map = []
 
-        self.time_signature_map = {
-            0: 4
-        }
-        current_time_signature = 4
-
         current_tempo = 0
         tmp_states = []
         measure_sizes = []
-        for i, (tick, event) in enumerate(self.midi.get_all_events()):
-            beat_in_measure, subbeat, abs_beat, measure = self.get_beat_and_measure(tick)
-
-            if event.__class__ == TimeSignatureEvent:
-                self.time_signature_map[tick] = event.numerator
-                current_time_signature = event.numerator
-
-            elif event.__class__ == NoteOnEvent and event.channel != 9:
-                if event.velocity == 0:
-                    pass
-                else:
-                    key = (measure, beat_in_measure, subbeat)
-                    while len(tmp_states) <= measure:
-                        tmp_states.append([])
-
-                    while len(tmp_states[measure]) < current_time_signature:
-                        tmp_states[measure].append([])
-
-                    tmp_states[measure][beat_in_measure].append((subbeat, event))
-
-                    while len(measure_sizes) <= measure:
-                        measure_sizes.append((0, current_time_signature))
-
-                    new_size = max(measure_sizes[measure][0], subbeat[1])
-                    measure_sizes[measure] = (new_size, measure_sizes[measure][1])
-            elif event.__class__ == NoteOffEvent:
-                pass
-
         self.measure_map = {} # { state_position: measure_number }
-        for m, measure in enumerate(tmp_states):
-            pivot_a = len(self.state_map)
 
-            self.measure_map[pivot_a] = m
 
-            prec, time_sig = measure_sizes[m]
-            minimum_new_states = prec * time_sig
-            for b, beat in enumerate(measure):
-                pivot_b = b * prec
-                for subbeat, event in beat:
-                    offset = int(subbeat[0] * prec / subbeat[1]) + pivot_a + pivot_b
-                    while len(self.state_map) <= offset:
+        beats = []
+        for i, (tick, event) in enumerate(self.midi.get_all_events()):
+            if event.__class__ == NoteOnEvent and event.channel != 9 and event.velocity > 0:
+                t = tick //self.midi.ppqn
+
+                while len(beats) <= t:
+                    beats.append([])
+
+                beats[t].append((tick % self.midi.ppqn, event))
+
+
+        MAXDEF = 4
+        MINDEF = 1
+        tick_counter = 0
+        for beat, events in enumerate(beats):
+            biggest = self.midi.ppqn // MINDEF
+            for pos, _ in events:
+                if pos == 0:
+                    pos = self.midi.ppqn
+                a = max(pos, biggest)
+                b = min(pos, biggest)
+                biggest = gcd(a, b)
+
+
+            biggest = max(self.midi.ppqn // MAXDEF, biggest) # If biggest < MAXDEF, will lose precision
+            definition = self.midi.ppqn // biggest
+
+            tmp_ticks = []
+            for i in range(definition):
+                tmp_ticks.append([])
+
+            for pos, event in events:
+                tmp_ticks[pos // biggest].append(event)
+
+            self.measure_map[tick_counter] = beat
+            for events in tmp_ticks:
+                for event in events:
+                    while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
                         self.active_notes_map.append({})
-                        minimum_new_states -= 1
-                    self.state_map[offset].add(event.note)
-                    self.active_notes_map[offset][event.note] = event
+                    self.state_map[tick_counter].add(event.note)
+                    self.active_notes_map[tick_counter][event.note] = event
+                tick_counter += 1
 
 
 
-            for i in range(max(0, minimum_new_states)):
-                self.state_map.append(set())
-                self.active_notes_map.append({})
 
     def get_state(self, tick):
         return self.state_map[tick].copy()
 
-
-    def get_beat_and_measure(self, tick):
-        DIV = 4
-        try:
-            output = self._calculated_beatmeasures[tick]
-        except KeyError:
-            tpb = self.midi.ppqn
-            current_tick = 0
-            total_beats = 0
-            prev_beats = 4
-            measure_count = 0
-
-            sorted_ticks = list(self.time_signature_map.keys())
-            sorted_ticks.sort()
-            for key_tick in sorted_ticks:
-                beats = self.time_signature_map[key_tick]
-
-                delta_ticks = key_tick - current_tick
-                delta_beats = delta_ticks / tpb
-                measure_count += delta_beats // beats
-                total_beats += delta_beats
-
-                prev_beats = beats
-                current_tick = key_tick
-
-            delta_ticks = tick - current_tick
-            delta_beats = delta_ticks / tpb
-            total_beats += delta_beats
-            measure_count += delta_beats // prev_beats
-
-            beat_in_measure = delta_beats % prev_beats
-
-            subbeat = (0, 1)
-            # Calculate subbeat
-            denominators = [2,4,3,8,5,6,7]
-            closest = (1, (0, 1))
-            test_beat = round(beat_in_measure % 1, 2)
-            found = False
-            if test_beat != 0:
-                for denom in denominators:
-                    for i in range(1, denom):
-                        test_val = round(i / denom, 2)
-                        if (test_beat == test_val):
-                            subbeat = (i, denom)
-                            found = True
-                            break
-                        elif closest[0] > abs(test_val - test_beat):
-                            closest = (abs(test_val - test_beat), (i, denom))
-                    if found:
-                        break
-
-                if not found:
-                    subbeat = closest[1]
-
-
-            output = (int(beat_in_measure), subbeat, int(total_beats), int(measure_count))
-            self._calculated_beatmeasures[tick] = output
-        return output
 
