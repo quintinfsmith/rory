@@ -77,16 +77,17 @@ class MIDIInterface(object):
 
     def get_pressed(self):
         # Test
-        #options = list(range(40, 100))
-        #output = set()
-        #for i in range(random.randint(1, 6)):
-        #    output.add(options.pop(random.randint(0, len(options) - 1)))
-        #time.sleep(.3)
-        #return output
-        if not self.controller.connected:
-            time.sleep(.05)
+        options = list(range(40, 100))
+        output = set()
+        for i in range(random.randint(1, 6)):
+            output.add(options.pop(random.randint(0, len(options) - 1)))
+        time.sleep(.3)
+        return output
 
-        return self.controller.get_pressed()
+        #if not self.controller.connected:
+        #    time.sleep(.05)
+
+        #return self.controller.get_pressed()
 
     def __len__(self):
         return len(self.state_map)
