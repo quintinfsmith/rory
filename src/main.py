@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # coding=utf-8
-'''main file of Misophonia'''
+'''main file of Rory'''
 import sys
 import time
 from Interface import Top

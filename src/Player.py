@@ -103,6 +103,7 @@ class Player(RectScene):
 
         self.active_row_position = 8
         self.rect_background = self.new_rect()
+        self.rect_active_row = self.rect_background.new_rect()
         #self.set_bg_color(Rect.BLUE)
         self.visible_note_rects = []
         self.pressed_note_rects = []
@@ -219,34 +220,44 @@ class Player(RectScene):
 
     def draw_pressed_row(self):
         while self.pressed_note_rects:
-            self.pressed_note_rects.pop().detach()
+            self.pressed_note_rects.pop().remove()
 
         active_state = self.midi_interface.get_state(self.song_position)
+
         y = self.rect_background.height - self.active_row_position
 
         pressed_notes = self.pressed_notes.copy()
         for note in pressed_notes:
+
             if note in self.need_to_release:
                 continue
 
             x = self.get_displayed_key_position(note)
 
-            note_rect = self.rect_background.new_rect()
-            note_rect.set_character(0, 0, self.NOTELIST[note % 12])
-            note_rect.move(x, y)
+            note_rect = self.rect_active_row.new_rect()
+            #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
+
+            if i % 12 in self.SHARPS:
+                #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
+                self.rect_active_row.set_character(x, 0, chr(9608))
+            else:
+                self.rect_background.set_character(x, 0, chr(9620))
+
+            note_rect.move(x, 0)
 
             if note in active_state:
-                note_rect.set_bg_color(Rect.GREEN)
-                note_rect.set_fg_color(Rect.BLACK)
+                note_rect.set_fg_color(Rect.GREEN)
+                note_rect.set_bg_color(Rect.BLACK)
             else:
-                note_rect.set_bg_color(Rect.RED)
-                note_rect.set_fg_color(Rect.BLACK)
+                note_rect.set_fg_color(Rect.RED)
+                note_rect.set_bg_color(Rect.BLACK)
 
             self.pressed_note_rects.append(note_rect)
 
     def draw_background(self):
         width = self.get_displayed_key_position(self.note_range[1] + 1)
         self.rect_background.set_fg_color(Rect.BRIGHTBLACK)
+        self.rect_active_row.set_fg_color(Rect.BRIGHTBLACK)
 
         self.rect_background.resize(
             height = self.height,
@@ -257,14 +268,17 @@ class Player(RectScene):
         self.rect_background.move(background_pos, 0)
 
         y = self.height - self.active_row_position
+
+        self.rect_active_row.resize(self.rect_background.width, 1)
+        self.rect_active_row.move(0, y - 1)
+
         for x in range(width):
             self.rect_background.set_character(x, y, chr(9473))
 
         for i in range(self.note_range[0], self.note_range[1]):
             x = self.get_displayed_key_position(i)
             if i % 12 in self.SHARPS:
-                self.rect_background.set_character(x, y - 1, chr(9608))
-                #self.rect_background.set_character(x, y, chr(9474))
+                self.rect_active_row.set_character(x, 0, chr(9608))
             else:
                 self.rect_background.set_character(x, y + 1, chr(9620))
 
