@@ -15,6 +15,12 @@ class Top(RectStage):
     CONTEXT_PLAYER = 1
     def __init__(self):
         super().__init__()
+
+        if self.width < 90:
+            self.kill()
+            self.running = False
+            return
+
         self.interactor = Interactor()
         self.midi_controller_path = "/dev/midi1"
         self.midi_controller = MIDIController(self.midi_controller_path)
@@ -30,6 +36,7 @@ class Top(RectStage):
 
         thread = threading.Thread(target=self._input_daemon)
         thread.start()
+
 
     def play_along(self, midi_path):
         '''Run the Player with the loaded MidiLike Object'''
