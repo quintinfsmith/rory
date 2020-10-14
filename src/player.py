@@ -1,17 +1,19 @@
 '''Plays MIDILike Objects'''
 
-from wrecked import RectScene, Rect
 import threading
-import math, time
-from apres import MIDI, TimeSignatureEvent, NoteOnEvent, NoteOffEvent, SetTempoEvent
+from wrecked import RectScene, Rect
+from apres import MIDI, NoteOnEvent
 
 
 def gcd(a, b):
-    while b:
-        t = b
-        b = a % b
-        a = t
-    return int(a)
+    bigger_int = max(a, b)
+    smaller_int = min(a, b)
+
+    while smaller_int:
+        tmp = smaller_int
+        smaller_int = bigger_int % smaller_int
+        bigger_int = tmp
+    return int(bigger_int)
 
 def logg(*msg):
     with open('logg', 'a') as fp:
@@ -36,7 +38,6 @@ class Player(RectScene):
         ''''shutdown the player Box'''
         self.is_active = False
         self.midi_controller.close()
-        super().kill()
 
     def next_state(self):
         self.song_position += 1
@@ -45,7 +46,7 @@ class Player(RectScene):
 
         self.song_position = min(self.loop[1], self.song_position)
 
-        if (self.song_position == self.loop[1]):
+        if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
 
         self.disp_flags[self.FLAG_POSITION] = True
@@ -57,17 +58,16 @@ class Player(RectScene):
         self.song_position = max(0, self.song_position)
         self.disp_flags[self.FLAG_POSITION] = True
 
-
     def set_state(self, song_position):
         '''set the song position as the value in the register'''
-        self.song_position = max(0, self.register)
+        self.song_position = max(0, song_position)
 
         while self.song_position < self.loop[1] and not self.midi_interface.get_state(self.song_position):
             self.song_position += 1
 
         self.song_position = min(self.loop[1], self.song_position)
 
-        if (self.song_position == self.loop[1]):
+        if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
 
         self.disp_flags[self.FLAG_POSITION] = True
@@ -144,18 +144,18 @@ class Player(RectScene):
     def tick(self):
         was_flagged = False
         if self.disp_flags[self.FLAG_BACKGROUND]:
-            self.draw_background()
+            self.__draw_background()
             self.disp_flags[self.FLAG_BACKGROUND] = False
             was_flagged = True
 
         if self.disp_flags[self.FLAG_POSITION]:
-            self.draw_visible_notes()
+            self.__draw_visible_notes()
             self.disp_flags[self.FLAG_POSITION] = False
             self.disp_flags[self.FLAG_PRESSED] = True
             was_flagged = True
 
         if self.disp_flags[self.FLAG_PRESSED]:
-            self.draw_pressed_row()
+            self.__draw_pressed_row()
             self.disp_flags[self.FLAG_PRESSED] = False
             was_flagged = True
 
@@ -163,7 +163,7 @@ class Player(RectScene):
             self.draw()
 
 
-    def draw_visible_notes(self):
+    def __draw_visible_notes(self):
         while self.visible_note_rects:
             self.visible_note_rects.pop().detach()
 
@@ -173,7 +173,7 @@ class Player(RectScene):
             if tick < 0 or tick >= len(self.midi_interface.state_map):
                 continue
 
-            if (_y <= self.active_row_position):
+            if _y <= self.active_row_position:
                 y = self.rect_background.height - _y
             else:
                 y = self.rect_background.height - ((_y * 2) - self.active_row_position)
@@ -182,8 +182,8 @@ class Player(RectScene):
 
             row = self.midi_interface.active_notes_map[tick]
             blocked_xs = set()
-            for note, message in row.items():
-                x = self.get_displayed_key_position(message.note)
+            for _note, message in row.items():
+                x = self.__get_displayed_key_position(message.note)
                 blocked_xs.add(x)
                 note_rect = self.rect_background.new_rect()
                 note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
@@ -218,13 +218,11 @@ class Player(RectScene):
 
 
 
-    def draw_pressed_row(self):
+    def __draw_pressed_row(self):
         while self.pressed_note_rects:
             self.pressed_note_rects.pop().remove()
 
         active_state = self.midi_interface.get_state(self.song_position)
-
-        y = self.rect_background.height - self.active_row_position
 
         pressed_notes = self.pressed_notes.copy()
         for note in pressed_notes:
@@ -232,12 +230,12 @@ class Player(RectScene):
             if note in self.need_to_release:
                 continue
 
-            x = self.get_displayed_key_position(note)
+            x = self.__get_displayed_key_position(note)
 
             note_rect = self.rect_active_row.new_rect()
             #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
 
-            if i % 12 in self.SHARPS:
+            if note % 12 in self.SHARPS:
                 #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
                 self.rect_active_row.set_character(x, 0, chr(9608))
             else:
@@ -254,8 +252,8 @@ class Player(RectScene):
 
             self.pressed_note_rects.append(note_rect)
 
-    def draw_background(self):
-        width = self.get_displayed_key_position(self.note_range[1] + 1)
+    def __draw_background(self):
+        width = self.__get_displayed_key_position(self.note_range[1] + 1)
         self.rect_background.set_fg_color(Rect.BRIGHTBLACK)
         self.rect_active_row.set_fg_color(Rect.BRIGHTBLACK)
 
@@ -276,7 +274,7 @@ class Player(RectScene):
             self.rect_background.set_character(x, y, chr(9473))
 
         for i in range(self.note_range[0], self.note_range[1]):
-            x = self.get_displayed_key_position(i)
+            x = self.__get_displayed_key_position(i)
             if i % 12 in self.SHARPS:
                 self.rect_active_row.set_character(x, 0, chr(9608))
             else:
@@ -317,7 +315,7 @@ class Player(RectScene):
 
         return color
 
-    def get_displayed_key_position(self, midi_key):
+    def __get_displayed_key_position(self, midi_key):
         piano_position = midi_key - self.note_range[0]
         octave = piano_position // 12
         piano_key = piano_position % 12
@@ -348,9 +346,11 @@ class Player(RectScene):
         '''Stop Looping'''
         self.loop = [0, len(self.midi_interface.state_map) - 1]
 
-    def set_register_digit(self, n):
+    def set_register_digit(self, digit):
+        assert (digit < 10), "Digit can't be more than 9. set_register is being called from somewhere it shouldn't."
+
         self.register *= 10
-        self.register += n
+        self.register += digit
 
     def clear_register(self):
         self.register = 0
@@ -360,9 +360,7 @@ class Player(RectScene):
         self.clear_register()
 
 
-
-
-class MIDIInterface(object):
+class MIDIInterface:
     def __init__(self, midi):
         self.midi = midi
         self._calculated_beatmeasures = {}
@@ -370,14 +368,11 @@ class MIDIInterface(object):
         self.state_map = []
         self.active_notes_map = []
 
-        current_tempo = 0
-        tmp_states = []
-        measure_sizes = []
         self.measure_map = {} # { state_position: measure_number }
 
 
         beats = []
-        for i, (tick, event) in enumerate(self.midi.get_all_events()):
+        for tick, event in self.midi.get_all_events():
             if event.__class__ == NoteOnEvent and event.channel != 9 and event.velocity > 0:
                 t = tick //self.midi.ppqn
 
@@ -387,41 +382,32 @@ class MIDIInterface(object):
                 beats[t].append((tick % self.midi.ppqn, event))
 
 
-        MAXDEF = 4
-        MINDEF = 1
+        maximum_definition = 4
+        minimum_definition = 1
         tick_counter = 0
         for beat, events in enumerate(beats):
-            biggest = self.midi.ppqn // MINDEF
+            biggest = self.midi.ppqn // minimum_definition
             for pos, _ in events:
                 if pos == 0:
                     pos = self.midi.ppqn
-                a = max(pos, biggest)
-                b = min(pos, biggest)
-                biggest = gcd(a, b)
-
-
-            biggest = max(self.midi.ppqn // MAXDEF, biggest) # If biggest < MAXDEF, will lose precision
-            definition = self.midi.ppqn // biggest
+                biggest = gcd(biggest, pos)
 
             tmp_ticks = []
-            for i in range(definition):
+            for _ in range(definition):
                 tmp_ticks.append([])
 
             for pos, event in events:
                 tmp_ticks[pos // biggest].append(event)
 
             self.measure_map[tick_counter] = beat
-            for events in tmp_ticks:
-                for event in events:
+            for tick_events in tmp_ticks:
+                for event in tick_events:
                     while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
                         self.active_notes_map.append({})
                     self.state_map[tick_counter].add(event.note)
                     self.active_notes_map[tick_counter][event.note] = event
                 tick_counter += 1
-
-
-
 
     def get_state(self, tick):
         return self.state_map[tick].copy()
