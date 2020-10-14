@@ -392,6 +392,9 @@ class MIDIInterface:
                     pos = self.midi.ppqn
                 biggest = gcd(biggest, pos)
 
+            biggest = max(self.midi.ppqn // maximum_definition, biggest) # If biggest < MAXDEF, will lose precision
+            definition = self.midi.ppqn // biggest
+
             tmp_ticks = []
             for _ in range(definition):
                 tmp_ticks.append([])
