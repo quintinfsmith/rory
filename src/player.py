@@ -101,6 +101,7 @@ class Player(RectScene):
             self.FLAG_BACKGROUND: True # Background needs redraw
         }
 
+        self.__last_tick_was_beat = False
         self.active_row_position = 8
         self.rect_background = self.new_rect()
         self.rect_active_row = self.rect_background.new_rect()
@@ -223,6 +224,22 @@ class Player(RectScene):
             self.pressed_note_rects.pop().remove()
 
         active_state = self.midi_interface.get_state(self.song_position)
+
+        y = self.height - self.active_row_position
+        width = self.__get_displayed_key_position(self.note_range[1] + 1)
+
+        tick_is_beat = self.song_position in self.midi_interface.measure_map.keys()
+
+        if tick_is_beat != self.__last_tick_was_beat or self.song_position == 0:
+            if tick_is_beat:
+                line_chr = chr(9473)
+            else:
+                line_chr = chr(9472)
+
+            for x in range(width):
+                self.rect_background.set_character(x, y, line_chr)
+
+            self.__last_tick_was_beat = tick_is_beat
 
         pressed_notes = self.pressed_notes.copy()
         for note in pressed_notes:
