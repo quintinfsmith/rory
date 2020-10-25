@@ -1,7 +1,8 @@
 '''Read Input from Midi Device'''
 import os
 import time
-import mido
+import select
+from apres import NoteOnEvent, NoteOffEvent
 
 class PipeClosed(Exception):
     pass
@@ -25,8 +26,9 @@ class MIDIController:
     def check_byte(self):
         output = None
         while not output:
-            output = os.read(self.pipe.fileno(), 1)
-            if len(output) > 0:
+            ready, _, __ = select.select([self.pipe], [], [], 0)
+            if self.pipe in ready:
+                output = os.read(self.pipe.fileno(), 1)
                 output = output[0]
             elif self.flag_close:
                 if self.connected:
@@ -45,14 +47,14 @@ class MIDIController:
                 note = self.check_byte()
                 velocity = self.check_byte()
                 if velocity == 0:
-                    output = mido.Message('note_off', note=note, velocity=0)
+                    output = NoteOffEvent(note=note, velocity=0, channel=(byte & 0x0F))
                 else:
-                    output = mido.Message('note_on', note=note, velocity=velocity)
+                    output = NoteOnEvent(note=note, velocity=velocity, channel=(byte & 0x0F))
             elif byte & 0xF0 == 0x80:
                 note = self.check_byte()
                 velocity = self.check_byte()
-                output = mido.Message('note_off', note=note, velocity=0)
+                output = NoteOffEvent(note=note, velocity=velocity, channel=(byte & 0x0F))
         except PipeClosed:
-            output = mido.Message('stop')
+            output = MIDIStopEvent()
 
         return output

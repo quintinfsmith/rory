@@ -2,7 +2,7 @@
 
 import threading
 from wrecked import RectScene, Rect
-from apres import MIDI, NoteOnEvent
+from apres import MIDI, NoteOnEvent, NoteOffEvent
 
 
 def gcd(a, b):
@@ -104,10 +104,11 @@ class Player(RectScene):
         self.__last_tick_was_beat = False
         self.active_row_position = 8
         self.rect_background = self.new_rect()
-        self.rect_active_row = self.rect_background.new_rect()
-        #self.set_bg_color(Rect.BLUE)
+        self.layer_visible_notes = self.rect_background.new_rect()
+        self.layer_active_notes = self.rect_background.new_rect()
+
         self.visible_note_rects = []
-        self.pressed_note_rects = []
+        self.pressed_note_rects = {}
 
         self.rect_position_display = self.new_rect()
 
@@ -123,10 +124,10 @@ class Player(RectScene):
         while self.is_active and self.midi_controller.connected:
             message = self.midi_controller.read()
             if message:
-                if message.type == 'note_on':
+                if type(message) == NoteOnEvent:
                     self.pressed_notes.add(message.note)
                     self.disp_flags[self.FLAG_PRESSED] = True
-                elif message.type == 'note_off':
+                elif type(message) == NoteOffEvent:
                     try:
                         self.pressed_notes.remove(message.note)
                     except KeyError:
@@ -139,7 +140,7 @@ class Player(RectScene):
                 song_state = self.midi_interface.get_state(self.song_position)
 
             if song_state.intersection(self.pressed_notes) == song_state and not self.need_to_release.intersection(song_state):
-                self.need_to_release = self.need_to_release.union(song_state)
+                self.need_to_release = self.need_to_release.union(self.pressed_notes)
                 self.next_state()
 
     def tick(self):
@@ -163,22 +164,22 @@ class Player(RectScene):
         if was_flagged:
             self.draw()
 
-
     def __draw_visible_notes(self):
         while self.visible_note_rects:
             self.visible_note_rects.pop().detach()
 
-        for _y in range(self.rect_background.height):
+        for _y in range(self.layer_visible_notes.height):
             tick = self.song_position - self.active_row_position + _y
 
             if tick < 0 or tick >= len(self.midi_interface.state_map):
                 continue
 
-            if _y <= self.active_row_position:
+            if _y == self.active_row_position:
                 y = self.rect_background.height - _y
+            elif _y < self.active_row_position:
+                y = self.rect_background.height - _y + 1
             else:
                 y = self.rect_background.height - ((_y * 2) - self.active_row_position)
-
 
 
             row = self.midi_interface.active_notes_map[tick]
@@ -186,7 +187,8 @@ class Player(RectScene):
             for _note, message in row.items():
                 x = self.__get_displayed_key_position(message.note)
                 blocked_xs.add(x)
-                note_rect = self.rect_background.new_rect()
+
+                note_rect = self.layer_visible_notes.new_rect()
                 note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
                 note_rect.move(x, y)
 
@@ -201,11 +203,13 @@ class Player(RectScene):
 
             # Draw Measure Lines
             if tick in self.midi_interface.measure_map.keys() and _y != self.active_row_position:
-                for x in range(0, self.rect_background.width, 3):
+                for x in range(2, self.rect_background.width, 4):
                     if x in blocked_xs:
                         continue
+                    if x % 14 == 0:
+                        continue
 
-                    line_rect = self.rect_background.new_rect()
+                    line_rect = self.layer_visible_notes.new_rect()
                     line_rect.set_character(0, 0, '-')
                     line_rect.move(x, y)
                     line_rect.set_fg_color(Rect.BRIGHTBLACK)
@@ -217,98 +221,83 @@ class Player(RectScene):
         self.rect_position_display.move(self.width - len(position_string) - 1, self.height - 1)
         self.rect_position_display.set_string(0, 0, position_string)
 
-
-
     def __draw_pressed_row(self):
-        while self.pressed_note_rects:
-            self.pressed_note_rects.pop().remove()
+        keys = list(self.pressed_note_rects.keys())
+        for key in keys:
+            self.pressed_note_rects[key].remove()
+            del self.pressed_note_rects[key]
 
         active_state = self.midi_interface.get_state(self.song_position)
 
         y = self.height - self.active_row_position
         width = self.__get_displayed_key_position(self.note_range[1] + 1)
 
-        tick_is_beat = self.song_position in self.midi_interface.measure_map.keys()
-
-        if tick_is_beat != self.__last_tick_was_beat or self.song_position == 0:
-            if tick_is_beat:
-                line_chr = chr(9473)
-            else:
-                line_chr = chr(9472)
-
-            for x in range(width):
-                self.rect_background.set_character(x, y, line_chr)
-
-            self.__last_tick_was_beat = tick_is_beat
-
         pressed_notes = self.pressed_notes.copy()
         for note in pressed_notes:
-
-            if note in self.need_to_release:
-                continue
-
             x = self.__get_displayed_key_position(note)
 
-            note_rect = self.rect_active_row.new_rect()
-            #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
+            note_rect = self.layer_active_notes.new_rect()
+            #note_rect.set_character(0, 0, chr(9620))
+            note_rect.set_character(0, 0, chr(9473))
+            note_rect.move(x, 1)
 
-            if note % 12 in self.SHARPS:
-                #note_rect.set_character(0, 0, self.NOTELIST[note % 12])
-                self.rect_active_row.set_character(x, 0, chr(9608))
+            if note in self.need_to_release:
+                if note in active_state:
+                    note_rect.set_fg_color(Rect.YELLOW)
+                else:
+                    note_rect.set_fg_color(Rect.RED)
             else:
-                self.rect_background.set_character(x, 0, chr(9620))
+                if note in active_state:
+                    note_rect.set_fg_color(Rect.GREEN)
+                else:
+                    note_rect.set_fg_color(Rect.RED)
 
-            note_rect.move(x, 0)
-
-            if note in active_state:
-                note_rect.set_fg_color(Rect.GREEN)
-                note_rect.set_bg_color(Rect.BLACK)
-            else:
-                note_rect.set_fg_color(Rect.RED)
-                note_rect.set_bg_color(Rect.BLACK)
-
-            self.pressed_note_rects.append(note_rect)
+            self.pressed_note_rects[note] = note_rect
 
     def __draw_background(self):
         width = self.__get_displayed_key_position(self.note_range[1] + 1)
         self.rect_background.set_fg_color(Rect.BRIGHTBLACK)
-        self.rect_active_row.set_fg_color(Rect.BRIGHTBLACK)
 
         self.rect_background.resize(
             height = self.height,
             width = width
         )
+        self.layer_visible_notes.resize(
+            height=self.height,
+            width = width
+        )
+        self.layer_visible_notes.set_transparency(True)
 
         background_pos = (self.width - width) // 2
         self.rect_background.move(background_pos, 0)
 
         y = self.height - self.active_row_position
 
-        self.rect_active_row.resize(self.rect_background.width, 1)
-        self.rect_active_row.move(0, y - 1)
+        self.layer_active_notes.resize(self.rect_background.width, 2)
+        self.layer_active_notes.move(0, y)
+        self.layer_active_notes.set_transparency(True)
 
         for x in range(width):
             self.rect_background.set_character(x, y, chr(9473))
 
         for i in range(self.note_range[0], self.note_range[1]):
             x = self.__get_displayed_key_position(i)
+
             if i % 12 in self.SHARPS:
-                self.rect_active_row.set_character(x, 0, chr(9608))
+                self.rect_background.set_character(x, y - 1, chr(9608))
             else:
                 self.rect_background.set_character(x, y + 1, chr(9620))
-
 
             if (i + 3) % 12 == 0:
                 for j in range(0, y - 1):
                     self.rect_background.set_character(x, j, chr(9550))
+
                 for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
 
         for y in range(self.height):
             self.set_character(background_pos - 1, y, chr(9475))
             self.set_character(background_pos + width, y, chr(9475))
-
-        self.rect_background.draw()
 
     def get_width(self):
         return (self.note_range[1] - self.note_range[0]) + 2
