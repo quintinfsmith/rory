@@ -41,12 +41,12 @@ class Player(RectScene):
 
     def next_state(self):
         self.song_position += 1
-        while self.song_position < self.loop[1] and not self.midi_interface.get_state(self.song_position):
+        while self.song_position <= self.loop[1] and not self.midi_interface.get_state(self.song_position):
             self.song_position += 1
 
-        self.song_position = min(self.loop[1], self.song_position)
+        self.song_position = min(self.loop[1] + 1, self.song_position)
 
-        if self.song_position == self.loop[1]:
+        if self.song_position > self.loop[1]:
             self.song_position = self.loop[0]
 
         self.disp_flags[self.FLAG_POSITION] = True
