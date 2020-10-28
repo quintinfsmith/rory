@@ -1,7 +1,7 @@
 '''Plays MIDILike Objects'''
 
 import threading
-from wrecked import RectScene, Rect
+from wrecked import RectScene, RectColor
 from apres import MIDI, NoteOnEvent, NoteOffEvent
 
 
@@ -195,7 +195,7 @@ class Player(RectScene):
                 color = self.get_channel_color(message.channel)
                 if message.note % 12 in self.SHARPS:
                     note_rect.set_bg_color(color)
-                    note_rect.set_fg_color(Rect.BLACK)
+                    note_rect.set_fg_color(RectColor.BLACK)
                 else:
                     note_rect.set_fg_color(color)
 
@@ -212,7 +212,7 @@ class Player(RectScene):
                     line_rect = self.layer_visible_notes.new_rect()
                     line_rect.set_character(0, 0, '-')
                     line_rect.move(x, y)
-                    line_rect.set_fg_color(Rect.BRIGHTBLACK)
+                    line_rect.set_fg_color(RectColor.BRIGHTBLACK)
 
                     self.visible_note_rects.append(line_rect)
 
@@ -243,20 +243,20 @@ class Player(RectScene):
 
             if note in self.need_to_release:
                 if note in active_state:
-                    note_rect.set_fg_color(Rect.YELLOW)
+                    note_rect.set_fg_color(RectColor.YELLOW)
                 else:
-                    note_rect.set_fg_color(Rect.RED)
+                    note_rect.set_fg_color(RectColor.RED)
             else:
                 if note in active_state:
-                    note_rect.set_fg_color(Rect.GREEN)
+                    note_rect.set_fg_color(RectColor.GREEN)
                 else:
-                    note_rect.set_fg_color(Rect.RED)
+                    note_rect.set_fg_color(RectColor.RED)
 
             self.pressed_note_rects[note] = note_rect
 
     def __draw_background(self):
         width = self.__get_displayed_key_position(self.note_range[1] + 1)
-        self.rect_background.set_fg_color(Rect.BRIGHTBLACK)
+        self.rect_background.set_fg_color(RectColor.BRIGHTBLACK)
 
         self.rect_background.resize(
             height = self.height,
@@ -305,19 +305,19 @@ class Player(RectScene):
     @staticmethod
     def get_channel_color(channel):
         colors = [
-            Rect.BRIGHTYELLOW,
-            Rect.WHITE,
-            Rect.CYAN,
-            Rect.GREEN,
-            Rect.MAGENTA,
-            Rect.BLUE,
-            Rect.BRIGHTBLACK, # i *think* it's channel 7 that is drums... if so, this is just a placeholder
-            Rect.RED
+            RectColor.BRIGHTYELLOW,
+            RectColor.WHITE,
+            RectColor.CYAN,
+            RectColor.GREEN,
+            RectColor.MAGENTA,
+            RectColor.BLUE,
+            RectColor.BRIGHTBLACK, # i *think* it's channel 7 that is drums... if so, this is just a placeholder
+            RectColor.RED
         ]
         color = colors[channel % 8]
 
         if channel > 8:
-            color ^= Rect.BRIGHT
+            color ^= RectColor.BRIGHT
 
         return color
 
