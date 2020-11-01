@@ -1,7 +1,7 @@
 '''Plays MIDILike Objects'''
 
 import threading
-from wrecked import RectScene, Rect, RectColor
+from wrecked import RectScene, RectColor
 from apres import MIDI, NoteOnEvent, NoteOffEvent
 
 
