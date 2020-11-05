@@ -2,7 +2,7 @@
 import os
 import time
 import select
-from apres import NoteOnEvent, NoteOffEvent
+from apres import NoteOn, NoteOff, MIDIStop
 
 class PipeClosed(Exception):
     pass
@@ -47,14 +47,14 @@ class MIDIController:
                 note = self.check_byte()
                 velocity = self.check_byte()
                 if velocity == 0:
-                    output = NoteOffEvent(note=note, velocity=0, channel=(byte & 0x0F))
+                    output = NoteOff(note=note, velocity=0, channel=(byte & 0x0F))
                 else:
-                    output = NoteOnEvent(note=note, velocity=velocity, channel=(byte & 0x0F))
+                    output = NoteOn(note=note, velocity=velocity, channel=(byte & 0x0F))
             elif byte & 0xF0 == 0x80:
                 note = self.check_byte()
                 velocity = self.check_byte()
-                output = NoteOffEvent(note=note, velocity=velocity, channel=(byte & 0x0F))
+                output = NoteOff(note=note, velocity=velocity, channel=(byte & 0x0F))
         except PipeClosed:
-            output = MIDIStopEvent()
+            output = MIDIStop()
 
         return output
