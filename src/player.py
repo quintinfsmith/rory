@@ -2,7 +2,7 @@
 
 import threading
 from wrecked import RectScene, RectColor
-from apres import MIDI, NoteOnEvent, NoteOffEvent
+from apres import MIDI, NoteOn, NoteOff
 
 
 def gcd(a, b):
@@ -86,6 +86,7 @@ class Player(RectScene):
         self.note_range = [21, 21 + 88]
 
         self.active_midi = MIDI(kwargs['path'])
+
         self.midi_controller = kwargs['controller']
         self.midi_interface = MIDIInterface(self.active_midi)
         self.clear_loop()
@@ -124,10 +125,10 @@ class Player(RectScene):
         while self.is_active and self.midi_controller.connected:
             message = self.midi_controller.read()
             if message:
-                if type(message) == NoteOnEvent:
+                if type(message) == NoteOn:
                     self.pressed_notes.add(message.note)
                     self.disp_flags[self.FLAG_PRESSED] = True
-                elif type(message) == NoteOffEvent:
+                elif type(message) == NoteOff:
                     try:
                         self.pressed_notes.remove(message.note)
                     except KeyError:
@@ -378,14 +379,16 @@ class MIDIInterface:
 
 
         beats = []
+
         for tick, event in self.midi.get_all_events():
-            if event.__class__ == NoteOnEvent and event.channel != 9 and event.velocity > 0:
+            if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
                 t = tick //self.midi.ppqn
 
                 while len(beats) <= t:
                     beats.append([])
 
                 beats[t].append((tick % self.midi.ppqn, event))
+
 
 
         maximum_definition = 4
