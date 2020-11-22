@@ -3,10 +3,10 @@ import os
 import sys
 import threading
 import time
-from player import Player
 from wrecked import RectStage
-from interactor import Interactor
-from midicontroller import MIDIController
+from rory.midicontroller import MIDIController
+from rory.player import Player
+from rory.interactor import Interactor
 
 
 class Top(RectStage):
