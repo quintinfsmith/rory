@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
-
 import threading
+import time
 from wrecked import RectScene, RectColor
 from apres import MIDI, NoteOn, NoteOff
 
@@ -122,27 +122,32 @@ class Player(RectScene):
 
     def midi_input_daemon(self):
         song_state = set()
-        while self.is_active and self.midi_controller.connected:
-            message = self.midi_controller.read()
-            if message:
-                if type(message) == NoteOn:
-                    self.pressed_notes.add(message.note)
-                    self.disp_flags[self.FLAG_PRESSED] = True
-                elif type(message) == NoteOff:
-                    try:
-                        self.pressed_notes.remove(message.note)
-                    except KeyError:
-                        pass
-                    try:
-                        self.need_to_release.remove(message.note)
-                    except KeyError:
-                        pass
-                    self.disp_flags[self.FLAG_PRESSED] = True
-                song_state = self.midi_interface.get_state(self.song_position)
-
-            if song_state.intersection(self.pressed_notes) == song_state and not self.need_to_release.intersection(song_state):
-                self.need_to_release = self.need_to_release.union(self.pressed_notes)
-                self.next_state()
+        while self.is_active:
+            if self.midi_controller.is_connected():
+                message = self.midi_controller.read()
+                if message:
+                    if type(message) == NoteOn:
+                        self.pressed_notes.add(message.note)
+                        self.disp_flags[self.FLAG_PRESSED] = True
+                    elif type(message) == NoteOff:
+                        try:
+                            self.pressed_notes.remove(message.note)
+                        except KeyError:
+                            pass
+                        try:
+                            self.need_to_release.remove(message.note)
+                        except KeyError:
+                            pass
+                        self.disp_flags[self.FLAG_PRESSED] = True
+                    song_state = self.midi_interface.get_state(self.song_position)
+                if song_state.intersection(self.pressed_notes) == song_state and not self.need_to_release.intersection(song_state):
+                    self.need_to_release = self.need_to_release.union(self.pressed_notes)
+                    self.next_state()
+            else:
+                if self.pressed_notes:
+                    self.pressed_notes = set()
+                    self.need_to_release = set()
+                time.sleep(.01)
 
     def tick(self):
         was_flagged = False

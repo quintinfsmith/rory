@@ -5,8 +5,8 @@ import threading
 import time
 from player import Player
 from wrecked import RectStage
-from Interactor import Interactor
-from MIDIController import MIDIController
+from interactor import Interactor
+from midicontroller import MIDIController
 
 
 class Top(RectStage):
@@ -52,6 +52,7 @@ class Top(RectStage):
             'j',
             self.player.next_state
         )
+
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'k',
@@ -86,13 +87,15 @@ class Top(RectStage):
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'q',
-            self.kill
+            self.kill_player
         )
 
         self.interactor.set_context(self.CONTEXT_PLAYER)
-
         self.start_scene(self.CONTEXT_PLAYER)
 
+    def kill_player(self):
+        self.player.kill()
+        self.kill()
 
     def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''

@@ -1,7 +1,21 @@
 '''Allow subclasses to listen for keyboard input'''
-from localfuncs import read_character
+import termios
 import threading
 import time
+import tty
+import sys
+
+def read_character():
+    '''Read character from stdin'''
+    init_fileno = sys.stdin.fileno() # store original pipe n
+    init_attr = termios.tcgetattr(init_fileno)  # store original input settings
+    try:
+        tty.setraw(sys.stdin.fileno()) # remove wait for "return"
+        ch = sys.stdin.read(1) # Read single character into memory
+    finally:
+        termios.tcsetattr(init_fileno, termios.TCSADRAIN, init_attr) # reset input settings
+    return ch
+
 
 class FunctionTreeNode(object):
     '''tree-like node to determine input-sequence'''
