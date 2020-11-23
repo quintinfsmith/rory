@@ -8,6 +8,8 @@ from rory.midicontroller import MIDIController
 from rory.player import Player
 from rory.interactor import Interactor
 
+class TerminalTooNarrow(Exception):
+    pass
 
 class Top(RectStage):
     '''Interface to Run the MidiPlayer'''
@@ -18,8 +20,7 @@ class Top(RectStage):
 
         if self.width < 90:
             self.kill()
-            self.running = False
-            return
+            raise TerminalTooNarrow()
 
         self.interactor = Interactor()
         self.midi_controller_path = "/dev/midi1"
@@ -30,7 +31,6 @@ class Top(RectStage):
             self.kill
         )
 
-        self.running = True
         self.player = None
         self.set_fps(24)
 
@@ -87,24 +87,24 @@ class Top(RectStage):
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'q',
-            self.kill_player
+            self.kill
         )
 
         self.interactor.set_context(self.CONTEXT_PLAYER)
         self.start_scene(self.CONTEXT_PLAYER)
 
-    def kill_player(self):
-        self.player.kill()
-        self.kill()
+    def kill(self):
+        try:
+            self.player.kill()
+        except:
+            pass
+        super().kill()
 
     def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''
-        while self.running:
-            self.interactor.get_input()
+        while not self.playing:
+            time.sleep(.01)
 
-    def kill(self):
-        '''shut it all down'''
-        self.running = False
-        self.midi_controller.close()
-        super().kill()
+        while self.playing:
+            self.interactor.get_input()
 
