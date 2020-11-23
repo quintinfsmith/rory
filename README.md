@@ -11,20 +11,21 @@ pip install rory
 rory path/to/midi.mid
 ```
 The song will only scroll upon hitting the correct key combinations.
-red: 'wrong note'
-green: 'correct note', but there are others needed
-orange: 'correct note' but you need to release and press again.
+*indicators*
+- red: 'wrong note'
+- green: 'correct note', but there are others needed
+- orange: 'correct note' but you need to release and press again.
 
 ### Controls
-'q': Quit
-'j': Next State
-'k': Previous state
-'[': set loop start
-']': set loop end
-'/': stop looping
-<number> 'p': jump to state [number]
+'q': Quit<br/>
+'j': Next State<br/>
+'k': Previous state<br/>
+'[': set loop start<br/>
+']': set loop end<br/>
+'/': stop looping<br/>
+[number] 'p': jump to state [number]<br/>
 
 ### Notes
--Terminal needs to be 90+ characters wide.
--I've generated some scale excercises in scales/*.mid
+- Terminal needs to be 90+ characters wide.
+- I've generated some scale excercises in scales/*.mid
 
