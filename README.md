@@ -1,4 +1,4 @@
-#Rory
+# Rory
 Learn Piano using MIDI files and a MIDI Keyboard
 
 ## Installation
