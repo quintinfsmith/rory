@@ -8,7 +8,7 @@ pip install rory
 
 ## Usage
 ```bash
-rory path/to/midi.mid
+python -m rory path/to/midi.mid
 ```
 The song will only scroll upon hitting the correct key combinations.
 *indicators*
