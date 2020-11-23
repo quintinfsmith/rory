@@ -3,12 +3,12 @@ Learn Piano using MIDI files and a MIDI Keyboard
 
 ## Installation
 ```bash
-pip install rory
+sudo pip install rory
 ```
 
 ## Usage
 ```bash
-python -m rory path/to/midi.mid
+rory path/to/midi.mid
 ```
 The song will only scroll upon hitting the correct key combinations.
 *indicators*
