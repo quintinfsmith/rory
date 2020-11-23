@@ -15,6 +15,7 @@ class TaskHandler(pyinotify.ProcessEvent):
 
     def process_IN_CREATE(self, event):
         if event.name[0:4] == 'midi':
+            time.sleep(.5)
             self.controller.connect(event.pathname)
 
     def process_IN_DELETE(self, event):
@@ -34,8 +35,7 @@ class MIDIController:
         notifier = pyinotify.ThreadedNotifier(self.watch_manager, TaskHandler(self))
         notifier.daemon = True
         notifier.start()
-        #self.watch_manager.add_watch('/dev/', pyinotify.IN_CREATE | pyinotify.IN_DELETE)
-        self.watch_manager.add_watch('/home/pent/mids/', pyinotify.IN_CREATE | pyinotify.IN_DELETE)
+        self.watch_manager.add_watch('/dev/', pyinotify.IN_CREATE | pyinotify.IN_DELETE)
 
     def is_connected(self):
         return bool(self.pipe)
@@ -57,11 +57,19 @@ class MIDIController:
 
     def close(self):
         self.flag_close = True
+        with open("LOGG", "a") as fp:
+            fp.write("\nDEAD!")
 
     def check_byte(self):
         output = None
         while not output:
-            ready, _, __ = select.select([self.pipe], [], [], 0)
+            try:
+                ready, _, __ = select.select([self.pipe], [], [], 0)
+            except TypeError:
+                ready = []
+            except ValueError:
+                ready = []
+
             if self.pipe in ready:
                 output = os.read(self.pipe.fileno(), 1)
                 if len(output):

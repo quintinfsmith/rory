@@ -1,31 +1,30 @@
+#Rory
 Learn Piano using MIDI files and a MIDI Keyboard
 
-Requirements:
+## Installation
+```bash
+pip install rory
+```
 
-      Unix like OS
-      Python 3
+## Usage
+```bash
+rory path/to/midi.mid
+```
+The song will only scroll upon hitting the correct key combinations.
+red: 'wrong note'
+green: 'correct note', but there are others needed
+orange: 'correct note' but you need to release and press again.
 
-      Some way of connecting your MIDI keyboard (or any MIDI instrument) to your computer
+### Controls
+'q': Quit
+'j': Next State
+'k': Previous state
+'[': set loop start
+']': set loop end
+'/': stop looping
+<number> 'p': jump to state [number]
 
+### Notes
+-Terminal needs to be 90+ characters wide.
+-I've generated some scale excercises in scales/*.mid
 
-Usage: 1: ensure your console is at least 90 chacters wide
-       2: $ ./main.py \<midifile\>
-
-Controls:
-    q - quit
-    j - Next State
-    k - Previous state
-    [ - set loop start
-    ] - set loop end
-    / - break loop
-
-    Register Commands ( type number, hit <cmd> )
-    i - toggle channel visibility
-    p - jump to state [number]
-
-Notes:
-    You may need to modify MIDIController.py to choose your midi device.
-
-    The Midi Library I created is incomplete, so not every midi will be read perfectly, though any I've used have worked without issue.
-
-    I've generated some scale excercises in scales/*.mid

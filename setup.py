@@ -1,19 +1,24 @@
 import setuptools
+from rory import __version__, __author__, __email__, __url__, __license__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="rory",
-    version="0.2.0",
+    version=__version__,
     description="Play along to MIDI files in console",
     author="Quintin Smith",
     author_email="smith.quintin@protonmail.com",
     install_requires=['pyinotify', 'wrecked', 'apres'],
     long_description=long_description,
     long_description_content_type="text/markdown",
+    license=__license__,
+    keywords=[],
+    python_requires="~=3.0",
+    py_modules=["rory"],
+    entry_points={ "console_scripts": ["rory = rory:main"] },
     url="https://github.com/quintinfsmith/rory",
-    python_requires=">=3.6",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

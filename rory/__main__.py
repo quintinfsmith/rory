@@ -1,21 +1,22 @@
-#!/usr/bin/env python3
-# coding=utf-8
-'''main file of Rory'''
-
 def main():
     import sys
     import time
-    from rory.interface import Top
+    from rory.interface import Top, TerminalTooNarrow
 
     if len(sys.argv) < 2:
         print("Specify Midi To Play")
         sys.exit()
 
-    interface = Top()
-    interface.play_along(sys.argv[1])
-    interface.play()
+    try:
+        interface = Top()
+    except TerminalTooNarrow:
+        print("Terminal needs to be at least 90 characters wide")
+        sys.exit()
 
-    while interface.running:
+    interface.play()
+    interface.play_along(sys.argv[1])
+
+    while interface.playing:
         time.sleep(.4)
 
     interface.kill()
