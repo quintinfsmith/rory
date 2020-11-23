@@ -57,8 +57,6 @@ class MIDIController:
 
     def close(self):
         self.flag_close = True
-        with open("LOGG", "a") as fp:
-            fp.write("\nDEAD!")
 
     def check_byte(self):
         output = None
