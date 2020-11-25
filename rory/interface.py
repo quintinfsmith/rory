@@ -18,13 +18,12 @@ class Top(RectStage):
     def __init__(self):
         super().__init__()
 
-        if self.width < 90:
+        if self.rect.width < 90:
             self.kill()
             raise TerminalTooNarrow()
 
         self.interactor = Interactor()
-        self.midi_controller_path = "/dev/midi1"
-        self.midi_controller = MIDIController(self.midi_controller_path)
+        self.midi_controller = MIDIController()
         self.interactor.assign_context_sequence(
             self.CONTEXT_DEFAULT,
             'q',
