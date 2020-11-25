@@ -24,11 +24,18 @@ class TaskHandler(pyinotify.ProcessEvent):
 
 class MIDIController:
     '''Read Input from Midi Device'''
-    def __init__(self, midipath="/dev/midi1"):
+    def __init__(self, midipath=""):
         self.pipe = None
         self.midipath = None
-        if os.path.exists(midipath):
-            self.connect(midipath)
+        if midipath:
+            if os.path.exists(midipath):
+                self.connect(midipath)
+        else:
+            for dev in os.listdir('/dev/'):
+                if dev[0:4] == 'midi':
+                    self.connect('/dev/' + dev)
+                    break
+
 
         self.flag_close = False
         self.watch_manager = pyinotify.WatchManager()
