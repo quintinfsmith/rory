@@ -1,5 +1,8 @@
 # Rory
-Learn Piano using MIDI files and a MIDI Keyboard
+Learn Piano using MIDI files and a MIDI Keyboard<br/>
+![PyPI - Downloads](https://img.shields.io/pypi/dw/rory?style=flat-square)
+![PyPI - License](https://img.shields.io/pypi/l/rory?style=flat-square)
+![PyPI](https://img.shields.io/pypi/v/rory?style=flat-square)
 
 ## Installation
 ```bash
