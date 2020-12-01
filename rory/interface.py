@@ -5,7 +5,7 @@ import threading
 import time
 from wrecked import RectStage
 from rory.midicontroller import MIDIController
-from rory.player import Player
+from rory.player import PlayerScene
 from rory.interactor import Interactor
 
 class TerminalTooNarrow(Exception):
@@ -30,7 +30,7 @@ class Top(RectStage):
             self.kill
         )
 
-        self.player = None
+        self.playerscene = None
         self.set_fps(24)
 
         thread = threading.Thread(target=self._input_daemon)
@@ -40,47 +40,48 @@ class Top(RectStage):
     def play_along(self, midi_path):
         '''Run the Player with the loaded MidiLike Object'''
 
-        if not self.player:
-            self.player = self.create_scene(self.CONTEXT_PLAYER, Player,
+        if not self.playerscene:
+            self.playerscene = self.create_scene(self.CONTEXT_PLAYER, PlayerScene,
                 path=midi_path,
                 controller=self.midi_controller
             )
+        player = self.playerscene.player
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'j',
-            self.player.next_state
+            player.next_state
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'k',
-            self.player.prev_state
+            player.prev_state
         )
 
         for n in range(10):
             self.interactor.assign_context_sequence(
                 self.CONTEXT_PLAYER,
                 str(n),
-                self.player.set_register_digit,
+                player.set_register_digit,
                 n
             )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             'p',
-            self.player.jump_to_register_position,
+            player.jump_to_register_position,
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             '[',
-            self.player.set_loop_start_to_position,
+            player.set_loop_start_to_position,
         )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
             ']',
-            self.player.set_loop_end_to_position,
+            player.set_loop_end_to_position,
         )
 
         self.interactor.assign_context_sequence(
@@ -94,7 +95,7 @@ class Top(RectStage):
 
     def kill(self):
         try:
-            self.player.kill()
+            self.playerscene.kill()
         except:
             pass
         super().kill()
