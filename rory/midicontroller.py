@@ -23,6 +23,7 @@ class TaskHandler(pyinotify.ProcessEvent):
             self.controller.disconnect(event.pathname)
 
 class MIDIController:
+    DEVROOT = '/dev/'
     '''Read Input from Midi Device'''
     def __init__(self, midipath=""):
         self.pipe = None
@@ -31,18 +32,17 @@ class MIDIController:
             if os.path.exists(midipath):
                 self.connect(midipath)
         else:
-            for dev in os.listdir('/dev/'):
+            for dev in os.listdir(MIDIController.DEVROOT):
                 if dev[0:4] == 'midi':
-                    self.connect('/dev/' + dev)
+                    self.connect(MIDIController.DEVROOT + dev)
                     break
 
 
-        self.flag_close = False
         self.watch_manager = pyinotify.WatchManager()
         notifier = pyinotify.ThreadedNotifier(self.watch_manager, TaskHandler(self))
         notifier.daemon = True
         notifier.start()
-        self.watch_manager.add_watch('/dev/', pyinotify.IN_CREATE | pyinotify.IN_DELETE)
+        self.watch_manager.add_watch(MIDIController.DEVROOT, pyinotify.IN_CREATE | pyinotify.IN_DELETE)
 
     def is_connected(self):
         return bool(self.pipe)
@@ -63,7 +63,7 @@ class MIDIController:
             self.midipath = ''
 
     def close(self):
-        self.flag_close = True
+        self.disconnect(self.midipath)
 
     def check_byte(self):
         output = None
@@ -75,16 +75,15 @@ class MIDIController:
             except ValueError:
                 ready = []
 
-            if self.pipe in ready:
+            if not self.is_connected():
+                raise PipeClosed()
+            elif self.pipe in ready:
                 output = os.read(self.pipe.fileno(), 1)
                 if len(output):
                     output = output[0]
                 else:
                     continue
 
-            elif self.flag_close:
-                self.disconnect(self.midipath)
-                raise PipeClosed()
             else: #wait for input
                 time.sleep(.01)
 
