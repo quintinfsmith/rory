@@ -5,6 +5,6 @@ python:
 install:
   - pip install wrecked
   - pip install apres
-  - pip install .
+  - pip install ./rory
 script: pytest
 
