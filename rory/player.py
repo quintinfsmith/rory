@@ -139,7 +139,7 @@ class PlayerScene(wrecked.RectScene):
             note_rect.set_character(0, 0, chr(9473))
             note_rect.move(x, 1)
 
-            if note in self.need_to_release:
+            if note in player.need_to_release:
                 if note in active_state:
                     note_rect.set_fg_color(wrecked.YELLOW)
                 else:
@@ -150,7 +150,7 @@ class PlayerScene(wrecked.RectScene):
                 else:
                     note_rect.set_fg_color(wrecked.RED)
 
-            player.pressed_note_rects[note] = note_rect
+            self.pressed_note_rects[note] = note_rect
 
 
     def __draw_background(self):
