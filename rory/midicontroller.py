@@ -78,10 +78,13 @@ class MIDIController:
             if not self.is_connected():
                 raise PipeClosed()
             elif self.pipe in ready:
-                output = os.read(self.pipe.fileno(), 1)
-                if len(output):
-                    output = output[0]
-                else:
+                try:
+                    output = os.read(self.pipe.fileno(), 1)
+                    if len(output):
+                        output = output[0]
+                    else:
+                        continue
+                except ValueError:
                     continue
 
             else: #wait for input

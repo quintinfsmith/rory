@@ -15,24 +15,42 @@ class PlayerTest(unittest.TestCase):
         except: pass
 
         self.test_midi = apres.MIDI()
-        for i in range(12):
-            note_on = apres.NoteOn(note=64 + i, velocity=100, channel=0)
-            note_off = apres.NoteOff(note=64 + i, velocity=100, channel=0)
-            if i == 0:
-                self.test_midi.add_event(note_on, wait=40)
-            else:
-                self.test_midi.add_event(note_on, wait=0)
+        self.test_midi.add_event(
+            apres.NoteOn(
+                note=0x40,
+                velocity=100,
+                channel=0
+            ),
+            wait=30
+        )
+        self.test_midi.add_event(
+            apres.NoteOff(
+                note=0x40,
+                velocity=100,
+                channel=0
+            ),
+            wait=40
+        )
+
+        for i in range(11):
+            note_on = apres.NoteOn(note=0x40 + i, velocity=100, channel=0)
+            note_off = apres.NoteOff(note=0x40 + i, velocity=100, channel=0)
+            self.test_midi.add_event(note_on, wait=0)
             self.test_midi.add_event(note_off, wait=40)
 
         self.test_midi_path = 'testmidi.mid'
         self.test_midi.save(self.test_midi_path)
 
-        self.controller = MIDIController()
+        self.midi_controller_path = "testdev/mididev"
+        self.controller = MIDIController(self.midi_controller_path)
 
         self.player = Player(
             path=self.test_midi_path,
             controller=self.controller
         )
+
+        with open('ttt', 'w') as fp:
+            fp.write(str(self.player.midi_interface.state_map))
 
     def tearDown(self):
         os.system("rm testdev -rf")
@@ -48,6 +66,17 @@ class PlayerTest(unittest.TestCase):
         self.player.next_state()
         assert self.player.song_position == 2, "next_state() didn't go to the next state"
 
+    def test_prev_state(self):
+        self.player.set_state(5)
+        self.player.prev_state()
+        assert self.player.song_position != 4, "prev_state() didn't skip the empty state"
+        assert self.player.song_position == 3, "prev_state() didn't move to the correct previous state"
+
+        self.player.set_state(1)
+        self.player.prev_state()
+        assert self.player.song_position == 1, "prev_state() didn't move to the next available state if 0 was empty"
+
+
     def test_set_state(self):
         self.player.set_state(0)
         assert self.player.song_position == 1, "player didn't move song position to next active state in set_state()"
@@ -61,12 +90,12 @@ class PlayerTest(unittest.TestCase):
     def test_set_loop(self):
         self.player.set_state(0)
         self.player.set_loop_start(1)
-        self.player.set_loop_end(3)
+        self.player.set_loop_end(5)
 
         for i in range(4):
             self.player.next_state()
 
-        assert self.player.song_position == 1, "Song didn't loop"
+        assert self.player.song_position == 1, "Song didn't loop correctly"
 
     def test_clear_loop(self):
         self.player.set_state(0)
@@ -100,3 +129,44 @@ class PlayerTest(unittest.TestCase):
 
         assert self.player.song_position == 10, "Didn't jump to register position"
         assert self.player.register == 0, "Register wasn't cleared after jump"
+
+
+    def test_input_daemon(self):
+        self.player.set_state(0)
+
+        # Midi note 64 ON (Correct Key)
+        with open(self.midi_controller_path, "ab") as fp:
+            fp.write(b'\x90\x40\x64')
+
+        time.sleep(1)
+        assert self.player.song_position == 2, "Didn't move to next state on correct midi input"
+
+        # Midi note 62 ON (incorrect key)
+        with open(self.midi_controller_path, "ab") as fp:
+            fp.write(b'\x80\x3E\x64')
+        time.sleep(.4)
+
+        assert self.player.song_position != 3, "Didn't require key to be released to move to next state"
+
+        # Midi note 64 Off
+        with open(self.midi_controller_path, "ab") as fp:
+            fp.write(b'\x80\x40\x64')
+        time.sleep(.4)
+
+        # Midi note 64 On
+        with open(self.midi_controller_path, "ab") as fp:
+            fp.write(b'\x90\x40\x64')
+        time.sleep(.4)
+
+        assert self.player.song_position == 3, "Didn't move to the next state with extra keys pressed."
+
+    def test_set_loop_by_position(self):
+        self.player.set_state(0)
+        self.player.set_loop_start_to_position()
+        self.player.next_state()
+        self.player.next_state()
+        self.player.set_loop_end_to_position()
+
+        self.player.set_state(0)
+
+        assert self.player.loop == [1, 3]
