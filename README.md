@@ -6,7 +6,7 @@ Learn Piano using MIDI files and a MIDI Keyboard<br/>
 
 ## Installation
 ```bash
-sudo pip install rory
+pip install rory
 ```
 
 ## Usage
