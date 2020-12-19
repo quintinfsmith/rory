@@ -3,9 +3,7 @@ python:
   - "3.6"
   - "3.8"
 install:
-  - pip install wrecked
-  - pip install apres
   - pip install .
 script:
-  - pytest
+  - pytest --cov=rory
 
