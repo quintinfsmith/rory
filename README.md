@@ -1,5 +1,6 @@
 # Rory
 Learn Piano using MIDI files and a MIDI Keyboard<br/>
+![Travis (.com)](https://img.shields.io/travis/com/quintinfsmith/rory?style=flat-square)
 ![PyPI - Downloads](https://img.shields.io/pypi/dw/rory?style=flat-square)
 ![PyPI - License](https://img.shields.io/pypi/l/rory?style=flat-square)
 ![PyPI](https://img.shields.io/pypi/v/rory?style=flat-square)
