@@ -1,15 +1,16 @@
 '''Interface between user and player'''
-import os
-import sys
 import threading
 import time
+import wrecked
 from wrecked import RectStage
+from apres import MIDI
+
 from rory.midicontroller import MIDIController
 from rory.player import Player
 from rory.interactor import Interactor
 
 class TerminalTooNarrow(Exception):
-    pass
+    '''Error thrown when the minimum width required isn't available'''
 
 class Top(RectStage):
     '''Interface to Run the MidiPlayer'''
@@ -59,12 +60,12 @@ class Top(RectStage):
             player.prev_state
         )
 
-        for n in range(10):
+        for digit in range(10):
             self.interactor.assign_context_sequence(
                 self.CONTEXT_PLAYER,
-                str(n),
+                str(digit),
                 player.set_register_digit,
-                n
+                digit
             )
 
         self.interactor.assign_context_sequence(
@@ -108,19 +109,14 @@ class Top(RectStage):
         while self.playing:
             self.interactor.get_input()
 
-'''Plays MIDILike Objects'''
-import threading
-import time
-from apres import MIDI, NoteOn, NoteOff
-from rory.midiinterface import MIDIInterface
-import wrecked
 
-def logg(*msg):
-    with open('logg', 'a') as fp:
-        for m in msg:
-            fp.write(str(m) + "\n")
+#def logg(*msg):
+#    with open('logg', 'a') as fp:
+#        for m in msg:
+#            fp.write(str(m) + "\n")
 
 class PlayerScene(wrecked.RectScene):
+    '''Handles visualization of the Player'''
     # Display constants
     SHARPS = (1, 3, 6, 8, 10)
     NOTELIST = 'CCDDEFFGGAAB'
@@ -239,7 +235,6 @@ class PlayerScene(wrecked.RectScene):
         active_state = midi_interface.get_state(song_position)
 
         y = self.height - self.active_row_position
-        width = self.__get_displayed_key_position(player.note_range[1] + 1)
 
         pressed_notes = player.pressed_notes.copy()
         for note in pressed_notes:
@@ -332,7 +327,8 @@ class PlayerScene(wrecked.RectScene):
             wrecked.GREEN,
             wrecked.MAGENTA,
             wrecked.BLUE,
-            wrecked.BRIGHTBLACK, # i *think* it's channel 7 that is drums... if so, this is just a placeholder
+             # i *think* it's channel 7 that is drums... if so, this is just a placeholder
+            wrecked.BRIGHTBLACK,
             wrecked.RED
         ]
         color = colors[channel % 8]
@@ -341,6 +337,7 @@ class PlayerScene(wrecked.RectScene):
             color ^= wrecked.BRIGHT
 
         return color
-    def kill(self):
-        self.player.kill()
 
+    def kill(self):
+        ''' Tear down the player backend '''
+        self.player.kill()
