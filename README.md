@@ -5,6 +5,8 @@ Learn Piano using MIDI files and a MIDI Keyboard<br/>
 [![PyPI](https://img.shields.io/pypi/v/rory?style=flat-square)](https://pypi.org/project/rory/)
 [![GitHub](https://img.shields.io/github/license/quintinfsmith/rory?style=flat-square)](https://github.com/quintinfsmith/rory/blob/master/LICENSE)
 
+<img src="res/sample.svg" />
+
 ## Installation
 ```bash
 pip install rory
