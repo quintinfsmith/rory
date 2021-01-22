@@ -1,9 +1,11 @@
 '''Plays MIDILike Objects'''
-from apres import NoteOn, NoteOff
+#from apres import NoteOn, NoteOff
+from apres import NoteOn
 
-def gcd(a, b):
-    bigger_int = max(a, b)
-    smaller_int = min(a, b)
+def greatest_common_divisor(number_a, number_b):
+    '''Euclid's method'''
+    bigger_int = max(number_a, number_b)
+    smaller_int = min(number_a, number_b)
 
     while smaller_int:
         tmp = smaller_int
@@ -12,6 +14,7 @@ def gcd(a, b):
     return int(bigger_int)
 
 class MIDIInterface:
+    '''Layer between Player and the MIDI input file'''
     def __init__(self, midi):
         self.midi = midi
         self._calculated_beatmeasures = {}
@@ -26,12 +29,12 @@ class MIDIInterface:
 
         for tick, event in self.midi.get_all_events():
             if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
-                t = tick //self.midi.ppqn
+                current_beat_tick = tick // self.midi.ppqn
 
-                while len(beats) <= t:
+                while len(beats) <= current_beat_tick:
                     beats.append([])
 
-                beats[t].append((tick % self.midi.ppqn, event))
+                beats[current_beat_tick].append((tick % self.midi.ppqn, event))
 
         maximum_definition = 4
         minimum_definition = 2
@@ -41,9 +44,10 @@ class MIDIInterface:
             for pos, _ in events:
                 if pos == 0:
                     pos = self.midi.ppqn
-                biggest = gcd(biggest, pos)
+                biggest = greatest_common_divisor(biggest, pos)
 
-            biggest = max(self.midi.ppqn // maximum_definition, biggest) # If biggest < MAXDEF, will lose precision
+            # If biggest < MAXDEF, will lose precision
+            biggest = max(self.midi.ppqn // maximum_definition, biggest)
             definition = self.midi.ppqn // biggest
 
             tmp_ticks = []
@@ -64,9 +68,8 @@ class MIDIInterface:
                 tick_counter += 1
 
     def get_state(self, tick):
+        '''Get a list of the notes currently 'On' at specified position'''
         return self.state_map[tick].copy()
 
     def __len__(self):
-        return len(self.state_map[tick].copy())
-
-
+        return len(self.state_map)
