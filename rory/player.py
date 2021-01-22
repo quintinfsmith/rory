@@ -97,10 +97,10 @@ class Player:
             if self.midi_controller.is_connected():
                 message = self.midi_controller.read()
                 if message:
-                    if isinstance(message) == NoteOn:
+                    if isinstance(message, NoteOn):
                         self.pressed_notes.add(message.note)
                         self.disp_flags[self.FLAG_PRESSED] = True
-                    elif isinstance(message) == NoteOff:
+                    elif isinstance(message, NoteOff):
                         try:
                             self.pressed_notes.remove(message.note)
                         except KeyError:

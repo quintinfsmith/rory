@@ -64,7 +64,8 @@ class MIDIController:
         '''Close the pipe to the path specified'''
         if self.midipath == midipath:
             try:
-                self.pipe.close()
+                if self.pipe != None:
+                    self.pipe.close()
             except Exception as e:
                 raise e
 
