@@ -21,12 +21,9 @@ class MIDIInterface:
         # For quick access to which keys are pressed
         self.state_map = []
         self.active_notes_map = []
-
         self.measure_map = {} # { state_position: measure_number }
 
-
         beats = []
-
         for tick, event in self.midi.get_all_events():
             if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
                 current_beat_tick = tick // self.midi.ppqn
@@ -36,26 +33,40 @@ class MIDIInterface:
 
                 beats[current_beat_tick].append((tick % self.midi.ppqn, event))
 
-        maximum_definition = 4
-        minimum_definition = 2
         tick_counter = 0
         for beat, events in enumerate(beats):
-            biggest = self.midi.ppqn // minimum_definition
-            for pos, _ in events:
-                if pos == 0:
-                    pos = self.midi.ppqn
-                biggest = greatest_common_divisor(biggest, pos)
+            diffs = set()
 
-            # If biggest < MAXDEF, will lose precision
-            biggest = max(self.midi.ppqn // maximum_definition, biggest)
-            definition = self.midi.ppqn // biggest
+            prev = 0
+            active_count = 0
+            delta_pairs = []
+            for pos, event in events:
+                delta = pos - prev
+                diffs.add(delta)
+                delta_pairs.append((delta, event))
+                prev = pos
+                active_count += 1
+
+            diffs.add(self.midi.ppqn - 1 - prev)
+
+            diffs = list(diffs)
+            diffs.sort()
 
             tmp_ticks = []
-            for _ in range(definition):
+            if active_count:
                 tmp_ticks.append([])
 
-            for pos, event in events:
-                tmp_ticks[pos // biggest].append(event)
+            for delta, event in delta_pairs:
+                k = diffs.index(delta)
+                for _ in range(k):
+                    tmp_ticks.append([])
+                tmp_ticks[-1].append(event)
+
+            if active_count:
+                k = diffs.index(self.midi.ppqn - 1 - prev)
+                for _ in range(k):
+                    tmp_ticks.append([])
+
 
             self.measure_map[tick_counter] = beat
             for tick_events in tmp_ticks:
