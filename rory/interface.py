@@ -185,7 +185,7 @@ class PlayerScene(wrecked.RectScene):
 
             row = midi_interface.active_notes_map[tick]
             blocked_xs = set()
-            for _note, message in row.items():
+            for note, message in row.items():
                 x = self.__get_displayed_key_position(message.note)
                 blocked_xs.add(x)
 
@@ -216,6 +216,17 @@ class PlayerScene(wrecked.RectScene):
                     line_rect.set_fg_color(wrecked.BRIGHTBLACK)
 
                     self.visible_note_rects.append(line_rect)
+
+
+        # Active Row Line
+        active_y = self.rect_background.height - self.active_row_position
+        if song_position in midi_interface.measure_map.keys():
+            line_char = chr(9552)
+        else:
+            line_char = chr(9472)
+
+        for x in range(self.rect_background.width):
+            self.rect_background.set_character(x, active_y, line_char)
 
         position_string = "%s / %s" % (song_position, len(state_map))
         self.rect_position_display.resize(len(position_string), 1)
@@ -282,9 +293,6 @@ class PlayerScene(wrecked.RectScene):
         self.layer_active_notes.resize(self.rect_background.width, 2)
         self.layer_active_notes.move(0, y)
         self.layer_active_notes.set_transparency(True)
-
-        for x in range(width):
-            self.rect_background.set_character(x, y, chr(9473))
 
         for i in range(note_range[0], note_range[1]):
             x = self.__get_displayed_key_position(i)
