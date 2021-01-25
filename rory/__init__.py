@@ -5,7 +5,7 @@ Usage:
     rory path/to/midi.midi
 """
 
-__version__ = "0.2.10"
+__version__ = "0.2.11"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
@@ -14,14 +14,14 @@ __url__ = "https://github.com/quintinfsmith/rory"
 def main():
     import sys
     import time
-    from rory.interface import Top, TerminalTooNarrow
+    from rory.interface import RoryStage, TerminalTooNarrow
 
     if len(sys.argv) < 2:
         print("Specify Midi To Play")
         sys.exit()
 
     try:
-        interface = Top()
+        interface = RoryStage()
     except TerminalTooNarrow:
         print("Terminal needs to be at least 90 characters wide")
         sys.exit()

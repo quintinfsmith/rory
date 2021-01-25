@@ -2,7 +2,7 @@
 import threading
 import time
 import wrecked
-from wrecked import RectStage
+from wrecked import RectManager, get_terminal_size
 from apres import MIDI
 
 from rory.midicontroller import MIDIController
@@ -12,14 +12,15 @@ from rory.interactor import Interactor
 class TerminalTooNarrow(Exception):
     '''Error thrown when the minimum width required isn't available'''
 
-class Top(RectStage):
+class RoryStage:
     '''Interface to Run the MidiPlayer'''
     CONTEXT_DEFAULT = 0
     CONTEXT_PLAYER = 1
     def __init__(self):
-        super().__init__()
+        self.rectmanager = RectManager()
+        self.scenes = {}
 
-        if self.rect.width < 90:
+        if self.rectmanager.root.width < 90:
             self.kill()
             raise TerminalTooNarrow()
 
@@ -31,22 +32,35 @@ class Top(RectStage):
             self.kill
         )
 
-        self.playerscene = None
-        self.set_fps(24)
+        self.delay = 1/24
+        self.active_scene = None
+
+        self.playing = False
 
         thread = threading.Thread(target=self._input_daemon)
         thread.start()
 
+        self.playerscene = None
+
+
+    def set_fps(self, fps):
+        self.delay = 1 / fps
+
+    def key_scene(self, key, scene):
+        self.scenes[key] = scene
 
     def play_along(self, midi_path):
         '''Run the Player with the loaded MidiLike Object'''
 
         if not self.playerscene:
-            self.playerscene = self.create_scene(self.CONTEXT_PLAYER, PlayerScene,
+            scene = PlayerScene(
+                self,
                 path=midi_path,
                 controller=self.midi_controller
             )
-        player = self.playerscene.player
+            self.key_scene(self.CONTEXT_PLAYER, scene)
+
+        player = self.scenes[self.CONTEXT_PLAYER].player
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
@@ -95,11 +109,13 @@ class Top(RectStage):
         self.start_scene(self.CONTEXT_PLAYER)
 
     def kill(self):
+        self.playing = False
+        self.rectmanager.kill()
         try:
-            self.playerscene.kill()
-        except:
+            self.scenes[self.active_scene].kill()
+        except KeyError:
             pass
-        super().kill()
+
 
     def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''
@@ -109,32 +125,98 @@ class Top(RectStage):
         while self.playing:
             self.interactor.get_input()
 
+    def resize(self, width, height):
+        self.rectmanager.resize(width, height)
+        try:
+            scene = self.scenes[self.active_scene]
+        except KeyError:
+            scene = None
 
-#def logg(*msg):
-#    with open('logg', 'a') as fp:
-#        for m in msg:
-#            fp.write(str(m) + "\n")
+        if scene:
+            scene.resize(width, height)
 
-class PlayerScene(wrecked.RectScene):
+    def _resize_check(self):
+        w, h = get_terminal_size()
+        if self.rectmanager.root.width != w or self.rectmanager.root.height != h:
+            self.resize(w, h)
+
+    def play(self):
+        play_thread = threading.Thread(
+            target=self._play
+        )
+        play_thread.start()
+
+    def _play(self):
+        self.playing = True
+        while self.playing:
+            self._resize_check()
+
+            try:
+                scene = self.scenes[self.active_scene]
+            except KeyError:
+                scene = None
+
+            if scene:
+                try:
+                    scene.tick()
+                except Exception as e:
+                    self.kill()
+                    raise e
+            time.sleep(self.delay)
+
+    def start_scene(self, new_scene_key):
+        if self.active_scene:
+            self.scenes[self.active_scene].disable()
+
+        self.active_scene = new_scene_key
+        self.scenes[self.active_scene].enable()
+        self.rectmanager.draw()
+
+    def new_rect(self):
+        root = self.rectmanager.root
+        rect = root.new_rect()
+        rect.resize(root.width, root.height)
+        return rect
+
+class RoryScene:
+    def __init__(self, rorystage):
+        self.root = rorystage.new_rect()
+
+    def disable(self):
+        self.root.disable()
+
+    def enable(self):
+        self.root.enable()
+
+    def draw(self):
+        self.root.draw()
+
+    def tick(self):
+        pass
+
+    def kill(self):
+        pass
+
+class PlayerScene(RoryScene):
     '''Handles visualization of the Player'''
     # Display constants
     SHARPS = (1, 3, 6, 8, 10)
     NOTELIST = 'CCDDEFFGGAAB'
 
-    def __init__(self, rect_id, rectmanager, **kwargs):
-        super().__init__(rect_id, rectmanager, **kwargs)
+    def __init__(self, rorystage, **kwargs):
+        super().__init__(rorystage)
 
         self.active_midi = MIDI(kwargs['path'])
         self.midi_controller = kwargs['controller']
 
-        self.rect_background = self.new_rect()
+        self.rect_background = self.root.new_rect()
         self.layer_visible_notes = self.rect_background.new_rect()
         self.layer_active_notes = self.rect_background.new_rect()
 
         self.visible_note_rects = []
         self.pressed_note_rects = {}
 
-        self.rect_position_display = self.new_rect()
+        self.rect_position_display = self.root.new_rect()
 
         self.active_row_position = 8
         self.player = Player(**kwargs)
@@ -185,7 +267,7 @@ class PlayerScene(wrecked.RectScene):
 
             row = midi_interface.active_notes_map[tick]
             blocked_xs = set()
-            for note, message in row.items():
+            for _, message in row.items():
                 x = self.__get_displayed_key_position(message.note)
                 blocked_xs.add(x)
 
@@ -229,8 +311,11 @@ class PlayerScene(wrecked.RectScene):
             self.rect_background.set_character(x, active_y, line_char)
 
         position_string = "%s / %s" % (song_position, len(state_map))
+        if self.player.loop != [0, len(state_map) - 1]:
+            position_string += "  [%d -> %d]" % tuple(self.player.loop)
+
         self.rect_position_display.resize(len(position_string), 1)
-        self.rect_position_display.move(self.width - len(position_string) - 1, self.height - 1)
+        self.rect_position_display.move(self.root.width - len(position_string) - 1, self.root.height - 1)
         self.rect_position_display.set_string(0, 0, position_string)
 
     def __draw_pressed_row(self):
@@ -245,7 +330,7 @@ class PlayerScene(wrecked.RectScene):
 
         active_state = midi_interface.get_state(song_position)
 
-        y = self.height - self.active_row_position
+        y = self.root.height - self.active_row_position
 
         pressed_notes = player.pressed_notes.copy()
         for note in pressed_notes:
@@ -276,20 +361,19 @@ class PlayerScene(wrecked.RectScene):
         self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
 
         self.rect_background.resize(
-            height = self.height,
+            height = self.root.height,
             width = width
         )
         self.layer_visible_notes.resize(
-            height=self.height,
+            height= self.root.height,
             width = width
         )
         self.layer_visible_notes.set_transparency(True)
 
-        background_pos = (self.width - width) // 2
+        background_pos = (self.root.width - width) // 2
         self.rect_background.move(background_pos, 0)
 
-        y = self.height - self.active_row_position
-
+        y = self.root.height - self.active_row_position
         self.layer_active_notes.resize(self.rect_background.width, 2)
         self.layer_active_notes.move(0, y)
         self.layer_active_notes.set_transparency(True)
@@ -309,9 +393,9 @@ class PlayerScene(wrecked.RectScene):
                 for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
 
-        for y in range(self.height):
-            self.set_character(background_pos - 1, y, chr(9475))
-            self.set_character(background_pos + width, y, chr(9475))
+        for y in range(self.root.height):
+            self.root.set_character(background_pos - 1, y, chr(9475))
+            self.root.set_character(background_pos + width, y, chr(9475))
 
     def __get_displayed_key_position(self, midi_key):
         piano_position = midi_key - self.player.note_range[0]
