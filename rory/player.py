@@ -11,7 +11,6 @@ class Player:
     # Display Flags
     FLAG_BACKGROUND = 1
     FLAG_PRESSED = 1 << 2
-    FLAG_POSITION = 1 << 3
 
     def kill(self):
         ''''Shutdown the player'''
@@ -30,7 +29,6 @@ class Player:
         if self.song_position > self.loop[1]:
             self.song_position = self.loop[0]
 
-        self.disp_flags[self.FLAG_POSITION] = True
 
     def prev_state(self):
         '''Change the song position to the last state with notes.'''
@@ -56,7 +54,6 @@ class Player:
         if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
 
-        self.disp_flags[self.FLAG_POSITION] = True
 
     def __init__(self, **kwargs):
         self.is_active = True
@@ -79,7 +76,6 @@ class Player:
 
         self.disp_flags = {
             self.FLAG_PRESSED: True, # Pressed notes have changed,
-            self.FLAG_POSITION: True, # Song Position has changed,
             self.FLAG_BACKGROUND: True # Background needs redraw
         }
 

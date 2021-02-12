@@ -219,6 +219,7 @@ class PlayerScene(RoryScene):
         self.rect_position_display = self.root.new_rect()
 
         self.active_row_position = 8
+        self.last_rendered_position = -1
         self.player = Player(**kwargs)
 
     def tick(self):
@@ -229,9 +230,10 @@ class PlayerScene(RoryScene):
             player.disp_flags[player.FLAG_BACKGROUND] = False
             was_flagged = True
 
-        if player.disp_flags[player.FLAG_POSITION]:
+        song_position = player.song_position
+        if self.last_rendered_position != song_position:
             self.__draw_visible_notes()
-            player.disp_flags[player.FLAG_POSITION] = False
+            self.last_rendered_position = song_position
             player.disp_flags[player.FLAG_PRESSED] = True
             was_flagged = True
 
