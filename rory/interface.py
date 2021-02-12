@@ -170,7 +170,7 @@ class RoryStage:
 
         self.active_scene = new_scene_key
         self.scenes[self.active_scene].enable()
-        self.rectmanager.draw()
+        self.rectmanager.render()
 
     def new_rect(self):
         root = self.rectmanager.root
