@@ -42,7 +42,6 @@ class RoryStage:
 
         self.playerscene = None
 
-
     def set_fps(self, fps):
         self.delay = 1 / fps
 
@@ -60,7 +59,8 @@ class RoryStage:
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
 
-        player = self.scenes[self.CONTEXT_PLAYER].player
+        playerscene = self.scenes[self.CONTEXT_PLAYER]
+        player = playerscene.player
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
@@ -98,6 +98,11 @@ class RoryStage:
             ']',
             player.set_loop_end_to_position,
         )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            '\\',
+            player.clear_loop,
+        )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
@@ -107,6 +112,7 @@ class RoryStage:
 
         self.interactor.set_context(self.CONTEXT_PLAYER)
         self.start_scene(self.CONTEXT_PLAYER)
+
 
     def kill(self):
         self.playing = False
@@ -217,11 +223,18 @@ class PlayerScene(RoryScene):
         self.pressed_note_rects = {}
 
         self.rect_position_display = self.root.new_rect()
+        self.rect_position_display.bold()
+        self.rect_position_display.underline()
         self.rect_chord_names = self.root.new_rect()
+        self.rect_chord_names.bold()
+        self.rect_chord_names.underline()
 
         self.active_row_position = 8
         self.last_rendered_position = -1
+        self.last_rendered_loop = (0, 0)
         self.player = Player(**kwargs)
+
+
 
     def tick(self):
         was_flagged = False
@@ -237,6 +250,10 @@ class PlayerScene(RoryScene):
             self.__draw_chord_name()
             self.last_rendered_position = song_position
             player.disp_flags[player.FLAG_PRESSED] = True
+            was_flagged = True
+
+        if self.last_rendered_loop != player.loop:
+            self.__draw_song_position()
             was_flagged = True
 
         if player.disp_flags[player.FLAG_PRESSED]:
@@ -258,7 +275,7 @@ class PlayerScene(RoryScene):
 
         chord_string = " | ".join(chord_names)
         self.rect_chord_names.resize(len(chord_string), 1)
-        self.rect_chord_names.move(self.rect_background.x - len(chord_string) - 1, self.root.height - self.active_row_position)
+        self.rect_chord_names.move(self.rect_background.x, self.root.height - 1)
         self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
@@ -328,13 +345,22 @@ class PlayerScene(RoryScene):
         for x in range(self.rect_background.width):
             self.rect_background.set_character(x, active_y, line_char)
 
-        position_string = "%s / %s" % (song_position, len(state_map))
+        self.__draw_song_position()
+
+    def __draw_song_position(self):
+        song_position = self.player.song_position
+        midi_interface = self.player.midi_interface
+        state_map = midi_interface.state_map
+
         if self.player.loop != [0, len(state_map) - 1]:
-            position_string += "  [%d -> %d]" % tuple(self.player.loop)
+            position_string = "[%04d: %04d :%04d]" % (self.player.loop[0], song_position, self.player.loop[1])
+        else:
+            position_string = "%04d/%04d" % (song_position, len(state_map))
 
         self.rect_position_display.resize(len(position_string), 1)
-        self.rect_position_display.move(self.root.width - len(position_string) - 1, self.root.height - 1)
+        self.rect_position_display.move(self.rect_background.x + self.rect_background.width - len(position_string), self.root.height - 1)
         self.rect_position_display.set_string(0, 0, position_string)
+        self.last_rendered_loop = self.player.loop.copy()
 
     def __draw_pressed_row(self):
         keys = list(self.pressed_note_rects.keys())

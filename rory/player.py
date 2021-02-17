@@ -33,7 +33,8 @@ class Player:
     def prev_state(self):
         '''Change the song position to the last state with notes.'''
         self.song_position -= 1
-        while self.song_position > 0 and not self.midi_interface.get_state(self.song_position):
+        while self.song_position > self.loop[0] \
+        and not self.midi_interface.get_state(self.song_position):
             self.song_position -= 1
 
         self.set_state(max(0, self.song_position))
