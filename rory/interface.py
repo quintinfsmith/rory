@@ -217,6 +217,7 @@ class PlayerScene(RoryScene):
         self.pressed_note_rects = {}
 
         self.rect_position_display = self.root.new_rect()
+        self.rect_chord_names = self.root.new_rect()
 
         self.active_row_position = 8
         self.last_rendered_position = -1
@@ -233,6 +234,7 @@ class PlayerScene(RoryScene):
         song_position = player.song_position
         if self.last_rendered_position != song_position:
             self.__draw_visible_notes()
+            self.__draw_chord_name()
             self.last_rendered_position = song_position
             player.disp_flags[player.FLAG_PRESSED] = True
             was_flagged = True
@@ -244,6 +246,20 @@ class PlayerScene(RoryScene):
 
         if was_flagged:
             self.draw()
+
+    def __draw_chord_name(self):
+        midi_interface = self.player.midi_interface
+        active_channels = midi_interface.get_active_channels(self.player.song_position)
+        chord_names = []
+        for channel in active_channels:
+            chord_name = midi_interface.get_chord_name(self.player.song_position, channel)
+            if chord_name:
+                chord_names.append(chord_name)
+
+        chord_string = " | ".join(chord_names)
+        self.rect_chord_names.resize(len(chord_string), 1)
+        self.rect_chord_names.move(self.rect_background.x - len(chord_string) - 1, self.root.height - self.active_row_position)
+        self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
         while self.visible_note_rects:
