@@ -116,7 +116,15 @@ class MIDIInterface:
 
             (0, 6, 7, 10): "7sus4",
             #(0, 12): "open",
+            (0, 4): "3",
+            (0, 3): "m3",
+            (0, 9): "m3/1",
+
             (0, 7): "5",
+            (0, 5): "5/1",
+            (0, 8): "aug5", #3/1
+            (0, 6): "dim5", #3/1
+
             (0, 4, 7, 9): "6",
             (0, 3, 7, 9): "m6",
             (0, 4, 7, 10): "7",
@@ -166,9 +174,8 @@ class MIDIInterface:
                 name = self._get_note_name(m) + name
         else:
             name = ""
-
-
         return name
+
 
     def _get_note_name(self, n):
         NOTELIST = 'CCDDEFFGGAAB'
