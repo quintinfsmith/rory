@@ -82,5 +82,103 @@ class MIDIInterface:
         '''Get a list of the notes currently 'On' at specified position'''
         return self.state_map[tick].copy()
 
+    def get_active_channels(self, tick):
+        active = set()
+        for note, event in self.active_notes_map[tick].items():
+            active.add(event.channel)
+
+        return active
+
+    def get_chord_name(self, tick, channel):
+        chord_names = {
+            (0, 3, 7): "m",
+            (0, 4, 9): "m/1",
+            (0, 5, 8): "m/2",
+
+            (0, 4, 7): "", # Major
+            (0, 3, 8): "/1",
+            (0, 5, 9): "/2",
+
+            (0, 3, 6): "dim",
+            (0, 3, 9): "dim/1",
+            (0, 6, 9): "dim/2",
+
+            (0, 3, 6, 9): "dim7",
+
+            (0, 4, 8): "aug", # Symmetrical
+            (0, 4, 8, 10): "aug7",
+
+            (0, 2, 7): "sus2",
+            (0, 5, 10): "sus2/1", # sus4/2
+
+            (0, 2, 7, 10): "7sus2",
+            (0, 5, 7): "sus4", # sus2/2
+
+            (0, 6, 7, 10): "7sus4",
+            #(0, 12): "open",
+            (0, 7): "5",
+            (0, 4, 7, 9): "6",
+            (0, 3, 7, 9): "m6",
+            (0, 4, 7, 10): "7",
+            (0, 3, 7, 10): "m7",
+            (0, 3, 6, 10): "m7b5",
+            (0, 4, 7, 11): "maj7",
+            (0, 3, 7, 11): "mM7",
+            (0, 4, 6, 10): "7-5",
+            (0, 4, 8, 10): "7+5",
+            (0, 4, 7, 10, 14): "9",
+            (0, 3, 7, 10, 14): "m9",
+            (0, 4, 7, 11, 14): "maj9",
+            (0, 4, 7, 10, 14, 17): "11",
+            (0, 3, 7, 10, 14, 17): "m11",
+            (0, 2, 4, 7): "add2",
+            (0, 4, 5, 7): "add4",
+            (0, 4, 7, 14): "add9",
+            (0, 4, 7, 17): "add11",
+        }
+
+
+        pressed = []
+        for note, event in self.active_notes_map[tick].items():
+            if event.channel == channel:
+                pressed.append(note)
+
+        m = min(pressed)
+        for i, n in enumerate(pressed):
+            pressed[i] = (n - m) % 12
+        pressed = list(set(pressed))
+
+        pressed.sort()
+
+        pressed = tuple(pressed)
+        if pressed in chord_names:
+            name = chord_names[pressed]
+
+            if name[-2:] == "/1":
+                slash = self._get_note_name(m)
+                m += pressed[-1]
+                name = "%s%s%s" % (self._get_note_name(m), name[0:-1], slash)
+            elif name[-2:] == "/2":
+                slash = self._get_note_name(m)
+                m += pressed[-2]
+                name = "%s%s%s" % (self._get_note_name(m), name[0:-1], slash)
+            else:
+                name = self._get_note_name(m) + name
+        else:
+            name = ""
+
+
+        return name
+
+    def _get_note_name(self, n):
+        NOTELIST = 'CCDDEFFGGAAB'
+
+        name = NOTELIST[n % len(NOTELIST)]
+        if n % len(NOTELIST) in (1,3,6,8,10):
+            name += "#"
+
+        return name
+
+
     def __len__(self):
         return len(self.state_map)
