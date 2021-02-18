@@ -2,7 +2,7 @@
 import threading
 import time
 import wrecked
-from wrecked import RectManager, get_terminal_size
+from wrecked import get_terminal_size
 from apres import MIDI
 
 from rory.midicontroller import MIDIController
@@ -17,10 +17,10 @@ class RoryStage:
     CONTEXT_DEFAULT = 0
     CONTEXT_PLAYER = 1
     def __init__(self):
-        self.rectmanager = RectManager()
+        self.root = wrecked.init()
         self.scenes = {}
 
-        if self.rectmanager.root.width < 90:
+        if self.root.width < 90:
             self.kill()
             raise TerminalTooNarrow()
 
@@ -116,11 +116,12 @@ class RoryStage:
 
     def kill(self):
         self.playing = False
-        self.rectmanager.kill()
         try:
             self.scenes[self.active_scene].kill()
         except KeyError:
             pass
+
+        wrecked.kill()
 
 
     def _input_daemon(self):
@@ -132,18 +133,18 @@ class RoryStage:
             self.interactor.get_input()
 
     def resize(self, width, height):
-        self.rectmanager.resize(width, height)
+        self.root.resize(width, height)
         try:
             scene = self.scenes[self.active_scene]
         except KeyError:
             scene = None
 
         if scene:
-            scene.resize(width, height)
+            scene.resiz(width, height)
 
     def _resize_check(self):
         w, h = get_terminal_size()
-        if self.rectmanager.root.width != w or self.rectmanager.root.height != h:
+        if self.root.width != w or self.root.height != h:
             self.resize(w, h)
 
     def play(self):
@@ -176,12 +177,11 @@ class RoryStage:
 
         self.active_scene = new_scene_key
         self.scenes[self.active_scene].enable()
-        self.rectmanager.render()
+        self.root.draw()
 
     def new_rect(self):
-        root = self.rectmanager.root
-        rect = root.new_rect()
-        rect.resize(root.width, root.height)
+        rect = self.root.new_rect()
+        rect.resize(self.root.width, self.root.height)
         return rect
 
 class RoryScene:
@@ -245,15 +245,11 @@ class PlayerScene(RoryScene):
             was_flagged = True
 
         song_position = player.song_position
-        if self.last_rendered_position != song_position:
+        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop:
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
             player.disp_flags[player.FLAG_PRESSED] = True
-            was_flagged = True
-
-        if self.last_rendered_loop != player.loop:
-            self.__draw_song_position()
             was_flagged = True
 
         if player.disp_flags[player.FLAG_PRESSED]:
@@ -280,7 +276,7 @@ class PlayerScene(RoryScene):
 
     def __draw_visible_notes(self):
         while self.visible_note_rects:
-            self.visible_note_rects.pop().detach()
+            self.visible_note_rects.pop().remove()
 
         song_position = self.player.song_position
         midi_interface = self.player.midi_interface
@@ -333,6 +329,21 @@ class PlayerScene(RoryScene):
                     line_rect.set_fg_color(wrecked.BRIGHTBLACK)
 
                     self.visible_note_rects.append(line_rect)
+
+            #if tick in self.player.loop:
+            #    for x in range(self.rect_background.width):
+            #        line_rect = self.layer_visible_notes.new_rect()
+            #        line_rect.set_character(0, 0, chr(9481))
+            #        line_rect.set_fg_color(wrecked.BRIGHTWHITE)
+            #        if tick == self.player.loop[0]:
+            #            if tick != song_position:
+            #                line_rect.move(x, y + 1)
+            #            else:
+            #                line_rect.move(x, y + 2)
+            #        else:
+            #            line_rect.move(x, y - 1)
+
+            #        self.visible_note_rects.append(line_rect)
 
 
         # Active Row Line
