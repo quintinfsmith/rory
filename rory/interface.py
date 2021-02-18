@@ -332,20 +332,20 @@ class PlayerScene(RoryScene):
 
                     self.visible_note_rects.append(line_rect)
 
-            #if tick in self.player.loop:
-            #    for x in range(self.rect_background.width):
-            #        line_rect = self.layer_visible_notes.new_rect()
-            #        line_rect.set_character(0, 0, chr(9481))
-            #        line_rect.set_fg_color(wrecked.BRIGHTWHITE)
-            #        if tick == self.player.loop[0]:
-            #            if tick != song_position:
-            #                line_rect.move(x, y + 1)
-            #            else:
-            #                line_rect.move(x, y + 2)
-            #        else:
-            #            line_rect.move(x, y - 1)
+            if tick in self.player.loop:
+                for x in range(self.rect_background.width):
+                    line_rect = self.layer_visible_notes.new_rect()
+                    line_rect.set_character(0, 0, chr(9481))
+                    line_rect.set_fg_color(wrecked.BRIGHTWHITE)
+                    if tick == self.player.loop[0]:
+                        if tick != song_position:
+                            line_rect.move(x, y + 1)
+                        else:
+                            line_rect.move(x, y + 2)
+                    else:
+                        line_rect.move(x, y - 1)
 
-            #        self.visible_note_rects.append(line_rect)
+                    self.visible_note_rects.append(line_rect)
 
 
         # Active Row Line
@@ -459,8 +459,8 @@ class PlayerScene(RoryScene):
                     self.rect_background.set_character(x, j, chr(9550))
 
         for y in range(self.root.height):
-            self.root.set_character(background_pos - 1, y, chr(9475))
-            self.root.set_character(background_pos + width, y, chr(9475))
+            self.root.set_character(inner_pos - 1, y, chr(9475))
+            self.root.set_character(inner_pos + width, y, chr(9475))
 
     def __get_displayed_key_position(self, midi_key):
         piano_position = midi_key - self.player.note_range[0]
