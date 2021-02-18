@@ -172,6 +172,7 @@ class MIDIInterface:
                 name = "%s%s%s" % (self._get_note_name(m), name[0:-1], slash)
             else:
                 name = self._get_note_name(m) + name
+
         else:
             name = ""
         return name

@@ -20,7 +20,7 @@ class RoryStage:
         self.rectmanager = RectManager()
         self.scenes = {}
 
-        if self.rectmanager.root.width < 90:
+        if self.rectmanager.root.width < 103:
             self.kill()
             raise TerminalTooNarrow()
 
@@ -215,17 +215,19 @@ class PlayerScene(RoryScene):
         self.active_midi = MIDI(kwargs['path'])
         self.midi_controller = kwargs['controller']
 
-        self.rect_background = self.root.new_rect()
+        self.rect_inner = self.root.new_rect()
+        self.rect_background = self.rect_inner.new_rect()
+
         self.layer_visible_notes = self.rect_background.new_rect()
         self.layer_active_notes = self.rect_background.new_rect()
 
         self.visible_note_rects = []
         self.pressed_note_rects = {}
 
-        self.rect_position_display = self.root.new_rect()
+        self.rect_position_display = self.rect_inner.new_rect()
         self.rect_position_display.bold()
         self.rect_position_display.underline()
-        self.rect_chord_names = self.root.new_rect()
+        self.rect_chord_names = self.rect_inner.new_rect()
         self.rect_chord_names.bold()
         self.rect_chord_names.underline()
 
@@ -275,7 +277,7 @@ class PlayerScene(RoryScene):
 
         chord_string = " | ".join(chord_names)
         self.rect_chord_names.resize(len(chord_string), 1)
-        self.rect_chord_names.move(self.rect_background.x, self.root.height - 1)
+        self.rect_chord_names.move(0, self.rect_inner.height - 1)
         self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
@@ -353,12 +355,16 @@ class PlayerScene(RoryScene):
         state_map = midi_interface.state_map
 
         if self.player.loop != [0, len(state_map) - 1]:
-            position_string = "[%04d: %04d :%04d]" % (self.player.loop[0], song_position, self.player.loop[1])
+            l = len(str(max(self.player.loop)))
+            fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
+            position_string = fmt_string % (self.player.loop[0], song_position, self.player.loop[1])
         else:
-            position_string = "%04d/%04d" % (song_position, len(state_map))
+            l = len(str(len(state_map)))
+            fmt_string = "%%0%dd/%%0%dd" % (l, l)
+            position_string = fmt_string % (song_position, len(state_map))
 
         self.rect_position_display.resize(len(position_string), 1)
-        self.rect_position_display.move(self.rect_background.x + self.rect_background.width - len(position_string), self.root.height - 1)
+        self.rect_position_display.move(self.rect_inner.width - len(position_string), self.rect_inner.height - 1)
         self.rect_position_display.set_string(0, 0, position_string)
         self.last_rendered_loop = self.player.loop.copy()
 
@@ -374,7 +380,7 @@ class PlayerScene(RoryScene):
 
         active_state = midi_interface.get_state(song_position)
 
-        y = self.root.height - self.active_row_position
+        y = self.rect_inner.height - self.active_row_position
 
         pressed_notes = player.pressed_notes.copy()
         for note in pressed_notes:
@@ -402,20 +408,24 @@ class PlayerScene(RoryScene):
         player = self.player
         note_range = player.note_range
         width = self.__get_displayed_key_position(note_range[1] + 1)
-        self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
+        self.rect_inner.resize(
+            height=self.root.height,
+            width=width
+        )
+        inner_pos = (self.root.width - self.rect_inner.width) // 2
+        self.rect_inner.move(inner_pos, 0)
 
+        self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
         self.rect_background.resize(
-            height = self.root.height,
-            width = width
+            height=self.rect_inner.height,
+            width=self.rect_inner.width
         )
         self.layer_visible_notes.resize(
-            height= self.root.height,
-            width = width
+            height=self.rect_background.height,
+            width=self.rect_background.width
         )
         self.layer_visible_notes.set_transparency(True)
 
-        background_pos = (self.root.width - width) // 2
-        self.rect_background.move(background_pos, 0)
 
         y = self.root.height - self.active_row_position
         self.layer_active_notes.resize(self.rect_background.width, 2)
