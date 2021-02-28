@@ -165,7 +165,8 @@ class RoryStage:
 
             if scene:
                 try:
-                    scene.tick()
+                    if scene.tick():
+                        scene.draw()
                 except Exception as e:
                     self.kill()
                     raise e
@@ -219,6 +220,9 @@ class PlayerScene(RoryScene):
         self.rect_background = self.rect_inner.new_rect()
 
         self.layer_visible_notes = self.rect_background.new_rect()
+        self.rect_loop_start = self.layer_visible_notes.new_rect()
+        self.rect_loop_end = self.layer_visible_notes.new_rect()
+
         self.layer_active_notes = self.rect_background.new_rect()
 
         self.visible_note_rects = []
@@ -259,8 +263,7 @@ class PlayerScene(RoryScene):
             player.disp_flags[player.FLAG_PRESSED] = False
             was_flagged = True
 
-        if was_flagged:
-            self.draw()
+        return was_flagged
 
     def __draw_chord_name(self):
         midi_interface = self.player.midi_interface
@@ -279,6 +282,9 @@ class PlayerScene(RoryScene):
     def __draw_visible_notes(self):
         while self.visible_note_rects:
             self.visible_note_rects.pop().remove()
+
+        self.rect_loop_start.disable()
+        self.rect_loop_end.disable()
 
         song_position = self.player.song_position
         midi_interface = self.player.midi_interface
@@ -332,20 +338,25 @@ class PlayerScene(RoryScene):
 
                     self.visible_note_rects.append(line_rect)
 
-            if tick in self.player.loop:
-                for x in range(self.rect_background.width):
-                    line_rect = self.layer_visible_notes.new_rect()
-                    line_rect.set_character(0, 0, chr(9481))
-                    line_rect.set_fg_color(wrecked.BRIGHTWHITE)
-                    if tick == self.player.loop[0]:
-                        if tick != song_position:
-                            line_rect.move(x, y + 1)
-                        else:
-                            line_rect.move(x, y + 2)
-                    else:
-                        line_rect.move(x, y - 1)
+            if tick == self.player.loop[0]:
+                self.rect_loop_start.enable()
+                if _y != self.active_row_position:
+                    self.rect_loop_start.move(0, y + 1)
+                else:
+                    self.rect_loop_start.move(0, y + 2)
+                self.rect_loop_start.resize(self.rect_background.width, 1)
+                string = chr(9473) * self.rect_loop_start.width
+                self.rect_loop_start.set_string(0, 0, string)
 
-                    self.visible_note_rects.append(line_rect)
+            if tick == self.player.loop[1]:
+                self.rect_loop_end.enable()
+                if _y != self.active_row_position:
+                    self.rect_loop_end.move(0, y - 1)
+                else:
+                    self.rect_loop_end.move(0, y - 2)
+                self.rect_loop_end.resize(self.rect_background.width, 1)
+                string = chr(9473) * self.rect_loop_end.width
+                self.rect_loop_end.set_string(0, 0, string)
 
 
         # Active Row Line
@@ -419,6 +430,7 @@ class PlayerScene(RoryScene):
         player = self.player
         note_range = player.note_range
         width = self.__get_displayed_key_position(note_range[1] + 1)
+
         self.rect_inner.resize(
             height=self.root.height,
             width=width
