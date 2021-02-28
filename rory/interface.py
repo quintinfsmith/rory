@@ -20,7 +20,7 @@ class RoryStage:
         self.root = wrecked.init()
         self.scenes = {}
 
-        if self.root.width < 90:
+        if self.root.width < 106:
             self.kill()
             raise TerminalTooNarrow()
 
