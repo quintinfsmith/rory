@@ -5,7 +5,7 @@ Usage:
     rory path/to/midi.midi
 """
 
-__version__ = "0.2.16"
+__version__ = "0.2.17"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
@@ -23,7 +23,7 @@ def main():
     try:
         interface = RoryStage()
     except TerminalTooNarrow:
-        print("Terminal needs to be at least 90 characters wide")
+        print("Terminal needs to be at least 106 characters wide")
         sys.exit()
 
     interface.play()
