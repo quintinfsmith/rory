@@ -140,11 +140,11 @@ class RoryStage:
             scene = None
 
         if scene:
-            scene.resiz(width, height)
+            scene.resize(width, height)
 
     def _resize_check(self):
-        w, h = get_terminal_size()
-        if self.root.width != w or self.root.height != h:
+        if wrecked.fit_to_terminal():
+            w, h = get_terminal_size()
             self.resize(w, h)
 
     def play(self):
@@ -204,6 +204,9 @@ class RoryScene:
     def kill(self):
         pass
 
+    def resize(self, new_width, new_height):
+        self.root.resize(new_width, new_height)
+
 class PlayerScene(RoryScene):
     '''Handles visualization of the Player'''
     # Display constants
@@ -228,26 +231,27 @@ class PlayerScene(RoryScene):
         self.visible_note_rects = []
         self.pressed_note_rects = {}
 
-        self.rect_position_display = self.rect_inner.new_rect()
+        self.rect_position_display = self.rect_background.new_rect()
         self.rect_position_display.bold()
         self.rect_position_display.underline()
-        self.rect_chord_names = self.rect_inner.new_rect()
+        self.rect_chord_names = self.rect_background.new_rect()
         self.rect_chord_names.bold()
         self.rect_chord_names.underline()
 
         self.active_row_position = 8
-        self.last_rendered_position = -1
-        self.last_rendered_loop = (0, 0)
         self.player = Player(**kwargs)
 
-
+        self.FLAG_BACKGROUND = True
+        self.last_rendered_pressed = None
+        self.last_rendered_position = -1
+        self.last_rendered_loop = (0, 0)
 
     def tick(self):
         was_flagged = False
         player = self.player
-        if player.disp_flags[player.FLAG_BACKGROUND]:
+        if self.FLAG_BACKGROUND:
             self.__draw_background()
-            player.disp_flags[player.FLAG_BACKGROUND] = False
+            self.FLAG_BACKGROUND = False
             was_flagged = True
 
         song_position = player.song_position
@@ -255,12 +259,11 @@ class PlayerScene(RoryScene):
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
-            player.disp_flags[player.FLAG_PRESSED] = True
+            self.last_rendered_pressed = None
             was_flagged = True
 
-        if player.disp_flags[player.FLAG_PRESSED]:
+        if player.pressed_notes != self.last_rendered_pressed:
             self.__draw_pressed_row()
-            player.disp_flags[player.FLAG_PRESSED] = False
             was_flagged = True
 
         return was_flagged
@@ -276,7 +279,7 @@ class PlayerScene(RoryScene):
 
         chord_string = " | ".join(chord_names)
         self.rect_chord_names.resize(len(chord_string), 1)
-        self.rect_chord_names.move(0, self.rect_inner.height - 1)
+        self.rect_chord_names.move(0, self.rect_background.height - 1)
         self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
@@ -386,7 +389,7 @@ class PlayerScene(RoryScene):
             position_string = fmt_string % (song_position, len(state_map))
 
         self.rect_position_display.resize(len(position_string), 1)
-        self.rect_position_display.move(self.rect_inner.width - len(position_string), self.rect_inner.height - 1)
+        self.rect_position_display.move(max(0, self.rect_background.width - len(position_string)), self.rect_background.height - 1)
         self.rect_position_display.set_string(0, 0, position_string)
         self.last_rendered_loop = self.player.loop.copy()
 
@@ -425,8 +428,9 @@ class PlayerScene(RoryScene):
 
             self.pressed_note_rects[note] = note_rect
 
+        self.last_rendered_pressed = pressed_notes
 
-    def __draw_background(self):
+    def __adjust_inner_rect_offset(self):
         player = self.player
         note_range = player.note_range
         width = self.__get_displayed_key_position(note_range[1] + 1)
@@ -435,14 +439,25 @@ class PlayerScene(RoryScene):
             height=self.root.height,
             width=width
         )
-        inner_pos = (self.root.width - self.rect_inner.width) // 2
+        inner_pos = max(0, (self.root.width - self.rect_inner.width) // 2)
         self.rect_inner.move(inner_pos, 0)
 
+        for y in range(self.root.height):
+            self.root.set_character(inner_pos - 1, y, chr(9475))
+            self.root.set_character(inner_pos + width, y, chr(9475))
+
+    def __draw_background(self):
+        player = self.player
+        note_range = player.note_range
+        self.__adjust_inner_rect_offset()
+
+        self.rect_background.clear_characters()
         self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
         self.rect_background.resize(
             height=self.rect_inner.height,
             width=self.rect_inner.width
         )
+
         self.layer_visible_notes.resize(
             height=self.rect_background.height,
             width=self.rect_background.width
@@ -450,7 +465,7 @@ class PlayerScene(RoryScene):
         self.layer_visible_notes.set_transparency(True)
 
 
-        y = self.root.height - self.active_row_position
+        y = max(0, self.root.height - self.active_row_position)
         self.layer_active_notes.resize(self.rect_background.width, 2)
         self.layer_active_notes.move(0, y)
         self.layer_active_notes.set_transparency(True)
@@ -470,9 +485,7 @@ class PlayerScene(RoryScene):
                 for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
 
-        for y in range(self.root.height):
-            self.root.set_character(inner_pos - 1, y, chr(9475))
-            self.root.set_character(inner_pos + width, y, chr(9475))
+
 
     def __get_displayed_key_position(self, midi_key):
         piano_position = midi_key - self.player.note_range[0]
@@ -510,3 +523,9 @@ class PlayerScene(RoryScene):
     def kill(self):
         ''' Tear down the player backend '''
         self.player.kill()
+
+    def resize(self, new_width, new_height):
+        super().resize(max(new_width, self.rect_inner.width + 2), new_height)
+        self.FLAG_BACKGROUND = True
+        self.last_rendered_position = -1
+
