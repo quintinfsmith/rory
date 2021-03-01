@@ -8,10 +8,6 @@ from rory.midiinterface import MIDIInterface
 class Player:
     '''Plays MIDILike Objects'''
 
-    # Display Flags
-    FLAG_BACKGROUND = 1
-    FLAG_PRESSED = 1 << 2
-
     def kill(self):
         ''''Shutdown the player'''
         self.is_active = False
@@ -75,11 +71,6 @@ class Player:
 
         self.song_position = -1
 
-        self.disp_flags = {
-            self.FLAG_PRESSED: True, # Pressed notes have changed,
-            self.FLAG_BACKGROUND: True # Background needs redraw
-        }
-
         self.midi_input_thread = threading.Thread(
             target=self.midi_input_daemon
         )
@@ -96,7 +87,6 @@ class Player:
                 if message:
                     if isinstance(message, NoteOn):
                         self.pressed_notes.add(message.note)
-                        self.disp_flags[self.FLAG_PRESSED] = True
                     elif isinstance(message, NoteOff):
                         try:
                             self.pressed_notes.remove(message.note)
@@ -107,7 +97,6 @@ class Player:
                             self.need_to_release.remove(message.note)
                         except KeyError:
                             pass
-                        self.disp_flags[self.FLAG_PRESSED] = True
                     song_state = self.midi_interface.get_state(self.song_position)
                 if song_state.intersection(self.pressed_notes) == song_state \
                 and not self.need_to_release.intersection(song_state):
