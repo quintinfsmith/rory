@@ -5,7 +5,7 @@ Usage:
     rory path/to/midi.midi
 """
 
-__version__ = "0.2.17"
+__version__ = "0.2.18"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
@@ -14,7 +14,7 @@ __url__ = "https://github.com/quintinfsmith/rory"
 def main():
     import sys
     import time
-    from rory.interface import RoryStage, TerminalTooNarrow
+    from rory.interface import RoryStage, TerminalTooNarrow, InvalidMIDIFile
 
     if len(sys.argv) < 2:
         print("Specify Midi To Play")
@@ -27,12 +27,17 @@ def main():
         sys.exit()
 
     interface.play()
-    interface.play_along(sys.argv[1])
+    try:
+        interface.play_along(sys.argv[1])
 
-    while interface.playing:
-        time.sleep(.4)
+        while interface.playing:
+            time.sleep(.4)
 
-    interface.kill()
+        interface.kill()
+    except InvalidMIDIFile:
+        interface.kill()
+        print("\"%s\" is not a valid MIDI" % sys.argv[1])
+
 
 if __name__ == "__main__":
     main()
