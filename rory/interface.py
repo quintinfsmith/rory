@@ -3,7 +3,7 @@ import threading
 import time
 import wrecked
 from wrecked import get_terminal_size
-from apres import MIDI
+from apres import MIDI, InvalidMIDIFile
 
 from rory.midicontroller import MIDIController
 from rory.player import Player
@@ -19,6 +19,7 @@ class RoryStage:
     def __init__(self):
         self.root = wrecked.init()
         self.scenes = {}
+        self.active_scene = None
 
         if self.root.width < 106:
             self.kill()
@@ -33,12 +34,8 @@ class RoryStage:
         )
 
         self.delay = 1/24
-        self.active_scene = None
 
         self.playing = False
-
-        thread = threading.Thread(target=self._input_daemon)
-        thread.start()
 
         self.playerscene = None
 
@@ -58,6 +55,8 @@ class RoryStage:
                 controller=self.midi_controller
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
+            thread = threading.Thread(target=self._input_daemon)
+            thread.start()
 
         playerscene = self.scenes[self.CONTEXT_PLAYER]
         player = playerscene.player
@@ -116,18 +115,14 @@ class RoryStage:
 
     def kill(self):
         self.playing = False
-        try:
-            self.scenes[self.active_scene].kill()
-        except KeyError:
-            pass
 
+        for scene in self.scenes.values():
+            scene.kill()
         wrecked.kill()
 
 
     def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''
-        while not self.playing:
-            time.sleep(.01)
 
         while self.playing:
             self.interactor.get_input()
@@ -148,13 +143,15 @@ class RoryStage:
             self.resize(w, h)
 
     def play(self):
-        play_thread = threading.Thread(
-            target=self._play
-        )
+        self.playing = True
+
+        #thread = threading.Thread(target=self._input_daemon)
+        #thread.start()
+        play_thread = threading.Thread(target=self._play)
         play_thread.start()
 
+
     def _play(self):
-        self.playing = True
         while self.playing:
             self._resize_check()
 
@@ -522,10 +519,15 @@ class PlayerScene(RoryScene):
 
     def kill(self):
         ''' Tear down the player backend '''
-        self.player.kill()
+        if self.player:
+            self.player.kill()
 
     def resize(self, new_width, new_height):
         super().resize(max(new_width, self.rect_inner.width + 2), new_height)
         self.FLAG_BACKGROUND = True
         self.last_rendered_position = -1
+
+    def draw(self):
+        super().draw()
+        #self.rect_inner.draw()
 

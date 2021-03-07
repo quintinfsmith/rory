@@ -53,14 +53,12 @@ class Player:
 
 
     def __init__(self, **kwargs):
-        self.is_active = True
+        self.active_midi = MIDI(kwargs['path'])
 
+        self.is_active = True
         self.register = 0
         self.loop = [0, 0]
-
         self.note_range = [21, 21 + 88]
-
-        self.active_midi = MIDI(kwargs['path'])
 
         self.midi_controller = kwargs['controller']
         self.midi_interface = MIDIInterface(self.active_midi)
