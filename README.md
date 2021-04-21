@@ -16,7 +16,7 @@ pip install rory
 ```bash
 rory path/to/midi.mid
 ```
-If you want to learn the piece in a different key you can pass the -t (transpose) parameter with <steps> as an integer.
+If you want to learn the piece in a different key you can pass the -t (transpose) parameter with steps as an integer.
 ```bash
 rory path/to/midi.mid -t <steps>
 ```
