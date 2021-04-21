@@ -16,6 +16,10 @@ pip install rory
 ```bash
 rory path/to/midi.mid
 ```
+If you want to learn the piece in a different key you can pass the -t (transpose) parameter with <steps> as an integer.
+```bash
+rory path/to/midi.mid -t <steps>
+```
 The song will only scroll upon hitting the correct key combinations.
 *indicators*
 - red: 'wrong note'
