@@ -61,7 +61,7 @@ class Player:
         self.note_range = [21, 21 + 88]
 
         self.midi_controller = kwargs['controller']
-        self.midi_interface = MIDIInterface(self.active_midi)
+        self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
         self.clear_loop()
 
         self.pressed_notes = set()

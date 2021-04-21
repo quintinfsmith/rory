@@ -5,7 +5,7 @@ Usage:
     rory path/to/midi.midi
 """
 
-__version__ = "0.2.19"
+__version__ = "0.2.20"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
@@ -15,10 +15,35 @@ def main():
     import sys
     import time
     from rory.interface import RoryStage, TerminalTooNarrow, InvalidMIDIFile
+    options = {
+        "-t": ("transpose", int),
+    }
+
+    arguments = sys.argv[1:]
+    kwargs = {}
+
+    i = 0
+    while i < len(arguments):
+        arg = arguments[i].lower()
+        if arg in options:
+            key, vartype = options[arg]
+            try:
+                kwargs[key] = vartype(arguments[i + 1])
+                arguments.pop(i)
+                arguments.pop(i)
+            except ValueError:
+                print("Invalid value '%s' for parameter '%s'" % (arguments[i + 1], arg))
+                sys.exit()
+            except IndexError:
+                print("A value is required for parameter '%s'" % arg)
+                sys.exit()
+        else:
+            i += 1
 
     if len(sys.argv) < 2:
         print("Specify Midi To Play")
         sys.exit()
+
 
     try:
         interface = RoryStage()
@@ -28,7 +53,7 @@ def main():
 
     interface.play()
     try:
-        interface.play_along(sys.argv[1])
+        interface.play_along(sys.argv[1], **kwargs)
 
         while interface.playing:
             time.sleep(.4)
