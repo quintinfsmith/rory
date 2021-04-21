@@ -15,13 +15,17 @@ def greatest_common_divisor(number_a, number_b):
 
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
-    def __init__(self, midi):
+    def __init__(self, midi, **kwargs):
         self.midi = midi
         self._calculated_beatmeasures = {}
         # For quick access to which keys are pressed
         self.state_map = []
         self.active_notes_map = []
         self.measure_map = {} # { state_position: measure_number }
+
+        self.transpose = 0
+        if 'transpose' in kwargs:
+            self.transpose = kwargs['transpose']
 
         beats = []
         for tick, event in self.midi.get_all_events():
@@ -71,6 +75,7 @@ class MIDIInterface:
             self.measure_map[tick_counter] = beat
             for tick_events in tmp_ticks:
                 for event in tick_events:
+                    event.set_note(event.note + self.transpose)
                     while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
                         self.active_notes_map.append({})

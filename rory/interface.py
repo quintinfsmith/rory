@@ -45,14 +45,19 @@ class RoryStage:
     def key_scene(self, key, scene):
         self.scenes[key] = scene
 
-    def play_along(self, midi_path):
+    def play_along(self, midi_path, **kwargs):
         '''Run the Player with the loaded MidiLike Object'''
 
         if not self.playerscene:
+            if 'transpose' in kwargs:
+                transpose = kwargs['transpose']
+            else:
+                transpose = 0
             scene = PlayerScene(
                 self,
                 path=midi_path,
-                controller=self.midi_controller
+                controller=self.midi_controller,
+                transpose=transpose
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
             thread = threading.Thread(target=self._input_daemon)
