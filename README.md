@@ -33,6 +33,6 @@ The song will only scroll upon hitting the correct key combinations.
 [number] 'p': jump to state [number]<br/>
 
 ### Notes
-- Terminal needs to be 90+ characters wide.
+- Terminal needs to be 106+ characters wide.
 - I've generated some scale excercises in scales/*.mid
 
