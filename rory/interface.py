@@ -85,6 +85,17 @@ class RoryStage:
                 player.set_register_digit,
                 digit
             )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            "\x1b",
+            player.clear_register
+        )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'h',
+            playerscene.toggle_help_menu
+        )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
@@ -215,6 +226,19 @@ class PlayerScene(RoryScene):
     SHARPS = (1, 3, 6, 8, 10)
     NOTELIST = 'CCDDEFFGGAAB'
 
+    COLORORDER = [
+        wrecked.BLUE,
+        wrecked.CYAN,
+        wrecked.WHITE,
+        wrecked.MAGENTA,
+        wrecked.YELLOW,
+        wrecked.BRIGHTBLUE,
+        wrecked.BRIGHTCYAN,
+        wrecked.BRIGHTWHITE,
+        wrecked.BRIGHTMAGENTA,
+        wrecked.BRIGHTYELLOW
+    ]
+
     def __init__(self, rorystage, **kwargs):
         super().__init__(rorystage)
 
@@ -240,6 +264,7 @@ class PlayerScene(RoryScene):
         self.rect_chord_names.bold()
         self.rect_chord_names.underline()
 
+
         self.active_row_position = 8
         self.player = Player(**kwargs)
 
@@ -247,6 +272,11 @@ class PlayerScene(RoryScene):
         self.last_rendered_pressed = None
         self.last_rendered_position = -1
         self.last_rendered_loop = (0, 0)
+
+        self.rect_help_menu = None
+        self.flag_show_menu = False
+
+        self.mapped_colors = {}
 
     def tick(self):
         was_flagged = False
@@ -268,7 +298,25 @@ class PlayerScene(RoryScene):
             self.__draw_pressed_row()
             was_flagged = True
 
+        if self.flag_show_menu and was_flagged:
+            self.flag_show_menu = False
+
+        if self.flag_show_menu:
+            if not self.rect_help_menu:
+                self.draw_help_menu()
+                was_flagged = True
+            if not self.rect_help_menu.enabled:
+                self.rect_help_menu.enable()
+                was_flagged = True
+        elif not self.flag_show_menu:
+            if self.rect_help_menu and self.rect_help_menu.enabled:
+                was_flagged = True
+                self.rect_help_menu.disable()
+
         return was_flagged
+
+    def toggle_help_menu(self):
+        self.flag_show_menu = not self.flag_show_menu
 
     def __draw_chord_name(self):
         midi_interface = self.player.midi_interface
@@ -487,6 +535,50 @@ class PlayerScene(RoryScene):
                 for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
 
+    def draw_help_menu(self):
+        if not self.rect_help_menu:
+            self.rect_help_menu = self.root.new_rect()
+
+        menu = self.rect_help_menu
+
+        lines = [
+            "Controls",
+            "",
+            "q    - Close Rory",
+            "h    - Toggle this pop up",
+            "0-9  - Set register",
+            "esc  - Clear register",
+            "j/k  - Next/previous state",
+            "p    - Jump to state in register",
+            "[    - Set start of loop",
+            "]    - Set end of loop",
+            "\\    - Clear start & end of loop"
+        ]
+
+        new_height = min(self.root.height - 2, len(lines) + 2)
+        menu.resize(int(self.root.width / 1.5), new_height)
+        menu.move((self.root.width - menu.width) // 2, (self.root.height - menu.height) // 2)
+
+        # Draw border
+        for y in range(1, menu.height - 1):
+            menu.set_character(0, y, chr(9553))
+            menu.set_character(menu.width - 1, y, chr(9553))
+
+        for x in range(1, menu.width - 1):
+            menu.set_character(x, 0, chr(9552))
+            menu.set_character(x, menu.height - 1, chr(9552))
+
+        menu.set_character(0,0, chr(9556))
+        menu.set_character(menu.width - 1, menu.height - 1, chr(9565))
+        menu.set_character(0,menu.height - 1, chr(9562))
+        menu.set_character(menu.width - 1, 0, chr(9559))
+
+
+        # Add the content
+        for i, line in enumerate(lines):
+            menu.set_string(2, 1 + i, line)
+
+
 
 
     def __get_displayed_key_position(self, midi_key):
@@ -502,24 +594,11 @@ class PlayerScene(RoryScene):
 
         return position
 
-    @staticmethod
-    def get_channel_color(channel):
-        colors = [
-            wrecked.BRIGHTYELLOW,
-            wrecked.WHITE,
-            wrecked.CYAN,
-            wrecked.GREEN,
-            wrecked.MAGENTA,
-            wrecked.BLUE,
-             # i *think* it's channel 7 that is drums... if so, this is just a placeholder
-            wrecked.BRIGHTBLACK,
-            wrecked.RED
-        ]
-        color = colors[channel % 8]
+    def get_channel_color(self, channel):
+        if channel not in self.mapped_colors:
+            self.mapped_colors[channel] = self.COLORORDER[len(self.mapped_colors) % len(self.COLORORDER)]
 
-        if channel > 8:
-            color ^= wrecked.BRIGHT
-
+        color = self.mapped_colors[channel]
         return color
 
     def kill(self):
