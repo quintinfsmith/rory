@@ -14,7 +14,7 @@ pip install rory
 
 ## Usage
 ```bash
-rory path/to/midi.mid [-t steps]
+rory path/to/midi.mid [-t steps_to_transpose]
 ```
 
 The song will only scroll upon hitting the correct key combinations.
@@ -30,6 +30,7 @@ The song will only scroll upon hitting the correct key combinations.
 '[': set loop start<br/>
 ']': set loop end<br/>
 '/': stop looping<br/>
+[number] 'i': ignore channel [number]<br/>
 [number] 'p': jump to state [number]<br/>
 
 ### Notes

@@ -17,7 +17,7 @@ class Player:
         '''Change the song position to the next state with notes.'''
         self.song_position += 1
         while self.song_position <= self.loop[1] \
-        and not self.midi_interface.get_state(self.song_position):
+        and not self.midi_interface.get_state(self.song_position, self.ignored_channels):
             self.song_position += 1
 
         self.song_position = min(self.loop[1] + 1, self.song_position)
@@ -30,7 +30,7 @@ class Player:
         '''Change the song position to the last state with notes.'''
         self.song_position -= 1
         while self.song_position > self.loop[0] \
-        and not self.midi_interface.get_state(self.song_position):
+        and not self.midi_interface.get_state(self.song_position, self.ignored_channels):
             self.song_position -= 1
 
         self.set_state(max(0, self.song_position))
@@ -43,7 +43,7 @@ class Player:
         self.song_position = max(0, song_position)
 
         while self.song_position < self.loop[1] \
-        and not self.midi_interface.get_state(self.song_position):
+        and not self.midi_interface.get_state(self.song_position, self.ignored_channels):
             self.song_position += 1
 
         self.song_position = min(self.loop[1], self.song_position)
@@ -59,6 +59,8 @@ class Player:
         self.register = 0
         self.loop = [0, 0]
         self.note_range = [21, 21 + 88]
+
+        self.ignored_channels = set()
 
         self.midi_controller = kwargs['controller']
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
@@ -95,7 +97,7 @@ class Player:
                             self.need_to_release.remove(message.note)
                         except KeyError:
                             pass
-                    song_state = self.midi_interface.get_state(self.song_position)
+                    song_state = self.midi_interface.get_state(self.song_position, self.ignored_channels)
                 if song_state.intersection(self.pressed_notes) == song_state \
                 and not self.need_to_release.intersection(song_state):
                     self.need_to_release = self.need_to_release.union(self.pressed_notes)
@@ -105,6 +107,15 @@ class Player:
                     self.pressed_notes = set()
                     self.need_to_release = set()
                 time.sleep(.01)
+
+    def ignore_channel(self, channel):
+        if channel < 16:
+            if channel in self.ignored_channels:
+                self.ignored_channels.remove(channel)
+            else:
+                self.ignored_channels.add(channel)
+
+        self.set_state(self.song_position)
 
     def set_loop_start_to_position(self):
         '''Set the beginning of the play loop to the current song position'''

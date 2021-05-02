@@ -83,9 +83,17 @@ class MIDIInterface:
                     self.active_notes_map[tick_counter][event.note] = event
                 tick_counter += 1
 
-    def get_state(self, tick):
+    def get_state(self, tick, ignored_channels=None):
         '''Get a list of the notes currently 'On' at specified position'''
-        return self.state_map[tick].copy()
+        if not ignored_channels:
+            state = self.state_map[tick].copy()
+        else:
+            state = set()
+            for note, event in self.active_notes_map[tick].items():
+                if event.channel not in ignored_channels:
+                    state.add(note)
+
+        return state
 
     def get_active_channels(self, tick):
         active = set()

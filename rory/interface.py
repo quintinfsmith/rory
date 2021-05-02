@@ -74,6 +74,17 @@ class RoryStage:
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
+            'i',
+            playerscene.ignore_channel
+        )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'u',
+            playerscene.unignore_channels
+        )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
             'k',
             player.prev_state
         )
@@ -272,12 +283,12 @@ class PlayerScene(RoryScene):
         self.last_rendered_pressed = None
         self.last_rendered_position = -1
         self.last_rendered_loop = (0, 0)
-
+        self.last_rendered_ignored_channels = None
         self.rect_help_menu = None
         self.flag_show_menu = False
 
         self.mapped_colors = {}
-
+        self.rechanneled = {}
     def tick(self):
         was_flagged = False
         player = self.player
@@ -287,11 +298,12 @@ class PlayerScene(RoryScene):
             was_flagged = True
 
         song_position = player.song_position
-        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop:
+        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels:
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
             self.last_rendered_pressed = None
+            self.last_rendered_ignored_channels = self.player.ignored_channels.copy()
             was_flagged = True
 
         if player.pressed_notes != self.last_rendered_pressed:
@@ -549,6 +561,8 @@ class PlayerScene(RoryScene):
             "0-9  - Set register",
             "esc  - Clear register",
             "j/k  - Next/previous state",
+            "i    - Ignore the channel in register",
+            "u    - Unignore all channels",
             "p    - Jump to state in register",
             "[    - Set start of loop",
             "]    - Set end of loop",
@@ -594,11 +608,29 @@ class PlayerScene(RoryScene):
 
         return position
 
+    def ignore_channel(self):
+        try:
+            channel = self.rechanneled[self.player.register]
+        except KeyError:
+            return
+
+        self.player.clear_register()
+        self.player.ignore_channel(channel)
+
+    def unignore_channels(self):
+        for channel in self.player.ignored_channels.copy():
+            self.player.ignore_channel(channel)
+
+
     def get_channel_color(self, channel):
         if channel not in self.mapped_colors:
+            self.rechanneled[len(self.mapped_colors) % len(self.COLORORDER)] = channel
             self.mapped_colors[channel] = self.COLORORDER[len(self.mapped_colors) % len(self.COLORORDER)]
 
-        color = self.mapped_colors[channel]
+        if channel in self.player.ignored_channels:
+            color = wrecked.BRIGHTBLACK
+        else:
+            color = self.mapped_colors[channel]
         return color
 
     def kill(self):
