@@ -15,15 +15,26 @@ class Player:
 
     def next_state(self):
         '''Change the song position to the next state with notes.'''
-        self.song_position += 1
-        while self.song_position <= self.loop[1] \
-        and not self.midi_interface.get_state(self.song_position, self.ignored_channels):
-            self.song_position += 1
+        new_position = self.song_position + 1
+        while new_position <= self.loop[1] \
+        and not self.midi_interface.get_state(new_position, self.ignored_channels):
+            new_position += 1
 
-        self.song_position = min(self.loop[1] + 1, self.song_position)
+        new_position = min(self.loop[1] + 1, new_position)
 
-        if self.song_position > self.loop[1]:
-            self.song_position = self.loop[0]
+
+        if new_position > self.loop[1]:
+            new_position = self.loop[0]
+            self.song_position = new_position
+        elif self.use_time_delay:
+            delay = self.calculate_delay(new_position)
+            diff = new_position - self.song_position
+            delay = delay / diff
+            for i in range(diff):
+                time.sleep(delay)
+                self.song_position += 1
+        else:
+            self.song_position = new_position
 
 
     def prev_state(self):
@@ -63,6 +74,11 @@ class Player:
         self.ignored_channels = set()
 
         self.midi_controller = kwargs['controller']
+
+        self.use_time_delay = False
+        if "use_delay" in kwargs.keys():
+            self.use_time_delay = kwargs["use_delay"]
+
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
         self.clear_loop()
 
@@ -77,6 +93,16 @@ class Player:
 
         self.midi_input_thread.start()
         self.next_state()
+
+
+    def calculate_delay(self, new_pos):
+        tick_wait = self.midi_interface.get_tick_wait(self.song_position, new_pos)
+        t = tick_wait / self.active_midi.ppqn
+
+        seconds_per_beat = 60 / self.midi_interface.get_tempo(self.song_position)
+        actual_wait = t * seconds_per_beat
+
+        return actual_wait
 
     def midi_input_daemon(self):
         '''Listen for and handle midi events coming from the MIDI controller'''
