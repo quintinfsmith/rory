@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
 #from apres import NoteOn, NoteOff
-from apres import NoteOn
+from apres import NoteOn, SetTempo
 
 def greatest_common_divisor(number_a, number_b):
     '''Euclid's method'''
@@ -22,6 +22,8 @@ class MIDIInterface:
         self.state_map = []
         self.active_notes_map = []
         self.measure_map = {} # { state_position: measure_number }
+        self.timing_map = {0: 0}
+        self.tempo_map = {0: 120}
 
         self.transpose = 0
         if 'transpose' in kwargs:
@@ -35,19 +37,23 @@ class MIDIInterface:
                 while len(beats) <= current_beat_tick:
                     beats.append([])
 
-                beats[current_beat_tick].append((tick % self.midi.ppqn, event))
+                beats[current_beat_tick].append((tick % self.midi.ppqn, event, tick))
+
+            elif event.__class__ == SetTempo:
+                self.tempo_map[tick] = event.get_bpm()
 
         tick_counter = 0
         for beat, events in enumerate(beats):
+            beat_tick = beat * self.midi.ppqn
             diffs = set()
 
             prev = 0
             active_count = 0
             delta_pairs = []
-            for pos, event in events:
+            for pos, event, real_tick in events:
                 delta = pos - prev
                 diffs.add(delta)
-                delta_pairs.append((delta, event))
+                delta_pairs.append((delta, (event, real_tick)))
                 prev = pos
                 active_count += 1
 
@@ -57,31 +63,96 @@ class MIDIInterface:
             diffs.sort()
 
             tmp_ticks = []
-            if active_count:
-                tmp_ticks.append([])
+            tmp_ticks.append([])
 
-            for delta, event in delta_pairs:
-                k = diffs.index(delta)
-                for _ in range(k):
-                    tmp_ticks.append([])
-                tmp_ticks[-1].append(event)
+            if delta_pairs:
+                for delta, event in delta_pairs:
+                    k = diffs.index(delta)
+                    for _ in range(k):
+                        tmp_ticks.append([])
+                    tmp_ticks[-1].append(event)
 
-            if active_count:
                 k = diffs.index(self.midi.ppqn - 1 - prev)
                 for _ in range(k):
+                    tmp_ticks.append([])
+            else:
+                for _ in range(3):
                     tmp_ticks.append([])
 
 
             self.measure_map[tick_counter] = beat
             for tick_events in tmp_ticks:
-                for event in tick_events:
+                for (event, real_tick) in tick_events:
                     event.set_note(event.note + self.transpose)
                     while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
                         self.active_notes_map.append({})
                     self.state_map[tick_counter].add(event.note)
                     self.active_notes_map[tick_counter][event.note] = event
+                    self.timing_map[tick_counter] = real_tick
                 tick_counter += 1
+
+    def get_tempo(self, song_position):
+        real_tick = self.get_real_tick(song_position)
+        output = 120
+        for tick, tempo in list(self.tempo_map.items())[::-1]:
+            if real_tick > tick:
+                output = tempo
+                break
+        return output
+
+    def get_real_tick(self, song_position):
+        first_post = song_position
+        last_post = song_position
+        keys = self.timing_map.keys()
+        max_tick = max(keys)
+        min_tick = min(keys)
+
+        divs = 0
+        while first_post not in keys and first_post > min_tick:
+            first_post -= 1
+            divs += 1
+
+        while last_post not in keys and last_post <= max_tick:
+            last_post += 1
+            divs += 1
+
+        if last_post > max_tick:
+            diff = len(self.midi) - self.timing_map[first_post]
+        else:
+            diff = self.timing_map[last_post] - self.timing_map[first_post]
+
+        if divs:
+            diff //= divs
+
+        return diff + self.timing_map[first_post]
+
+    def get_tick_wait(self, song_position, new_position):
+        first_post = song_position
+        last_post = new_position
+        keys = self.timing_map.keys()
+        max_tick = max(keys)
+        min_tick = min(keys)
+
+        divs = 0
+        while first_post not in keys and first_post > min_tick:
+            first_post -= 1
+            divs += 1
+
+        while last_post not in keys and last_post <= max_tick:
+            last_post += 1
+            divs += 1
+
+        if last_post > max_tick:
+            diff = len(self.midi) - self.timing_map[first_post]
+        else:
+            diff = self.timing_map[last_post] - self.timing_map[first_post]
+
+        if divs:
+            diff //= divs
+
+        return diff
+
 
     def get_state(self, tick, ignored_channels=None):
         '''Get a list of the notes currently 'On' at specified position'''

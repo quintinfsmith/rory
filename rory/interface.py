@@ -74,6 +74,12 @@ class RoryStage:
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
+            ".",
+            playerscene.use_tempo
+        )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
             'i',
             playerscene.ignore_channel
         )
@@ -196,6 +202,8 @@ class RoryStage:
                     raise e
             time.sleep(self.delay)
 
+
+
     def start_scene(self, new_scene_key):
         if self.active_scene:
             self.scenes[self.active_scene].disable()
@@ -289,6 +297,10 @@ class PlayerScene(RoryScene):
 
         self.mapped_colors = {}
         self.rechanneled = {}
+
+    def use_tempo(self):
+        self.player.use_time_delay = not self.player.use_time_delay
+
     def tick(self):
         was_flagged = False
         player = self.player
