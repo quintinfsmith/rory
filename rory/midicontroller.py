@@ -3,7 +3,7 @@ import os
 import time
 import select
 import pyinotify
-from apres import NoteOn, NoteOff, MIDIStop
+from apres import NoteOn, NoteOff, MIDIStop, ControlChange
 
 class PipeClosed(Exception):
     '''Error Thrown when the midi device pipe is closed or disconnected'''
@@ -111,7 +111,11 @@ class MIDIController:
         output = None
         try:
             byte = self.check_byte()
-            if byte & 0xF0 == 0x90:
+            if byte & 0xF0 == 0xB0:
+                controller = self.check_byte()
+                value = self.check_byte()
+                output = ControlChange(channel=(byte & 0x0F), value=value, controller=controller)
+            elif byte & 0xF0 == 0x90:
                 note = self.check_byte()
                 velocity = self.check_byte()
                 if velocity == 0:
@@ -122,6 +126,14 @@ class MIDIController:
                 note = self.check_byte()
                 velocity = self.check_byte()
                 output = NoteOff(note=note, velocity=velocity, channel=(byte & 0x0F))
+            elif byte & 0xF0 == 0xC0:
+                for i in range(1):
+                    self.check_byte()
+            elif byte == 0xFF:
+                _meta_type = self.check_byte()
+                for i in range(self.check_byte()):
+                    self.check_byte()
+
         except PipeClosed:
             output = MIDIStop()
 
