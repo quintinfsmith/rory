@@ -4,8 +4,6 @@ import time
 import wrecked
 from wrecked import get_terminal_size
 from apres import MIDI, InvalidMIDIFile
-
-from rory.midicontroller import MIDIController
 from rory.player import Player
 from rory.interactor import Interactor
 
@@ -26,7 +24,6 @@ class RoryStage:
             raise TerminalTooNarrow()
 
         self.interactor = Interactor()
-        self.midi_controller = MIDIController()
         self.interactor.assign_context_sequence(
             self.CONTEXT_DEFAULT,
             'q',
@@ -56,7 +53,6 @@ class RoryStage:
             scene = PlayerScene(
                 self,
                 path=midi_path,
-                controller=self.midi_controller,
                 transpose=transpose
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
@@ -262,7 +258,6 @@ class PlayerScene(RoryScene):
         super().__init__(rorystage)
 
         self.active_midi = MIDI(kwargs['path'])
-        self.midi_controller = kwargs['controller']
 
         self.rect_inner = self.root.new_rect()
         self.rect_background = self.rect_inner.new_rect()
@@ -318,7 +313,7 @@ class PlayerScene(RoryScene):
             self.last_rendered_ignored_channels = self.player.ignored_channels.copy()
             was_flagged = True
 
-        if player.pressed_notes != self.last_rendered_pressed:
+        if player.get_pressed_notes() != self.last_rendered_pressed:
             self.__draw_pressed_row()
             was_flagged = True
 
@@ -481,7 +476,7 @@ class PlayerScene(RoryScene):
 
         y = self.rect_inner.height - self.active_row_position
 
-        pressed_notes = player.pressed_notes.copy()
+        pressed_notes = player.get_pressed_notes()
         for note in pressed_notes:
             x = self.__get_displayed_key_position(note)
 

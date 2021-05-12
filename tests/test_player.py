@@ -2,9 +2,9 @@ import unittest
 import time
 import os
 import apres
+from apres import MIDIController
 
-from rory.player import Player
-from rory.midicontroller import MIDIController
+from rory.player import Player, RoryController
 
 class PlayerTest(unittest.TestCase):
     def setUp(self):
@@ -42,15 +42,12 @@ class PlayerTest(unittest.TestCase):
         self.test_midi.save(self.test_midi_path)
 
         self.midi_controller_path = "testdev/mididev"
-        self.controller = MIDIController(self.midi_controller_path)
+        os.system("touch %s" % self.midi_controller_path)
 
         self.player = Player(
             path=self.test_midi_path,
-            controller=self.controller
+            controller_path=self.midi_controller_path
         )
-
-        with open('ttt', 'w') as fp:
-            fp.write(str(self.player.midi_interface.state_map))
 
     def tearDown(self):
         os.system("rm testdev -rf")
@@ -134,8 +131,8 @@ class PlayerTest(unittest.TestCase):
 
     def test_input_daemon(self):
         self.player.set_state(0)
-
         assert self.player.song_position == 1
+        assert self.player.midi_controller.is_connected()
 
         # Midi note 64 ON (Correct Key)
         with open(self.midi_controller_path, "ab") as fp:

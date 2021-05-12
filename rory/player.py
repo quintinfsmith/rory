@@ -2,8 +2,48 @@
 import threading
 import time
 
-from apres import MIDI, NoteOn, NoteOff
+from apres import MIDI, NoteOn, NoteOff, MIDIController
 from rory.midiinterface import MIDIInterface
+
+
+class RoryController(MIDIController):
+    def __init__(self, player, path=""):
+        self.player = player
+        super().__init__(path)
+        self.pressed = set()
+
+    def hook_NoteOn(self, event):
+        if event.velocity == 0:
+            self.release_note(event.note)
+        else:
+            self.press_note(event.note)
+
+    def hook_NoteOff(self, event):
+        self.release_note(event.note)
+
+    def press_note(self, note):
+        self.pressed.add(note)
+        self.player.do_state_check()
+
+    def release_note(self, note):
+        try:
+            self.pressed.remove(note)
+        except KeyError:
+            pass
+        try:
+            self.player.need_to_release.remove(note)
+        except KeyError:
+            pass
+        self.player.do_state_check()
+
+    def connect(self, midipath):
+        self.player.need_to_release = set()
+        super().connect(midipath)
+        # Automatically start listening for input on connect
+        input_thread = threading.Thread(
+            target=self.listen
+        )
+        input_thread.start()
 
 class Player:
     '''Plays MIDILike Objects'''
@@ -21,7 +61,6 @@ class Player:
             new_position += 1
 
         new_position = min(self.loop[1] + 1, new_position)
-
 
         if new_position > self.loop[1]:
             new_position = self.loop[0]
@@ -73,7 +112,10 @@ class Player:
 
         self.ignored_channels = set()
 
-        self.midi_controller = kwargs['controller']
+        if 'controller_path' in kwargs:
+            self.midi_controller = RoryController(self, kwargs['controller_path'])
+        else:
+            self.midi_controller = RoryController(self)
 
         self.use_time_delay = False
         if "use_delay" in kwargs.keys():
@@ -82,16 +124,10 @@ class Player:
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
         self.clear_loop()
 
-        self.pressed_notes = set()
         self.need_to_release = set()
 
         self.song_position = -1
 
-        self.midi_input_thread = threading.Thread(
-            target=self.midi_input_daemon
-        )
-
-        self.midi_input_thread.start()
         self.next_state()
 
 
@@ -104,35 +140,16 @@ class Player:
 
         return actual_wait
 
-    def midi_input_daemon(self):
-        '''Listen for and handle midi events coming from the MIDI controller'''
-        song_state = set()
-        while self.is_active:
-            if self.midi_controller.is_connected():
-                message = self.midi_controller.read()
-                if message:
-                    if isinstance(message, NoteOn):
-                        self.pressed_notes.add(message.note)
-                    elif isinstance(message, NoteOff):
-                        try:
-                            self.pressed_notes.remove(message.note)
-                        except KeyError:
-                            pass
+    def get_pressed_notes(self):
+        return self.midi_controller.pressed.copy()
 
-                        try:
-                            self.need_to_release.remove(message.note)
-                        except KeyError:
-                            pass
-                    song_state = self.midi_interface.get_state(self.song_position, self.ignored_channels)
-                if song_state.intersection(self.pressed_notes) == song_state \
-                and not self.need_to_release.intersection(song_state):
-                    self.need_to_release = self.need_to_release.union(self.pressed_notes)
-                    self.next_state()
-            else:
-                if self.pressed_notes:
-                    self.pressed_notes = set()
-                    self.need_to_release = set()
-                time.sleep(.01)
+    def do_state_check(self):
+        song_state = self.midi_interface.get_state(self.song_position, self.ignored_channels)
+        pressed = self.get_pressed_notes()
+        if song_state.intersection(pressed) == song_state \
+        and not self.need_to_release.intersection(song_state):
+            self.need_to_release = self.need_to_release.union(pressed)
+            self.next_state()
 
     def ignore_channel(self, channel):
         if channel < 16:
