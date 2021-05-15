@@ -4,13 +4,48 @@ import time
 
 from apres import MIDI, NoteOn, NoteOff, MIDIController
 from rory.midiinterface import MIDIInterface
+import pyinotify
+import os
 
+class TaskHandler(pyinotify.ProcessEvent):
+    '''Event hooks to connect/disconnect from newly made midi device'''
+    def __init__(self, controller):
+        self.controller = controller
+        super().__init__()
+
+    def process_IN_CREATE(self, event):
+        '''Hook to connect when midi device is plugged in'''
+        if event.name[0:4] == 'midi':
+            time.sleep(.5)
+            self.controller.connect(event.pathname)
+
+    def process_IN_DELETE(self, event):
+        '''Hook to disconnect when midi device is unplugged'''
+        if self.controller.midipath == event.pathname:
+            self.controller.disconnect(event.pathname)
 
 class RoryController(MIDIController):
     def __init__(self, player, path=""):
         self.player = player
+
+        if not path:
+            for f in os.listdir("/dev/"):
+                if "midi" in f:
+                    path = "/dev/%s" % f
+                    break
+
         super().__init__(path)
+
         self.pressed = set()
+
+        self.watch_manager = pyinotify.WatchManager()
+        notifier = pyinotify.ThreadedNotifier(self.watch_manager, TaskHandler(self))
+        notifier.daemon = True
+        notifier.start()
+        self.watch_manager.add_watch(
+            "/dev/",
+            pyinotify.IN_CREATE | pyinotify.IN_DELETE
+        )
 
     def hook_NoteOn(self, event):
         if event.velocity == 0:
