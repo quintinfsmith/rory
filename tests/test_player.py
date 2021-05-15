@@ -8,8 +8,6 @@ from rory.player import Player, RoryController
 
 class PlayerTest(unittest.TestCase):
     def setUp(self):
-        self.original_devroot = MIDIController.DEVROOT
-        MIDIController.DEVROOT = 'testdev/'
         try:
             os.mkdir('testdev')
         except: pass
@@ -51,7 +49,6 @@ class PlayerTest(unittest.TestCase):
 
     def tearDown(self):
         os.system("rm testdev -rf")
-        MIDIController.DEVROOT = self.original_devroot
         if os.path.isfile(self.test_midi_path):
             os.remove(self.test_midi_path)
         self.player.kill()
