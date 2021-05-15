@@ -174,8 +174,6 @@ class RoryStage:
     def play(self):
         self.playing = True
 
-        #thread = threading.Thread(target=self._input_daemon)
-        #thread.start()
         play_thread = threading.Thread(target=self._play)
         play_thread.start()
 
@@ -197,8 +195,6 @@ class RoryStage:
                     self.kill()
                     raise e
             time.sleep(self.delay)
-
-
 
     def start_scene(self, new_scene_key):
         if self.active_scene:
@@ -274,10 +270,20 @@ class PlayerScene(RoryScene):
         self.rect_position_display = self.rect_background.new_rect()
         self.rect_position_display.bold()
         self.rect_position_display.underline()
+        self.rect_position_display.set_bg_color(wrecked.BLACK)
+        self.rect_position_display.set_fg_color(wrecked.WHITE)
         self.rect_chord_names = self.rect_background.new_rect()
         self.rect_chord_names.bold()
         self.rect_chord_names.underline()
+        self.rect_chord_names.set_bg_color(wrecked.BLACK)
+        self.rect_chord_names.set_fg_color(wrecked.WHITE)
 
+        self.rect_background.set_bg_color(wrecked.BLACK)
+        self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
+        self.rect_loop_start.set_bg_color(wrecked.BLACK)
+        self.rect_loop_end.set_bg_color(wrecked.BLACK)
+        self.rect_loop_start.set_fg_color(wrecked.BRIGHTWHITE)
+        self.rect_loop_end.set_fg_color(wrecked.BRIGHTWHITE)
 
         self.active_row_position = 8
         self.player = Player(**kwargs)
@@ -392,6 +398,7 @@ class PlayerScene(RoryScene):
                     note_rect.set_fg_color(wrecked.BLACK)
                 else:
                     note_rect.set_fg_color(color)
+                    note_rect.set_bg_color(wrecked.BLACK)
 
                 self.visible_note_rects.append(note_rect)
 
@@ -407,6 +414,7 @@ class PlayerScene(RoryScene):
                     line_rect.set_character(0, 0, '-')
                     line_rect.move(x, y)
                     line_rect.set_fg_color(wrecked.BRIGHTBLACK)
+                    line_rect.set_bg_color(wrecked.BLACK)
 
                     self.visible_note_rects.append(line_rect)
 
