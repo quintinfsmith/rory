@@ -490,6 +490,7 @@ class PlayerScene(RoryScene):
 
             note_rect = self.layer_active_notes.new_rect()
             note_rect.set_character(0, 0, chr(9473))
+            note_rect.set_bg_color(wrecked.BLACK)
             note_rect.move(x, 1)
 
             if note in player.need_to_release:
