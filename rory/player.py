@@ -147,16 +147,18 @@ class Player:
 
         self.ignored_channels = set()
 
-        if 'controller_path' in kwargs:
-            self.midi_controller = RoryController(self, kwargs['controller_path'])
-        else:
-            self.midi_controller = RoryController(self)
 
         self.use_time_delay = False
         if "use_delay" in kwargs.keys():
             self.use_time_delay = kwargs["use_delay"]
 
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
+
+        if 'controller_path' in kwargs:
+            self.midi_controller = RoryController(self, kwargs['controller_path'])
+        else:
+            self.midi_controller = RoryController(self)
+
         self.clear_loop()
 
         self.need_to_release = set()
