@@ -154,11 +154,6 @@ class Player:
 
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
 
-        if 'controller_path' in kwargs:
-            self.midi_controller = RoryController(self, kwargs['controller_path'])
-        else:
-            self.midi_controller = RoryController(self)
-
         self.clear_loop()
 
         self.need_to_release = set()
@@ -166,6 +161,12 @@ class Player:
         self.song_position = -1
 
         self.next_state()
+
+        if 'controller_path' in kwargs:
+            self.midi_controller = RoryController(self, kwargs['controller_path'])
+        else:
+            self.midi_controller = RoryController(self)
+
 
 
     def calculate_delay(self, new_pos):
