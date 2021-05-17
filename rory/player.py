@@ -22,7 +22,7 @@ class TaskHandler(pyinotify.ProcessEvent):
     def process_IN_DELETE(self, event):
         '''Hook to disconnect when midi device is unplugged'''
         if self.controller.midipath == event.pathname:
-            self.controller.disconnect(event.pathname)
+            self.controller.disconnect()
 
 class RoryController(MIDIController):
     def __init__(self, player, path=""):
@@ -73,12 +73,15 @@ class RoryController(MIDIController):
 
     def connect(self, midipath):
         self.player.need_to_release = set()
-        super().connect(midipath)
-        # Automatically start listening for input on connect
-        input_thread = threading.Thread(
-            target=self.listen
-        )
-        input_thread.start()
+        try:
+            super().connect(midipath)
+            # Automatically start listening for input on connect
+            input_thread = threading.Thread(
+                target=self.listen
+            )
+            input_thread.start()
+        except FileNotFoundError:
+            pass
 
 class Player:
     '''Plays MIDILike Objects'''
