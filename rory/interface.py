@@ -403,7 +403,11 @@ class PlayerScene(RoryScene):
                 self.visible_note_rects.append(note_rect)
 
             # Draw Measure Lines
-            if tick in midi_interface.measure_map.keys() and _y != self.active_row_position:
+            if tick in midi_interface.beat_map.keys() and _y != self.active_row_position:
+                if tick in midi_interface.measure_map:
+                    line_char = '-'
+                else:
+                    line_char = "."
                 for x in range(2, self.rect_background.width, 4):
                     if x in blocked_xs:
                         continue
@@ -411,7 +415,7 @@ class PlayerScene(RoryScene):
                         continue
 
                     line_rect = self.layer_visible_notes.new_rect()
-                    line_rect.set_character(0, 0, '-')
+                    line_rect.set_character(0, 0, line_char)
                     line_rect.move(x, y)
                     line_rect.set_fg_color(wrecked.BRIGHTBLACK)
                     line_rect.set_bg_color(wrecked.BLACK)
@@ -441,8 +445,10 @@ class PlayerScene(RoryScene):
 
         # Active Row Line
         active_y = self.rect_background.height - self.active_row_position
-        if song_position in midi_interface.measure_map.keys():
+        if song_position in midi_interface.measure_map:
             line_char = chr(9552)
+        elif song_position in midi_interface.beat_map:
+            line_char = chr(9476)
         else:
             line_char = chr(9472)
 

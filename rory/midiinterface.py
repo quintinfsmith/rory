@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
 #from apres import NoteOn, NoteOff
-from apres import NoteOn, SetTempo
+from apres import NoteOn, SetTempo, TimeSignature
 
 def greatest_common_divisor(number_a, number_b):
     '''Euclid's method'''
@@ -21,15 +21,18 @@ class MIDIInterface:
         # For quick access to which keys are pressed
         self.state_map = []
         self.active_notes_map = []
+        self.beat_map = {}
         self.measure_map = {} # { state_position: measure_number }
         self.timing_map = {0: 0}
         self.tempo_map = {0: 120}
+        self.time_signature_map = {0: (4,4)}
 
         self.transpose = 0
         if 'transpose' in kwargs:
             self.transpose = kwargs['transpose']
 
         beats = []
+        last_tick = 0
         for tick, event in self.midi.get_all_events():
             if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
                 current_beat_tick = tick // self.midi.ppqn
@@ -41,6 +44,29 @@ class MIDIInterface:
 
             elif event.__class__ == SetTempo:
                 self.tempo_map[tick] = event.get_bpm()
+            elif isinstance(event, TimeSignature):
+                self.time_signature_map[tick] = (event.numerator, event.denominator)
+            last_tick = max(last_tick, tick)
+
+        ordered_time_signatures = list(self.time_signature_map.keys())
+        ordered_time_signatures.sort()
+        current_tick = ordered_time_signatures.pop(0)
+        counter = 0
+        real_measure_map = {}
+        for i in range(len(ordered_time_signatures) + 1):
+            if ordered_time_signatures:
+                next_tick = ordered_time_signatures.pop(0)
+            else:
+                next_tick = last_tick
+
+            ts = self.time_signature_map[current_tick]
+            diff = next_tick - current_tick
+            beat_size = (2 * self.midi.ppqn) // ts[1]
+
+            measure_size = beat_size * ts[0]
+            for i in range(diff // measure_size):
+                real_measure_map[current_tick + (i * measure_size)] = counter
+                counter += 1
 
         tick_counter = 0
         for beat, events in enumerate(beats):
@@ -79,10 +105,12 @@ class MIDIInterface:
                 for _ in range(3):
                     tmp_ticks.append([])
 
+            if beat_tick in real_measure_map:
+                self.measure_map[tick_counter] = real_measure_map[beat_tick]
 
-            self.measure_map[tick_counter] = beat
-            for tick_events in tmp_ticks:
-                for (event, real_tick) in tick_events:
+            self.beat_map[tick_counter] = beat
+            for i, tick_events in enumerate(tmp_ticks):
+                for j, (event, real_tick) in enumerate(tick_events):
                     event.set_note(event.note + self.transpose)
                     while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
@@ -90,7 +118,9 @@ class MIDIInterface:
                     self.state_map[tick_counter].add(event.note)
                     self.active_notes_map[tick_counter][event.note] = event
                     self.timing_map[tick_counter] = real_tick
+
                 tick_counter += 1
+
 
     def get_tempo(self, song_position):
         real_tick = self.get_real_tick(song_position)
