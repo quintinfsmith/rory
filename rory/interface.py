@@ -406,9 +406,11 @@ class PlayerScene(RoryScene):
             if tick in midi_interface.beat_map.keys() and _y != self.active_row_position:
                 if tick in midi_interface.measure_map:
                     line_char = '-'
+                    base = 4
                 else:
                     line_char = "."
-                for x in range(2, self.rect_background.width, 4):
+                    base = 8
+                for x in range(2, self.rect_background.width, base):
                     if x in blocked_xs:
                         continue
                     if x % 14 == 0:
