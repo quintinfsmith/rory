@@ -15,6 +15,8 @@ def greatest_common_divisor(number_a, number_b):
 
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
+    notelist = 'CCDDEFFGGAAB'
+
     def __init__(self, midi, **kwargs):
         self.midi = midi
         self._calculated_beatmeasures = {}
@@ -53,19 +55,19 @@ class MIDIInterface:
         current_tick = ordered_time_signatures.pop(0)
         counter = 0
         real_measure_map = {}
-        for i in range(len(ordered_time_signatures) + 1):
+        for _ in range(len(ordered_time_signatures) + 1):
             if ordered_time_signatures:
                 next_tick = ordered_time_signatures.pop(0)
             else:
                 next_tick = last_tick
 
-            ts = self.time_signature_map[current_tick]
+            time_signature = self.time_signature_map[current_tick]
             diff = next_tick - current_tick
-            beat_size = (2 * self.midi.ppqn) // ts[1]
+            beat_size = (2 * self.midi.ppqn) // time_signature[1]
 
-            measure_size = beat_size * ts[0]
-            for i in range(diff // measure_size):
-                real_measure_map[current_tick + (i * measure_size)] = counter
+            measure_size = beat_size * time_signature[0]
+            for j in range(diff // measure_size):
+                real_measure_map[current_tick + (j * measure_size)] = counter
                 counter += 1
 
         tick_counter = 0
@@ -109,8 +111,8 @@ class MIDIInterface:
                 self.measure_map[tick_counter] = real_measure_map[beat_tick]
 
             self.beat_map[tick_counter] = beat
-            for i, tick_events in enumerate(tmp_ticks):
-                for j, (event, real_tick) in enumerate(tick_events):
+            for _i, tick_events in enumerate(tmp_ticks):
+                for _j, (event, real_tick) in enumerate(tick_events):
                     event.set_note(event.note + self.transpose)
                     while len(self.state_map) <= tick_counter:
                         self.state_map.append(set())
@@ -123,6 +125,7 @@ class MIDIInterface:
 
 
     def get_tempo(self, song_position):
+        ''' Get the tempo in BPM at a given song position '''
         real_tick = self.get_real_tick(song_position)
         output = 120
         for tick, tempo in list(self.tempo_map.items())[::-1]:
@@ -132,6 +135,7 @@ class MIDIInterface:
         return output
 
     def get_real_tick(self, song_position):
+        ''' Get the tick from before the midi is processed for playing '''
         first_post = song_position
         last_post = song_position
         keys = self.timing_map.keys()
@@ -158,6 +162,7 @@ class MIDIInterface:
         return diff + self.timing_map[first_post]
 
     def get_tick_wait(self, song_position, new_position):
+        ''' Calculate how long, in midi ticks, between to song positions '''
         first_post = song_position
         last_post = new_position
         keys = self.timing_map.keys()
@@ -197,13 +202,15 @@ class MIDIInterface:
         return state
 
     def get_active_channels(self, tick):
+        ''' Get set of channels present at a given position '''
         active = set()
-        for note, event in self.active_notes_map[tick].items():
+        for _note, event in self.active_notes_map[tick].items():
             active.add(event.channel)
 
         return active
 
     def get_chord_name(self, tick, channel):
+        ''' Attempt to detect the name of the chord being played at a given position '''
         chord_names = {
             (0, 3, 7): "m",
             (0, 4, 9): "m/1",
@@ -265,9 +272,9 @@ class MIDIInterface:
             if event.channel == channel:
                 pressed.append(note)
 
-        m = min(pressed)
-        for i, n in enumerate(pressed):
-            pressed[i] = (n - m) % 12
+        tonic = min(pressed)
+        for i, pressed_note in enumerate(pressed):
+            pressed[i] = (pressed_note - tonic) % 12
         pressed = list(set(pressed))
 
         pressed.sort()
@@ -277,30 +284,28 @@ class MIDIInterface:
             name = chord_names[pressed]
 
             if name[-2:] == "/1":
-                slash = self._get_note_name(m)
-                m += pressed[-1]
-                name = "%s%s%s" % (self._get_note_name(m), name[0:-1], slash)
+                slash = self.get_note_name(tonic)
+                tonic += pressed[-1]
+                name = "%s%s%s" % (self.get_note_name(tonic), name[0:-1], slash)
             elif name[-2:] == "/2":
-                slash = self._get_note_name(m)
-                m += pressed[-2]
-                name = "%s%s%s" % (self._get_note_name(m), name[0:-1], slash)
+                slash = self.get_note_name(tonic)
+                tonic += pressed[-2]
+                name = "%s%s%s" % (self.get_note_name(tonic), name[0:-1], slash)
             else:
-                name = self._get_note_name(m) + name
+                name = self.get_note_name(tonic) + name
 
         else:
             name = ""
         return name
 
+    def __len__(self):
+        return len(self.state_map)
 
-    def _get_note_name(self, n):
-        NOTELIST = 'CCDDEFFGGAAB'
-
-        name = NOTELIST[n % len(NOTELIST)]
-        if n % len(NOTELIST) in (1,3,6,8,10):
+    @staticmethod
+    def get_note_name(midi_note):
+        ''' Get note's letter name '''
+        name = MIDIInterface.notelist[midi_note % len(MIDIInterface.notelist)]
+        if midi_note % len(MIDIInterface.notelist) in (1,3,6,8,10):
             name += "#"
 
         return name
-
-
-    def __len__(self):
-        return len(self.state_map)

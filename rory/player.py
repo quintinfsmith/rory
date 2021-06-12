@@ -1,11 +1,11 @@
 '''Plays MIDILike Objects'''
 import threading
 import time
-
-from apres import MIDI, NoteOn, NoteOff, MIDIController
-from rory.midiinterface import MIDIInterface
-import pyinotify
 import os
+import pyinotify
+
+from apres import MIDI, MIDIController
+from rory.midiinterface import MIDIInterface
 
 class TaskHandler(pyinotify.ProcessEvent):
     '''Event hooks to connect/disconnect from newly made midi device'''
@@ -29,9 +29,9 @@ class RoryController(MIDIController):
         self.player = player
 
         if not path:
-            for f in os.listdir("/dev/"):
-                if "midi" in f:
-                    path = "/dev/%s" % f
+            for filename in os.listdir("/dev/"):
+                if "midi" in filename:
+                    path = "/dev/%s" % filename
                     break
 
         super().__init__(path)
@@ -57,10 +57,13 @@ class RoryController(MIDIController):
         self.release_note(event.note)
 
     def press_note(self, note):
+        '''Press a Midi Note'''
         self.pressed.add(note)
         self.player.do_state_check()
 
     def release_note(self, note):
+        '''Release a Midi Note'''
+        self.pressed.add(note)
         try:
             self.pressed.remove(note)
         except KeyError:
@@ -71,10 +74,10 @@ class RoryController(MIDIController):
             pass
         self.player.do_state_check()
 
-    def connect(self, midipath):
+    def connect(self, path):
         self.player.need_to_release = set()
         try:
-            super().connect(midipath)
+            super().connect(path)
             # Automatically start listening for input on connect
             input_thread = threading.Thread(
                 target=self.listen
@@ -106,8 +109,8 @@ class Player:
         elif self.use_time_delay:
             delay = self.calculate_delay(new_position)
             diff = new_position - self.song_position
-            delay = delay / diff
-            for i in range(diff):
+            delay /= diff
+            for _ in range(diff):
                 time.sleep(delay)
                 self.song_position += 1
         else:
@@ -173,18 +176,24 @@ class Player:
 
 
     def calculate_delay(self, new_pos):
+        '''
+            Calculate the time, in seconds, that is theoritically in between
+            the current position and the given one
+        '''
         tick_wait = self.midi_interface.get_tick_wait(self.song_position, new_pos)
-        t = tick_wait / self.active_midi.ppqn
+        beats = tick_wait / self.active_midi.ppqn
 
         seconds_per_beat = 60 / self.midi_interface.get_tempo(self.song_position)
-        actual_wait = t * seconds_per_beat
+        actual_wait = beats * seconds_per_beat
 
         return actual_wait
 
     def get_pressed_notes(self):
+        ''' Get the notes that the midi device has held down '''
         return self.midi_controller.pressed.copy()
 
     def do_state_check(self):
+        ''' Check if the midi device is pressing the coresponding notes '''
         song_state = self.midi_interface.get_state(self.song_position, self.ignored_channels)
         pressed = self.get_pressed_notes()
         if song_state.intersection(pressed) == song_state \
@@ -192,7 +201,11 @@ class Player:
             self.need_to_release = self.need_to_release.union(pressed)
             self.next_state()
 
-    def ignore_channel(self, channel):
+    def toggle_ignore_channel(self, channel):
+        '''
+            Add or remove a channel to be ignored when considering
+            if the song position needs to be incremented or decremented
+        '''
         if channel < 16:
             if channel in self.ignored_channels:
                 self.ignored_channels.remove(channel)
