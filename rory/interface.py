@@ -30,7 +30,7 @@ class RoryStage:
             self.kill
         )
 
-        self.delay = 1/24
+        self.delay = 1/12
 
         self.playing = False
 
@@ -265,7 +265,6 @@ class PlayerScene(RoryScene):
         self.layer_active_notes = self.rect_background.new_rect()
 
         self.visible_note_rects = []
-        self.pressed_note_rects = {}
 
         self.rect_position_display = self.rect_background.new_rect()
         self.rect_position_display.bold()
@@ -479,20 +478,15 @@ class PlayerScene(RoryScene):
         self.last_rendered_loop = self.player.loop.copy()
 
     def __draw_pressed_row(self):
-        keys = list(self.pressed_note_rects.keys())
-        for key in keys:
-            self.pressed_note_rects[key].remove()
-            del self.pressed_note_rects[key]
-
         player = self.player
         midi_interface = player.midi_interface
         song_position = player.song_position
+        pressed_notes = player.get_pressed_notes()
 
         active_state = midi_interface.get_state(song_position)
 
         y = self.rect_inner.height - self.active_row_position
 
-        pressed_notes = player.get_pressed_notes()
         for note in pressed_notes:
             x = self.__get_displayed_key_position(note)
 
@@ -511,8 +505,6 @@ class PlayerScene(RoryScene):
                     note_rect.set_fg_color(wrecked.GREEN)
                 else:
                     note_rect.set_fg_color(wrecked.RED)
-
-            self.pressed_note_rects[note] = note_rect
 
         self.last_rendered_pressed = pressed_notes
 
