@@ -35,19 +35,23 @@ class MIDIInterface:
 
         beats = []
         last_tick = 0
+        current_beat_size = self.midi.ppqn
+        # TODO: Beat Detection needs an overhaul. can't use tick % beat_size,
+        # As beat size will change with differing denominators
         for tick, event in self.midi.get_all_events():
             if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
-                current_beat_tick = tick // self.midi.ppqn
+                current_beat_tick = tick // current_beat_size
 
                 while len(beats) <= current_beat_tick:
                     beats.append([])
 
-                beats[current_beat_tick].append((tick % self.midi.ppqn, event, tick))
+                beats[current_beat_tick].append((tick % current_beat_size, event, tick))
 
             elif event.__class__ == SetTempo:
                 self.tempo_map[tick] = event.get_bpm()
             elif isinstance(event, TimeSignature):
-                self.time_signature_map[tick] = (event.numerator, event.denominator)
+                self.time_signature_map[tick] = (event.numerator, 2 ** event.denominator)
+                current_beat_size = self.midi.ppqn * ((2 ** event.denominator) / 4))
             last_tick = max(last_tick, tick)
 
         ordered_time_signatures = list(self.time_signature_map.keys())
@@ -63,7 +67,7 @@ class MIDIInterface:
 
             time_signature = self.time_signature_map[current_tick]
             diff = next_tick - current_tick
-            beat_size = (2 * self.midi.ppqn) // time_signature[1]
+            beat_size = int(self.midi.ppqn * (time_signature[1] / 4))
 
             measure_size = beat_size * time_signature[0]
             for j in range(diff // measure_size):
@@ -71,6 +75,9 @@ class MIDIInterface:
                 counter += 1
 
         tick_counter = 0
+        current_measure = 0
+        self.inverse_measure_map = {}
+
         for beat, events in enumerate(beats):
             beat_tick = beat * self.midi.ppqn
             diffs = set()
@@ -109,6 +116,10 @@ class MIDIInterface:
 
             if beat_tick in real_measure_map:
                 self.measure_map[tick_counter] = real_measure_map[beat_tick]
+                current_measure = real_measure_map[beat_tick]
+                if not current_measure in self.inverse_measure_map:
+                    self.inverse_measure_map[current_measure] = tick_counter
+
 
             self.beat_map[tick_counter] = beat
             for _i, tick_events in enumerate(tmp_ticks):
@@ -122,6 +133,7 @@ class MIDIInterface:
                     self.timing_map[tick_counter] = real_tick
 
                 tick_counter += 1
+
 
 
     def get_tempo(self, song_position):
@@ -300,6 +312,21 @@ class MIDIInterface:
 
     def __len__(self):
         return len(self.state_map)
+
+    def get_first_tick_in_measure(self, measure):
+        measure = max(min(measure, max(list(self.inverse_measure_map.keys()))), 0)
+        return self.inverse_measure_map[measure]
+
+    def get_measure(self, tick):
+        keys = list(self.measure_map.keys())
+        keys.sort()
+        check = min(keys)
+        for k in keys:
+            if tick < k:
+                break
+            else:
+                check = k
+        return self.measure_map[check]
 
     @staticmethod
     def get_note_name(midi_note):

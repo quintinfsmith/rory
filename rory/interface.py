@@ -115,6 +115,11 @@ class RoryStage:
             'p',
             player.jump_to_register_position,
         )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'P',
+            playerscene.jump_to_register_measure,
+        )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
@@ -459,23 +464,37 @@ class PlayerScene(RoryScene):
 
         self.__draw_song_position()
 
+    def __get_measure(self, song_position):
+        return self.player.midi_interface.get_measure(song_position) + 1
+
     def __draw_song_position(self):
         song_position = self.player.song_position
         midi_interface = self.player.midi_interface
         state_map = midi_interface.state_map
-
         if self.player.loop != [0, len(state_map) - 1]:
             l = len(str(max(self.player.loop)))
             fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
             position_string = fmt_string % (self.player.loop[0], song_position, self.player.loop[1])
+
+            min_measure = self.__get_measure(self.player_loop[0])
+            max_measure = self.__get_measure(self.player_loop[1])
+            l = len(str(max_measure))
+            fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
+            measure_string = fmt_string % (min_measure, self.__get_measure(song_position), max_measure)
         else:
             l = len(str(len(state_map)))
             fmt_string = "%%0%dd/%%0%dd" % (l, l)
             position_string = fmt_string % (song_position, len(state_map))
 
-        self.rect_position_display.resize(len(position_string), 1)
-        self.rect_position_display.move(max(0, self.rect_background.width - len(position_string)), self.rect_background.height - 1)
-        self.rect_position_display.set_string(0, 0, position_string)
+            max_measure = self.__get_measure(len(state_map))
+            l = len(str(max_measure))
+            fmt_string = "%%0%dd/%%0%dd" % (l, l)
+            measure_string = fmt_string % (self.__get_measure(song_position), max_measure)
+
+        self.rect_position_display.resize(len(position_string), 2)
+        self.rect_position_display.move(max(0, self.rect_background.width - len(position_string)), self.rect_background.height - 2)
+        self.rect_position_display.set_string(len(position_string) - len(measure_string), 0, measure_string)
+        self.rect_position_display.set_string(0, 1, position_string)
         self.last_rendered_loop = self.player.loop.copy()
 
     def __draw_pressed_row(self):
@@ -671,3 +690,7 @@ class PlayerScene(RoryScene):
         super().draw()
         #self.rect_inner.draw()
 
+    def jump_to_register_measure(self):
+        register = self.player.register
+        self.player.clear_register()
+        self.player.set_measure(register - 1)
