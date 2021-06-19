@@ -35,23 +35,30 @@ class MIDIInterface:
 
         beats = []
         last_tick = 0
-        current_beat_size = self.midi.ppqn
-        # TODO: Beat Detection needs an overhaul. can't use tick % beat_size,
-        # As beat size will change with differing denominators
+        running_tick_count = (0, 0, 0) # 0: total, 1:beat_count, 2:last_tick_totalled
+        beat_size = self.midi.ppqn
         for tick, event in self.midi.get_all_events():
+            tick_diff = tick - running_tick_count[1]
             if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
-                current_beat_tick = tick // current_beat_size
+                current_beat = (tick_diff // beat_size) + running_tick_count[1]
 
-                while len(beats) <= current_beat_tick:
+                while len(beats) <= current_beat:
                     beats.append([])
 
-                beats[current_beat_tick].append((tick % current_beat_size, event, tick))
+                beats[current_beat].append((tick_diff % beat_size, event, tick))
 
             elif event.__class__ == SetTempo:
                 self.tempo_map[tick] = event.get_bpm()
+
             elif isinstance(event, TimeSignature):
+                running_tick_count = (
+                    running_tick_count[0] + (tick_diff * beat_size),
+                    running_tick_count[1] + (tick_diff // beat_size),
+                    tick
+                )
                 self.time_signature_map[tick] = (event.numerator, 2 ** event.denominator)
-                current_beat_size = self.midi.ppqn * ((2 ** event.denominator) / 4))
+                beat_size = int(self.midi.ppqn / ((2 ** event.denominator) / 4))
+
             last_tick = max(last_tick, tick)
 
         ordered_time_signatures = list(self.time_signature_map.keys())
