@@ -142,6 +142,10 @@ class Player:
         if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
 
+    def set_measure(self, measure):
+        state = self.midi_interface.get_first_tick_in_measure(measure)
+        self.set_state(state)
+
 
     def __init__(self, **kwargs):
         self.active_midi = MIDI(kwargs['path'])
