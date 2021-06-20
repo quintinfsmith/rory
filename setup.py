@@ -15,7 +15,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     license=__license__,
     keywords=[],
-    python_requires="~=3.0",
+    python_requires="~=3.7",
     py_modules=["rory"],
     entry_points={ "console_scripts": ["rory = rory:main"] },
     url="https://github.com/quintinfsmith/rory",
