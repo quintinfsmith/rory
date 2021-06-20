@@ -120,9 +120,10 @@ class PlayerTest(unittest.TestCase):
     def test_jump_to_register(self):
         for d in "10":
             self.player.set_register_digit(int(d))
+
         self.player.jump_to_register_position()
 
-        assert self.player.song_position == 11, "Didn't jump to register position"
+        assert self.player.song_position == 10, "Didn't jump to register position"
         assert self.player.register == 0, "Register wasn't cleared after jump"
 
 

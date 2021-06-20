@@ -1,11 +1,13 @@
 '''Interface between user and player'''
+from __future__ import annotations
 import threading
 import time
 import wrecked
-from wrecked import get_terminal_size
+from wrecked import get_terminal_size, Rect
 from apres import MIDI, InvalidMIDIFile
 from rory.player import Player
 from rory.interactor import Interactor
+from typing import Final
 
 class TerminalTooNarrow(Exception):
     '''Error thrown when the minimum width required isn't available'''
@@ -36,13 +38,13 @@ class RoryStage:
 
         self.playerscene = None
 
-    def set_fps(self, fps):
+    def set_fps(self, fps: float) -> None:
         self.delay = 1 / fps
 
-    def key_scene(self, key, scene):
+    def key_scene(self, key: int, scene: RoryScene):
         self.scenes[key] = scene
 
-    def play_along(self, midi_path, **kwargs):
+    def play_along(self, midi_path: str, **kwargs) -> None:
         '''Run the Player with the loaded MidiLike Object'''
 
         if not self.playerscene:
@@ -66,12 +68,6 @@ class RoryStage:
             self.CONTEXT_PLAYER,
             'j',
             player.next_state
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            ".",
-            playerscene.use_tempo
         )
 
         self.interactor.assign_context_sequence(
@@ -147,7 +143,7 @@ class RoryStage:
         self.start_scene(self.CONTEXT_PLAYER)
 
 
-    def kill(self):
+    def kill(self) -> None:
         self.playing = False
 
         for scene in self.scenes.values():
@@ -155,13 +151,13 @@ class RoryStage:
         wrecked.kill()
 
 
-    def _input_daemon(self):
+    def _input_daemon(self) -> None:
         '''Main loop, just handles computer keyboard input'''
 
         while self.playing:
             self.interactor.get_input()
 
-    def resize(self, width, height):
+    def resize(self, width: int, height: int) -> None:
         self.root.resize(width, height)
         try:
             scene = self.scenes[self.active_scene]
@@ -171,19 +167,19 @@ class RoryStage:
         if scene:
             scene.resize(width, height)
 
-    def _resize_check(self):
+    def _resize_check(self) -> None:
         if wrecked.fit_to_terminal():
             w, h = get_terminal_size()
             self.resize(w, h)
 
-    def play(self):
+    def play(self) -> None:
         self.playing = True
 
         play_thread = threading.Thread(target=self._play)
         play_thread.start()
 
 
-    def _play(self):
+    def _play(self) -> None:
         while self.playing:
             self._resize_check()
 
@@ -201,7 +197,7 @@ class RoryStage:
                     raise e
             time.sleep(self.delay)
 
-    def start_scene(self, new_scene_key):
+    def start_scene(self, new_scene_key: int) -> None:
         if self.active_scene:
             self.scenes[self.active_scene].disable()
 
@@ -209,40 +205,40 @@ class RoryStage:
         self.scenes[self.active_scene].enable()
         self.root.draw()
 
-    def new_rect(self):
+    def new_rect(self) -> Rect:
         rect = self.root.new_rect()
         rect.resize(self.root.width, self.root.height)
         return rect
 
 class RoryScene:
-    def __init__(self, rorystage):
+    def __init__(self, rorystage: RoryStage):
         self.root = rorystage.new_rect()
 
-    def disable(self):
+    def disable(self) -> None:
         self.root.disable()
 
-    def enable(self):
+    def enable(self) -> None:
         self.root.enable()
 
-    def draw(self):
+    def draw(self) -> None:
         self.root.draw()
 
-    def tick(self):
+    def tick(self) -> None:
         pass
 
-    def kill(self):
+    def kill(self) -> None:
         pass
 
-    def resize(self, new_width, new_height):
+    def resize(self, new_width: int, new_height: int) -> None:
         self.root.resize(new_width, new_height)
 
 class PlayerScene(RoryScene):
     '''Handles visualization of the Player'''
     # Display constants
-    SHARPS = (1, 3, 6, 8, 10)
-    NOTELIST = 'CCDDEFFGGAAB'
+    SHARPS: Final[tuple[int]] = (1, 3, 6, 8, 10)
+    NOTELIST: Final[str] = 'CCDDEFFGGAAB'
 
-    COLORORDER = [
+    COLORORDER: Final[list[int]] = [
         wrecked.BLUE,
         wrecked.CYAN,
         wrecked.WHITE,
@@ -255,7 +251,7 @@ class PlayerScene(RoryScene):
         wrecked.BRIGHTYELLOW
     ]
 
-    def __init__(self, rorystage, **kwargs):
+    def __init__(self, rorystage: RoryStage, **kwargs):
         super().__init__(rorystage)
 
         self.active_midi = MIDI(kwargs['path'])
@@ -303,10 +299,7 @@ class PlayerScene(RoryScene):
         self.mapped_colors = {}
         self.rechanneled = {}
 
-    def use_tempo(self):
-        self.player.use_time_delay = not self.player.use_time_delay
-
-    def tick(self):
+    def tick(self) -> bool:
         was_flagged = False
         player = self.player
         if self.FLAG_BACKGROUND:
@@ -344,10 +337,10 @@ class PlayerScene(RoryScene):
 
         return was_flagged
 
-    def toggle_help_menu(self):
+    def toggle_help_menu(self) -> None:
         self.flag_show_menu = not self.flag_show_menu
 
-    def __draw_chord_name(self):
+    def __draw_chord_name(self) -> None:
         midi_interface = self.player.midi_interface
         active_channels = midi_interface.get_active_channels(self.player.song_position)
         chord_names = []
@@ -361,7 +354,7 @@ class PlayerScene(RoryScene):
         self.rect_chord_names.move(0, self.rect_background.height - 1)
         self.rect_chord_names.set_string(0, 0, chord_string)
 
-    def __draw_visible_notes(self):
+    def __draw_visible_notes(self) -> None:
         while self.visible_note_rects:
             self.visible_note_rects.pop().remove()
 
@@ -463,10 +456,10 @@ class PlayerScene(RoryScene):
 
         self.__draw_song_position()
 
-    def __get_measure(self, song_position):
+    def __get_measure(self, song_position: int) -> int:
         return self.player.midi_interface.get_measure(song_position) + 1
 
-    def __draw_song_position(self):
+    def __draw_song_position(self) -> None:
         song_position = self.player.song_position
         midi_interface = self.player.midi_interface
         state_map = midi_interface.state_map
@@ -496,7 +489,7 @@ class PlayerScene(RoryScene):
         self.rect_position_display.set_string(0, 1, position_string)
         self.last_rendered_loop = self.player.loop.copy()
 
-    def __draw_pressed_row(self):
+    def __draw_pressed_row(self) -> None:
         player = self.player
         midi_interface = player.midi_interface
         song_position = player.song_position
@@ -527,7 +520,7 @@ class PlayerScene(RoryScene):
 
         self.last_rendered_pressed = pressed_notes
 
-    def __adjust_inner_rect_offset(self):
+    def __adjust_inner_rect_offset(self) -> None:
         player = self.player
         note_range = player.note_range
         width = self.__get_displayed_key_position(note_range[1] + 1)
@@ -543,7 +536,7 @@ class PlayerScene(RoryScene):
             self.root.set_character(inner_pos - 1, y, chr(9475))
             self.root.set_character(inner_pos + width, y, chr(9475))
 
-    def __draw_background(self):
+    def __draw_background(self) -> None:
         player = self.player
         note_range = player.note_range
         self.__adjust_inner_rect_offset()
@@ -582,7 +575,7 @@ class PlayerScene(RoryScene):
                 for j in range(y + 2, self.rect_background.height):
                     self.rect_background.set_character(x, j, chr(9550))
 
-    def draw_help_menu(self):
+    def draw_help_menu(self) -> None:
         if not self.rect_help_menu:
             self.rect_help_menu = self.root.new_rect()
 
@@ -627,10 +620,7 @@ class PlayerScene(RoryScene):
         for i, line in enumerate(lines):
             menu.set_string(2, 1 + i, line)
 
-
-
-
-    def __get_displayed_key_position(self, midi_key):
+    def __get_displayed_key_position(self, midi_key: int) -> int:
         piano_position = midi_key - self.player.note_range[0]
         octave = piano_position // 12
         piano_key = piano_position % 12
@@ -643,7 +633,7 @@ class PlayerScene(RoryScene):
 
         return position
 
-    def ignore_channel(self):
+    def ignore_channel(self) -> None:
         try:
             channel = self.rechanneled[self.player.register]
         except KeyError:
@@ -652,12 +642,12 @@ class PlayerScene(RoryScene):
         self.player.clear_register()
         self.player.ignore_channel(channel)
 
-    def unignore_channels(self):
+    def unignore_channels(self) -> None:
         for channel in self.player.ignored_channels.copy():
             self.player.ignore_channel(channel)
 
 
-    def get_channel_color(self, channel):
+    def get_channel_color(self, channel: int) -> int:
         if channel not in self.mapped_colors:
             self.rechanneled[len(self.mapped_colors) % len(self.COLORORDER)] = channel
             self.mapped_colors[channel] = self.COLORORDER[len(self.mapped_colors) % len(self.COLORORDER)]
@@ -668,21 +658,17 @@ class PlayerScene(RoryScene):
             color = self.mapped_colors[channel]
         return color
 
-    def kill(self):
+    def kill(self) -> None:
         ''' Tear down the player backend '''
         if self.player:
             self.player.kill()
 
-    def resize(self, new_width, new_height):
+    def resize(self, new_width: int, new_height: int) -> None:
         super().resize(max(new_width, self.rect_inner.width + 2), new_height)
         self.FLAG_BACKGROUND = True
         self.last_rendered_position = -1
 
-    def draw(self):
-        super().draw()
-        #self.rect_inner.draw()
-
-    def jump_to_register_measure(self):
+    def jump_to_register_measure(self) -> None:
         register = self.player.register
         self.player.clear_register()
         self.player.set_measure(register - 1)
