@@ -161,7 +161,7 @@ class Player:
 
 
 class RoryController(MIDIController):
-    def __init__(self, player: Player, path: str = ""):
+    def __init__(self, player: Player, path: str = "") -> None:
         self.player = player
 
         if not path:
