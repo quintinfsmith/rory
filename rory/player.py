@@ -4,7 +4,7 @@ import time
 import os
 import pyinotify
 
-from apres import MIDI, MIDIController, MIDIEvent
+from apres import MIDI, MIDIController, MIDIEvent, NoteOn, NoteOff
 from rory.midiinterface import MIDIInterface
 
 class Player:
@@ -27,13 +27,6 @@ class Player:
         if new_position > self.loop[1]:
             new_position = self.loop[0]
             self.song_position = new_position
-        elif self.use_time_delay:
-            delay = self.calculate_delay(new_position)
-            diff = new_position - self.song_position
-            delay /= diff
-            for _ in range(diff):
-                time.sleep(delay)
-                self.song_position += 1
         else:
             self.song_position = new_position
 
@@ -76,11 +69,6 @@ class Player:
         self.note_range = [21, 21 + 88]
 
         self.ignored_channels = set()
-
-
-        self.use_time_delay = False
-        if "use_delay" in kwargs.keys():
-            self.use_time_delay = kwargs["use_delay"]
 
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
 
@@ -183,13 +171,13 @@ class RoryController(MIDIController):
             pyinotify.IN_CREATE | pyinotify.IN_DELETE
         )
 
-    def hook_NoteOn(self, event: MIDIEvent) -> None:
+    def hook_NoteOn(self, event: NoteOn) -> None:
         if event.velocity == 0:
             self.release_note(event.note)
         else:
             self.press_note(event.note)
 
-    def hook_NoteOff(self, event: MIDIEvent) -> None:
+    def hook_NoteOff(self, event: NoteOff) -> None:
         self.release_note(event.note)
 
     def press_note(self, note: int) -> None:
@@ -199,7 +187,6 @@ class RoryController(MIDIController):
 
     def release_note(self, note: int) -> None:
         '''Release a Midi Note'''
-        self.pressed.add(note)
         try:
             self.pressed.remove(note)
         except KeyError:
