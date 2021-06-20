@@ -1,7 +1,6 @@
 '''Plays MIDILike Objects'''
-#from apres import NoteOn, NoteOff
-from apres import NoteOn, SetTempo, TimeSignature
 import math
+from apres import NoteOn, SetTempo, TimeSignature, MIDIEvent
 
 def greatest_common_divisor(number_a, number_b):
     '''Euclid's method'''
@@ -18,140 +17,112 @@ class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
     notelist = 'CCDDEFFGGAAB'
 
-    def __init__(self, midi, **kwargs):
-        self.midi = midi
-        self._calculated_beatmeasures = {}
-        # For quick access to which keys are pressed
-        self.state_map = []
-        self.active_notes_map = []
-        self.beat_map = {}
-        self.measure_map = {} # { state_position: measure_number }
-        self.timing_map = {0: 0}
-        self.tempo_map = {0: 120}
-        self.time_signature_map = {0: (4,4)}
-
-        self.transpose = 0
+    def __handle_kwargs(self, kwargs) -> None:
         if 'transpose' in kwargs:
             self.transpose = kwargs['transpose']
 
-
+    def __calculate_beat_chunks(self) -> list[list[tuple[int, MIDIEvent, int], int, bool]]:
         beats = []
-        beat_size = self.midi.ppqn
-        beat_map = []
 
-        last_tick = 0
-        running_beat_count = (0, 0) # 0:beat_count, 1:last_tick_totalled
-        real_measure_map = []
-        current_time_signature = (4,4)
+        last_tick = 0 # will be the final tick with a note on event
+        running_beat_count = (0, 0) # beat_count, last_tick_totalled
+        measure_map = [] # index: measure, value: midi tick
+        beat_map = [] # index: beat, value: midi tick
+
+        current_numerator = 4
+        beat_size = self.midi.ppqn
+
         for tick, event in self.midi.get_all_events():
+            final_tick = tick
             tick_diff = tick - running_beat_count[1]
 
             current_beat = int(running_beat_count[0] + (tick_diff // beat_size))
             while len(beats) <= current_beat:
-                beats.append([])
+                beats.append([[], beat_size, False])
                 beat_map.append(tick)
 
-            if event.__class__ == NoteOn and event.channel != 9 and event.velocity > 0:
-                beats[current_beat].append((tick_diff % beat_size, event, tick))
-            elif event.__class__ == SetTempo:
-                self.tempo_map[tick] = event.get_bpm()
+            if isinstance(event, NoteOn) and event.channel != 9 and event.velocity > 0:
+                beats[current_beat][0].append((tick_diff % beat_size, event, tick))
 
             elif isinstance(event, TimeSignature):
-                for i in range(math.ceil(tick_diff // (beat_size * current_time_signature[0]))):
-                    real_measure_map.append((i * (beat_size * current_time_signature[0])) + running_beat_count[1])
+                for i in range(math.ceil(tick_diff // (beat_size * current_numerator))):
+                    measure_map.append((i * (beat_size * current_numerator)) + running_beat_count[1])
 
-                running_beat_count = (
-                    current_beat,
-                    tick
-                )
-                current_time_signature = (event.numerator, 2 ** event.denominator)
-                self.time_signature_map[tick] = current_time_signature
+                running_beat_count = (current_beat, tick)
+                current_numerator = event.numerator
                 beat_size = self.midi.ppqn // ((2 ** event.denominator) / 4)
 
-                with open("testts", "a") as fp:
-                    fp.write("\n" + str(current_time_signature))
+        if final_tick != running_beat_count[1]:
+            tick_diff = final_tick - running_beat_count[1]
+            for i in range(math.ceil(tick_diff / (beat_size * current_numerator))):
+                measure_map.append((i * (beat_size * current_numerator)) + running_beat_count[1])
 
-            last_tick = max(last_tick, tick)
+        for b in range(len(beats)):
+            beats[b][2] = (beat_map[b] in measure_map)
 
-        if last_tick != running_beat_count[1]:
-            tick_diff = last_tick - running_beat_count[1]
-            for i in range(math.ceil(tick_diff / (beat_size * current_time_signature[0]))):
-                real_measure_map.append((i * (beat_size * current_time_signature[0])) + running_beat_count[1])
+        return beats
+
+    def __init__(self, midi, **kwargs):
+        self.midi = midi
+
+        # For quick access to which keys are pressed
+        self.state_map = []
+        self.active_notes_map = []
+        self.beat_map = {}
+        self.measure_map = [] # { state_position: measure_number }
+        self.timing_map = {0: 0}
+        self.transpose = 0
+
+        self.__handle_kwargs(kwargs)
+
+        beats = self.__calculate_beat_chunks()
+
+        for beat, (events, beat_size, is_measure_start) in enumerate(beats):
+            adjusted_states = [[]]
+            if len(events):
+                delta_pairs = []
+                relative_distances = set()
+
+                prev = 0
+                for pos, event, real_tick in events:
+                    delta = pos - prev
+                    relative_distances.add(delta)
+                    delta_pairs.append((delta, (event, real_tick)))
+                    prev = pos
+                final_tick_delta = beat_size - 1 - prev
+                del prev
 
 
-        tick_counter = 0
-        current_measure = 0
-        self.inverse_measure_map = {}
+                relative_distances.add(final_tick_delta)
+                relative_distances = list(relative_distances)
+                relative_distances.sort()
 
-        for beat, events in enumerate(beats):
-            beat_tick = beat_map[beat]
-            diffs = set()
-
-            prev = 0
-            active_count = 0
-            delta_pairs = []
-            for pos, event, real_tick in events:
-                delta = pos - prev
-                diffs.add(delta)
-                delta_pairs.append((delta, (event, real_tick)))
-                prev = pos
-                active_count += 1
-
-            diffs.add(self.midi.ppqn - 1 - prev)
-
-            diffs = list(diffs)
-            diffs.sort()
-
-            tmp_ticks = []
-            tmp_ticks.append([])
-
-            if delta_pairs:
                 for delta, event in delta_pairs:
-                    k = diffs.index(delta)
-                    for _ in range(k):
-                        tmp_ticks.append([])
-                    tmp_ticks[-1].append(event)
+                    for _ in range(relative_distances.index(delta)):
+                        adjusted_states.append([])
+                    adjusted_states[-1].append(event)
 
-                k = diffs.index(self.midi.ppqn - 1 - prev)
-                for _ in range(k):
-                    tmp_ticks.append([])
+                for _ in range(relative_distances.index(final_tick_delta) + 1):
+                    adjusted_states.append([])
             else:
-                for _ in range(3):
-                    tmp_ticks.append([])
+                for _ in range(4):
+                    adjusted_states.append([])
 
-            if beat_tick in real_measure_map:
-                current_measure = real_measure_map.index(beat_tick)
-                self.measure_map[tick_counter] = current_measure
-                if not current_measure in self.inverse_measure_map:
-                    self.inverse_measure_map[current_measure] = tick_counter
+            if is_measure_start:
+                self.measure_map.append(len(self.state_map))
 
-
-            self.beat_map[tick_counter] = beat
-            for _i, tick_events in enumerate(tmp_ticks):
+            self.beat_map[len(self.state_map)] = beat
+            for _i, tick_events in enumerate(adjusted_states):
+                self.state_map.append(set())
+                self.active_notes_map.append({})
                 for _j, (event, real_tick) in enumerate(tick_events):
                     event.set_note(event.note + self.transpose)
-                    while len(self.state_map) <= tick_counter:
-                        self.state_map.append(set())
-                        self.active_notes_map.append({})
-                    self.state_map[tick_counter].add(event.note)
-                    self.active_notes_map[tick_counter][event.note] = event
-                    self.timing_map[tick_counter] = real_tick
 
-                tick_counter += 1
+                    self.state_map[-1].add(event.note)
+                    self.active_notes_map[-1][event.note] = event
+                    self.timing_map[len(self.state_map)] = real_tick
 
-
-
-    def get_tempo(self, song_position):
-        ''' Get the tempo in BPM at a given song position '''
-        real_tick = self.get_real_tick(song_position)
-        output = 120
-        for tick, tempo in list(self.tempo_map.items())[::-1]:
-            if real_tick > tick:
-                output = tempo
-                break
-        return output
-
-    def get_real_tick(self, song_position):
+    def get_real_tick(self, song_position: int) -> int:
         ''' Get the tick from before the midi is processed for playing '''
         first_post = song_position
         last_post = song_position
@@ -178,7 +149,7 @@ class MIDIInterface:
 
         return diff + self.timing_map[first_post]
 
-    def get_tick_wait(self, song_position, new_position):
+    def get_tick_wait(self, song_position: int, new_position: int) -> int:
         ''' Calculate how long, in midi ticks, between to song positions '''
         first_post = song_position
         last_post = new_position
@@ -206,27 +177,27 @@ class MIDIInterface:
         return diff
 
 
-    def get_state(self, tick, ignored_channels=None):
+    def get_state(self, position: int, ignored_channels: set[int] = None) -> set[int]:
         '''Get a list of the notes currently 'On' at specified position'''
         if not ignored_channels:
-            state = self.state_map[tick].copy()
+            state = self.state_map[position].copy()
         else:
             state = set()
-            for note, event in self.active_notes_map[tick].items():
+            for note, event in self.active_notes_map[position].items():
                 if event.channel not in ignored_channels:
                     state.add(note)
 
         return state
 
-    def get_active_channels(self, tick):
+    def get_active_channels(self, position: int) -> set[int]:
         ''' Get set of channels present at a given position '''
         active = set()
-        for _note, event in self.active_notes_map[tick].items():
+        for _note, event in self.active_notes_map[position].items():
             active.add(event.channel)
 
         return active
 
-    def get_chord_name(self, tick, channel):
+    def get_chord_name(self, position: int, channel: int) -> str:
         ''' Attempt to detect the name of the chord being played at a given position '''
         chord_names = {
             (0, 3, 7): "m",
@@ -285,7 +256,7 @@ class MIDIInterface:
 
 
         pressed = []
-        for note, event in self.active_notes_map[tick].items():
+        for note, event in self.active_notes_map[position].items():
             if event.channel == channel:
                 pressed.append(note)
 
@@ -318,23 +289,23 @@ class MIDIInterface:
     def __len__(self):
         return len(self.state_map)
 
-    def get_first_tick_in_measure(self, measure):
-        measure = max(min(measure, max(list(self.inverse_measure_map.keys()))), 0)
-        return self.inverse_measure_map[measure]
+    def get_first_position_in_measure(self, measure: int) -> int:
+        measure = min(measure, max(len(self.measure_map) - 1, 0))
+        return self.measure_map[measure]
 
-    def get_measure(self, tick):
-        keys = list(self.measure_map.keys())
-        keys.sort()
-        check = min(keys)
-        for k in keys:
-            if tick < k:
+
+    def get_measure(self, test_position: int) -> int:
+        output = 0
+
+        for (i, relative_position) in enumerate(self.measure_map):
+            if test_position < relative_position:
                 break
-            else:
-                check = k
-        return self.measure_map[check]
+            output = i
+
+        return output
 
     @staticmethod
-    def get_note_name(midi_note):
+    def get_note_name(midi_note: int) -> str:
         ''' Get note's letter name '''
         name = MIDIInterface.notelist[midi_note % len(MIDIInterface.notelist)]
         if midi_note % len(MIDIInterface.notelist) in (1,3,6,8,10):
