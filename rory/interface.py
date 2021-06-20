@@ -266,6 +266,7 @@ class PlayerScene(RoryScene):
         self.layer_active_notes = self.rect_background.new_rect()
 
         self.visible_note_rects = []
+        self.pressed_note_rects = {}
 
         self.rect_position_display = self.rect_background.new_rect()
         self.rect_position_display.bold()
@@ -495,9 +496,15 @@ class PlayerScene(RoryScene):
         song_position = player.song_position
         pressed_notes = player.get_pressed_notes()
 
+        keys = list(self.pressed_note_rects.keys())
+        for key in keys:
+            self.pressed_note_rects[key].remove()
+            del self.pressed_note_rects[key]
+
         active_state = midi_interface.get_state(song_position)
 
         y = self.rect_inner.height - self.active_row_position
+
 
         for note in pressed_notes:
             x = self.__get_displayed_key_position(note)
@@ -506,6 +513,7 @@ class PlayerScene(RoryScene):
             note_rect.set_character(0, 0, chr(9473))
             note_rect.set_bg_color(wrecked.BLACK)
             note_rect.move(x, 1)
+            self.pressed_note_rects[note] = note_rect
 
             if note in player.need_to_release:
                 if note in active_state:
