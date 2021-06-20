@@ -373,9 +373,9 @@ class PlayerScene(RoryScene):
         state_map = midi_interface.state_map
 
         for _y in range(self.layer_visible_notes.height):
-            tick = song_position - self.active_row_position + _y
+            position = song_position - self.active_row_position + _y
 
-            if tick < 0 or tick >= len(state_map):
+            if position < 0 or position >= len(state_map):
                 continue
 
             if _y == self.active_row_position:
@@ -386,7 +386,7 @@ class PlayerScene(RoryScene):
                 y = self.rect_background.height - ((_y * 2) - self.active_row_position)
 
 
-            row = midi_interface.active_notes_map[tick]
+            row = midi_interface.active_notes_map[position]
             blocked_xs = set()
             for _, message in row.items():
                 x = self.__get_displayed_key_position(message.note)
@@ -407,8 +407,8 @@ class PlayerScene(RoryScene):
                 self.visible_note_rects.append(note_rect)
 
             # Draw Measure Lines
-            if tick in midi_interface.beat_map.keys() and _y != self.active_row_position:
-                if tick in midi_interface.measure_map:
+            if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
+                if position in midi_interface.measure_map:
                     line_char = '-'
                     base = 4
                 else:
@@ -428,7 +428,7 @@ class PlayerScene(RoryScene):
 
                     self.visible_note_rects.append(line_rect)
 
-            if tick == self.player.loop[0]:
+            if position == self.player.loop[0]:
                 self.rect_loop_start.enable()
                 if _y != self.active_row_position:
                     self.rect_loop_start.move(0, y + 1)
@@ -438,7 +438,7 @@ class PlayerScene(RoryScene):
                 string = chr(9473) * self.rect_loop_start.width
                 self.rect_loop_start.set_string(0, 0, string)
 
-            if tick == self.player.loop[1]:
+            if position == self.player.loop[1]:
                 self.rect_loop_end.enable()
                 if _y != self.active_row_position:
                     self.rect_loop_end.move(0, y - 1)
