@@ -171,6 +171,25 @@ class RoryController(MIDIController):
             pyinotify.IN_CREATE | pyinotify.IN_DELETE
         )
 
+        self.state_check_ticket = 0
+        self.processing_ticket = 0
+
+    def do_state_check(self):
+        ''' Ticketed wrapper for player's do_state_check '''
+        my_ticket = self.state_check_ticket
+        self.state_check_ticket += 1
+
+        while my_ticket != self.processing_ticket:
+            time.sleep(.05)
+
+        # If there are newer tickets queued, skip this state_check
+        if my_ticket == self.state_check_ticket - 1:
+            self.player.do_state_check()
+        else:
+            pass
+
+        self.processing_ticket += 1
+
     def hook_NoteOn(self, event: NoteOn) -> None:
         if event.velocity == 0:
             self.release_note(event.note)
@@ -183,7 +202,7 @@ class RoryController(MIDIController):
     def press_note(self, note: int) -> None:
         '''Press a Midi Note'''
         self.pressed.add(note)
-        self.player.do_state_check()
+        self.do_state_check()
 
     def release_note(self, note: int) -> None:
         '''Release a Midi Note'''
@@ -195,7 +214,7 @@ class RoryController(MIDIController):
             self.player.need_to_release.remove(note)
         except KeyError:
             pass
-        self.player.do_state_check()
+        self.do_state_check()
 
     def connect(self, path: str) -> None:
         self.player.need_to_release = set()
