@@ -402,12 +402,12 @@ class PlayerScene(RoryScene):
 
             # Draw Measure Lines
             if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
+                line_char = chr(9590)
                 if position in midi_interface.measure_map:
-                    line_char = '-'
-                    base = 4
+                    base = 1
                 else:
-                    line_char = "."
-                    base = 8
+                    base = 3
+
                 for x in range(2, self.rect_background.width, base):
                     if x in blocked_xs:
                         continue
@@ -445,12 +445,12 @@ class PlayerScene(RoryScene):
 
         # Active Row Line
         active_y = self.rect_background.height - self.active_row_position
-        if song_position in midi_interface.measure_map:
+        if song_position in midi_interface.measure_map: # ═
             line_char = chr(9552)
-        elif song_position in midi_interface.beat_map:
-            line_char = chr(9476)
-        else:
+        elif song_position in midi_interface.beat_map: # ─
             line_char = chr(9472)
+        else:
+            line_char = chr(9548) # ╌
 
         for x in range(self.rect_background.width):
             self.rect_background.set_character(x, active_y, line_char)
