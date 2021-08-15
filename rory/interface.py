@@ -469,8 +469,8 @@ class PlayerScene(RoryScene):
             fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
             position_string = fmt_string % (self.player.loop[0], song_position, self.player.loop[1])
 
-            min_measure = self.__get_measure(self.player_loop[0])
-            max_measure = self.__get_measure(self.player_loop[1])
+            min_measure = self.__get_measure(self.player.loop[0])
+            max_measure = self.__get_measure(self.player.loop[1])
             l = len(str(max_measure))
             fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
             measure_string = fmt_string % (min_measure, self.__get_measure(song_position), max_measure)
