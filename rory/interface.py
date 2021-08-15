@@ -652,7 +652,7 @@ class PlayerScene(RoryScene):
 
     def unignore_channels(self) -> None:
         for channel in self.player.ignored_channels.copy():
-            self.player.ignore_channel(channel)
+            self.player.unignore_channel(channel)
 
 
     def get_channel_color(self, channel: int) -> int:

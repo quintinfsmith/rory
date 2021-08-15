@@ -111,6 +111,15 @@ class Player:
 
         self.set_state(self.song_position)
 
+    def unignore_channel(self, channel: int) -> None:
+        try:
+            self.ignored_channels.remove(channel)
+        except KeyError:
+            pass
+
+    def ignore_channel(self, channel: int) -> None:
+        self.ignored_channels.add(channel)
+
     def set_loop_start_to_position(self) -> None:
         '''Set the beginning of the play loop to the current song position'''
         self.set_loop_start(self.song_position)
