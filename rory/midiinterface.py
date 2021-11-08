@@ -17,11 +17,11 @@ class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
     notelist = 'CCDDEFFGGAAB'
 
-    def __handle_kwargs(self, kwargs) -> None:
+    def __handle_kwargs(self, kwargs):
         if 'transpose' in kwargs:
             self.transpose = kwargs['transpose']
 
-    def __calculate_beat_chunks(self) -> list[list[tuple[int, MIDIEvent, int], int, bool]]:
+    def __calculate_beat_chunks(self):
         beats = []
 
         last_tick = 0 # will be the final tick with a note on event
@@ -122,7 +122,7 @@ class MIDIInterface:
                     self.active_notes_map[-1][event.note] = event
                     self.timing_map[len(self.state_map)] = real_tick
 
-    def get_real_tick(self, song_position: int) -> int:
+    def get_real_tick(self, song_position):
         ''' Get the tick from before the midi is processed for playing '''
         first_post = song_position
         last_post = song_position
@@ -149,7 +149,7 @@ class MIDIInterface:
 
         return diff + self.timing_map[first_post]
 
-    def get_tick_wait(self, song_position: int, new_position: int) -> int:
+    def get_tick_wait(self, song_position, new_position):
         ''' Calculate how long, in midi ticks, between to song positions '''
         first_post = song_position
         last_post = new_position
@@ -177,7 +177,7 @@ class MIDIInterface:
         return diff
 
 
-    def get_state(self, position: int, ignored_channels: set[int] = None) -> set[int]:
+    def get_state(self, position, ignored_channels = None):
         '''Get a list of the notes currently 'On' at specified position'''
         if not ignored_channels:
             state = self.state_map[position].copy()
@@ -189,7 +189,7 @@ class MIDIInterface:
 
         return state
 
-    def get_active_channels(self, position: int) -> set[int]:
+    def get_active_channels(self, position):
         ''' Get set of channels present at a given position '''
         active = set()
         for _note, event in self.active_notes_map[position].items():
@@ -197,7 +197,7 @@ class MIDIInterface:
 
         return active
 
-    def get_chord_name(self, position: int, channel: int) -> str:
+    def get_chord_name(self, position, channel):
         ''' Attempt to detect the name of the chord being played at a given position '''
         chord_names = {
             (0, 3, 7): "m",
@@ -289,12 +289,12 @@ class MIDIInterface:
     def __len__(self):
         return len(self.state_map)
 
-    def get_first_position_in_measure(self, measure: int) -> int:
+    def get_first_position_in_measure(self, measure):
         measure = min(measure, max(len(self.measure_map) - 1, 0))
         return self.measure_map[measure]
 
 
-    def get_measure(self, test_position: int) -> int:
+    def get_measure(self, test_position):
         output = 0
 
         for (i, relative_position) in enumerate(self.measure_map):
@@ -305,7 +305,7 @@ class MIDIInterface:
         return output
 
     @staticmethod
-    def get_note_name(midi_note: int) -> str:
+    def get_note_name(midi_note):
         ''' Get note's letter name '''
         name = MIDIInterface.notelist[midi_note % len(MIDIInterface.notelist)]
         if midi_note % len(MIDIInterface.notelist) in (1,3,6,8,10):

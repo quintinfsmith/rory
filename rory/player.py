@@ -10,12 +10,12 @@ from rory.midiinterface import MIDIInterface
 class Player:
     '''Plays MIDILike Objects'''
 
-    def kill(self) -> None:
+    def kill(self)
         ''''Shutdown the player'''
         self.is_active = False
         self.midi_controller.close()
 
-    def next_state(self) -> None:
+    def next_state(self)
         '''Change the song position to the next state with notes.'''
         new_position = self.song_position + 1
         while new_position <= self.loop[1] \
@@ -31,7 +31,7 @@ class Player:
             self.song_position = new_position
 
 
-    def prev_state(self) -> None:
+    def prev_state(self)
         '''Change the song position to the last state with notes.'''
         self.song_position -= 1
         while self.song_position > self.loop[0] \
@@ -40,7 +40,7 @@ class Player:
 
         self.set_state(max(0, self.song_position))
 
-    def set_state(self, song_position: int) -> None:
+    def set_state(self, song_position)
         '''
             Set the song position as the value in the register,
             then move to the next state with notes.
@@ -56,7 +56,7 @@ class Player:
         if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
 
-    def set_measure(self, measure: int) -> None:
+    def set_measure(self, measure)
         position = self.midi_interface.get_first_position_in_measure(measure)
         self.set_state(position)
 
@@ -85,11 +85,11 @@ class Player:
         else:
             self.midi_controller = RoryController(self)
 
-    def get_pressed_notes(self) -> set[int]:
+    def get_pressed_notes(self):
         ''' Get the notes that the midi device has held down '''
         return self.midi_controller.pressed.copy()
 
-    def do_state_check(self) -> None:
+    def do_state_check(self)
         ''' Check if the midi device is pressing the coresponding notes '''
         song_state = self.midi_interface.get_state(self.song_position, self.ignored_channels)
         pressed = self.get_pressed_notes()
@@ -98,7 +98,7 @@ class Player:
             self.need_to_release = self.need_to_release.union(pressed)
             self.next_state()
 
-    def toggle_ignore_channel(self, channel: int) -> None:
+    def toggle_ignore_channel(self, channel)
         '''
             Add or remove a channel to be ignored when considering
             if the song position needs to be incremented or decremented
@@ -111,54 +111,54 @@ class Player:
 
         self.set_state(self.song_position)
 
-    def unignore_channel(self, channel: int) -> None:
+    def unignore_channel(self, channel)
         try:
             self.ignored_channels.remove(channel)
         except KeyError:
             pass
 
-    def ignore_channel(self, channel: int) -> None:
+    def ignore_channel(self, channel)
         self.ignored_channels.add(channel)
 
-    def set_loop_start_to_position(self) -> None:
+    def set_loop_start_to_position(self)
         '''Set the beginning of the play loop to the current song position'''
         self.set_loop_start(self.song_position)
 
-    def set_loop_end_to_position(self) -> None:
+    def set_loop_end_to_position(self)
         '''Set the end of the play loop to the current song position'''
         self.set_loop_end(self.song_position)
 
-    def set_loop_start(self, position) -> None:
+    def set_loop_start(self, position)
         '''set current positions as loop start'''
         self.loop[0] = min(max(0, position), len(self.midi_interface.state_map) - 1)
 
-    def set_loop_end(self, position) -> None:
+    def set_loop_end(self, position)
         '''set current positions as loop end'''
         self.loop[1] = min(max(0, position), len(self.midi_interface.state_map) - 1)
 
-    def clear_loop(self) -> None:
+    def clear_loop(self)
         '''Stop Looping'''
         self.loop = [0, len(self.midi_interface.state_map) - 1]
 
-    def set_register_digit(self, digit: int) -> None:
+    def set_register_digit(self, digit)
         '''Insert digit to register'''
         assert (digit < 10), "Digit can't be more than 9. Called from somewhere it shouldn't be"
 
         self.register *= 10
         self.register += digit
 
-    def clear_register(self) -> None:
+    def clear_register(self)
         '''Set the register to 0'''
         self.register = 0
 
-    def jump_to_register_position(self) -> None:
+    def jump_to_register_position(self)
         '''Set the song position to the value of the input register'''
         self.set_state(self.register)
         self.clear_register()
 
 
 class RoryController(MIDIController):
-    def __init__(self, player: Player, path: str = "") -> None:
+    def __init__(self, player, path = "")
         self.player = player
 
         if not path:
@@ -199,21 +199,21 @@ class RoryController(MIDIController):
 
         self.processing_ticket += 1
 
-    def hook_NoteOn(self, event: NoteOn) -> None:
+    def hook_NoteOn(self, event)
         if event.velocity == 0:
             self.release_note(event.note)
         else:
             self.press_note(event.note)
 
-    def hook_NoteOff(self, event: NoteOff) -> None:
+    def hook_NoteOff(self, event)
         self.release_note(event.note)
 
-    def press_note(self, note: int) -> None:
+    def press_note(self, note)
         '''Press a Midi Note'''
         self.pressed.add(note)
         self.do_state_check()
 
-    def release_note(self, note: int) -> None:
+    def release_note(self, note)
         '''Release a Midi Note'''
         try:
             self.pressed.remove(note)
@@ -225,7 +225,7 @@ class RoryController(MIDIController):
             pass
         self.do_state_check()
 
-    def connect(self, path: str) -> None:
+    def connect(self, path)
         self.player.need_to_release = set()
         try:
             super().connect(path)
@@ -239,17 +239,17 @@ class RoryController(MIDIController):
 
 class TaskHandler(pyinotify.ProcessEvent):
     '''Event hooks to connect/disconnect from newly made midi device'''
-    def __init__(self, controller: RoryController):
+    def __init__(self, controller):
         self.controller = controller
         super().__init__()
 
-    def process_IN_CREATE(self, event: MIDIEvent) -> None:
+    def process_IN_CREATE(self, event)
         '''Hook to connect when midi device is plugged in'''
         if event.name[0:4] == 'midi':
             time.sleep(.5)
             self.controller.connect(event.pathname)
 
-    def process_IN_DELETE(self, event: MIDIEvent) -> None:
+    def process_IN_DELETE(self, event)
         '''Hook to disconnect when midi device is unplugged'''
         if self.controller.midipath == event.pathname:
             self.controller.disconnect()
