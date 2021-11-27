@@ -32,7 +32,7 @@ class RoryStage:
             self.kill
         )
 
-        self.delay = 1/12
+        self.delay = 1/64
 
         self.playing = False
 
