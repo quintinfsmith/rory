@@ -265,7 +265,8 @@ class PlayerScene(RoryScene):
 
         self.layer_active_notes = self.rect_background.new_rect()
 
-        self.visible_note_rects = []
+        self.visible_note_rects = {}
+        self.visible_note_rects_lines = {}
         self.pressed_note_rects = {}
 
         self.rect_position_display = self.rect_background.new_rect()
@@ -356,22 +357,21 @@ class PlayerScene(RoryScene):
         self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
-        while self.visible_note_rects:
-            self.visible_note_rects.pop().remove()
-
         self.rect_loop_start.disable()
         self.rect_loop_end.disable()
 
         song_position = self.player.song_position
         midi_interface = self.player.midi_interface
         state_map = midi_interface.state_map
-
+        cache_keys_used = set()
+        used_lines = set()
         for _y in range(self.layer_visible_notes.height):
             position = song_position - self.active_row_position + _y
 
             if position < 0 or position >= len(state_map):
                 continue
 
+            # Warp y-spacing based on if tick is active, upcoming or passed
             if _y == self.active_row_position:
                 y = self.rect_background.height - _y
             elif _y < self.active_row_position:
@@ -383,22 +383,30 @@ class PlayerScene(RoryScene):
             row = midi_interface.active_notes_map[position]
             blocked_xs = set()
             for _, message in row.items():
+                color = self.get_channel_color(message.channel)
+                # include color in cachekey for 'ignored'
+                cachekey = (message.channel, color, message.note, position)
+                cache_keys_used.add(cachekey)
                 x = self.__get_displayed_key_position(message.note)
                 blocked_xs.add(x)
 
-                note_rect = self.layer_visible_notes.new_rect()
-                note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
+                # Don't need to create and color a new rect if one already exists
+                try:
+                    note_rect = self.visible_note_rects[cachekey]
+                except KeyError:
+                    note_rect = self.layer_visible_notes.new_rect()
+                    self.visible_note_rects[cachekey] = note_rect
+                    note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
+                    if message.note % 12 in self.SHARPS:
+                        note_rect.set_bg_color(color)
+                        note_rect.set_fg_color(wrecked.BLACK)
+                    else:
+                        note_rect.set_fg_color(color)
+                        note_rect.set_bg_color(wrecked.BLACK)
+
                 note_rect.move(x, y)
 
-                color = self.get_channel_color(message.channel)
-                if message.note % 12 in self.SHARPS:
-                    note_rect.set_bg_color(color)
-                    note_rect.set_fg_color(wrecked.BLACK)
-                else:
-                    note_rect.set_fg_color(color)
-                    note_rect.set_bg_color(wrecked.BLACK)
 
-                self.visible_note_rects.append(note_rect)
 
             # Draw Measure Lines
             if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
@@ -413,14 +421,18 @@ class PlayerScene(RoryScene):
                         continue
                     if x % 14 == 0:
                         continue
+                    used_lines.add((position, x))
 
-                    line_rect = self.layer_visible_notes.new_rect()
-                    line_rect.set_character(0, 0, line_char)
+                    try:
+                        line_rect = self.visible_note_rects_lines[(position, x)]
+                    except KeyError:
+                        line_rect = self.layer_visible_notes.new_rect()
+                        line_rect.set_character(0, 0, line_char)
+                        line_rect.set_fg_color(wrecked.BRIGHTBLACK)
+                        line_rect.set_bg_color(wrecked.BLACK)
+                        self.visible_note_rects_lines[(position, x)] = line_rect
                     line_rect.move(x, y)
-                    line_rect.set_fg_color(wrecked.BRIGHTBLACK)
-                    line_rect.set_bg_color(wrecked.BLACK)
 
-                    self.visible_note_rects.append(line_rect)
 
             if position == self.player.loop[0]:
                 self.rect_loop_start.enable()
@@ -454,6 +466,17 @@ class PlayerScene(RoryScene):
 
         for x in range(self.rect_background.width):
             self.rect_background.set_character(x, active_y, line_char)
+
+
+        unused_cache_keys = set(self.visible_note_rects.keys()) - cache_keys_used
+        for key in unused_cache_keys:
+            self.visible_note_rects[key].remove()
+            del self.visible_note_rects[key]
+
+        unused_lines = set(self.visible_note_rects_lines.keys()) - used_lines
+        for key in unused_lines:
+            self.visible_note_rects_lines[key].remove()
+            del self.visible_note_rects_lines[key]
 
         self.__draw_song_position()
 
