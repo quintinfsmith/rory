@@ -89,24 +89,20 @@ class MIDIInterface:
                     relative_distances.add(delta)
                     delta_pairs.append((delta, (event, real_tick)))
                     prev = pos
-                final_tick_delta = beat_size - 1 - prev
-                del prev
 
-
-                relative_distances.add(final_tick_delta)
                 relative_distances = list(relative_distances)
                 relative_distances.sort()
 
                 for delta, event in delta_pairs:
-                    for _ in range(relative_distances.index(delta)):
+                    for _ in range(round(relative_distances.index(delta) ** .5)):
                         adjusted_states.append([])
                     adjusted_states[-1].append(event)
 
-                for _ in range(relative_distances.index(final_tick_delta) + 1):
-                    adjusted_states.append([])
-            else:
-                for _ in range(4):
-                    adjusted_states.append([])
+                if prev != 0:
+                    full_length = (beat_size / prev) * (len(adjusted_states) - 1)
+                    while len(adjusted_states) < full_length:
+                        adjusted_states.append([])
+                del prev
 
             if is_measure_start:
                 self.measure_map.append(len(self.state_map))
@@ -281,9 +277,9 @@ class MIDIInterface:
                 name = "%s%s%s" % (self.get_note_name(tonic), name[0:-1], slash)
             else:
                 name = self.get_note_name(tonic) + name
-
         else:
             name = ""
+
         return name
 
     def __len__(self):
