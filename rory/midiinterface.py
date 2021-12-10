@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
 import math
-from apres import NoteOn, SetTempo, TimeSignature, MIDIEvent
+from apres import NoteOn, NoteOff, SetTempo, TimeSignature, MIDIEvent
 
 def greatest_common_divisor(number_a, number_b):
     '''Euclid's method'''
@@ -31,7 +31,7 @@ class MIDIInterface:
 
         current_numerator = 4
         beat_size = self.midi.ppqn
-
+        active_notes = {}
         for tick, event in self.midi.get_all_events():
             final_tick = tick
             tick_diff = tick - running_beat_count[1]
@@ -42,7 +42,16 @@ class MIDIInterface:
                 beat_map.append(tick)
 
             if isinstance(event, NoteOn) and event.channel != 9 and event.velocity > 0:
-                beats[current_beat][0].append((tick_diff % beat_size, event, tick))
+                active_notes[(event.channel, event.note)] = (current_beat, len(beats[current_beat][0]))
+                beats[current_beat][0].append((tick_diff % beat_size, event, tick, 0))
+
+            elif (isinstance(event, NoteOn) and event.channel != 9 and event.velocity == 0) or (isinstance(event, NoteOff) and event.channel != 9):
+                try:
+                    beat, index = active_notes[(event.channel, event.note)]
+                    _a, _b, original_tick, duration = beats[beat][0][index]
+                    beats[beat][0][index] = (_a, _b, original_tick, tick - original_tick)
+                except KeyError:
+                    pass
 
             elif isinstance(event, TimeSignature):
                 for i in range(math.ceil(tick_diff // (beat_size * current_numerator))):
@@ -76,7 +85,6 @@ class MIDIInterface:
         self.__handle_kwargs(kwargs)
 
         beats = self.__calculate_beat_chunks()
-
         for beat, (events, beat_size, is_measure_start) in enumerate(beats):
             adjusted_states = [[]]
             if len(events):
@@ -84,24 +92,30 @@ class MIDIInterface:
                 relative_distances = set()
 
                 prev = 0
-                for pos, event, real_tick in events:
+                total_duration = 0
+                for pos, event, real_tick, duration in events:
                     delta = pos - prev
+
                     relative_distances.add(delta)
                     delta_pairs.append((delta, (event, real_tick)))
                     prev = pos
+                    total_duration += duration
 
                 relative_distances = list(relative_distances)
                 relative_distances.sort()
 
                 for delta, event in delta_pairs:
-                    for _ in range(round(relative_distances.index(delta) ** .5)):
+                    i = relative_distances.index(delta)
+                    for _ in range(i):
                         adjusted_states.append([])
                     adjusted_states[-1].append(event)
 
-                if prev != 0:
-                    full_length = (beat_size / prev) * (len(adjusted_states) - 1)
-                    while len(adjusted_states) < full_length:
-                        adjusted_states.append([])
+                # Fill out the remainder of the the beat with space
+                percent = total_duration / beat_size
+                full_length = len(adjusted_states) / percent
+                while full_length > len(adjusted_states):
+                    adjusted_states.append([])
+
                 del prev
 
             if is_measure_start:
