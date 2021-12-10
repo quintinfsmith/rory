@@ -24,7 +24,7 @@ class MIDIInterface:
     def __calculate_beat_chunks(self):
         beats = []
 
-        last_tick = 0 # will be the final tick with a note on event
+        final_tick = 0 # will be the final tick with a note on event
         running_beat_count = (0, 0) # beat_count, last_tick_totalled
         measure_map = [] # index: measure, value: midi tick
         beat_map = [] # index: beat, value: midi tick
