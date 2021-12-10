@@ -415,11 +415,8 @@ class PlayerScene(RoryScene):
                     base = 1
                 else:
                     base = 3
-
-                for x in range(2, self.rect_background.width, base):
+                for x in range(1, self.rect_background.width, base):
                     if x in blocked_xs:
-                        continue
-                    if x % 14 == 0:
                         continue
                     used_lines.add((position, x))
 
@@ -652,16 +649,12 @@ class PlayerScene(RoryScene):
             menu.set_string(2, 1 + i, line)
 
     def __get_displayed_key_position(self, midi_key):
-        piano_position = midi_key - self.player.note_range[0]
-        octave = piano_position // 12
-        piano_key = piano_position % 12
-        position = (octave * 14) + piano_key
-
-        if piano_key > 2: # B
+        # TODO: Make me more effecient
+        position = 0
+        for i in range(self.player.note_range[0], midi_key):
+            if i in (2, 7):
+                position += 1
             position += 1
-        if piano_key > 7:
-            position += 1
-
         return position
 
     def ignore_channel(self):
