@@ -92,14 +92,14 @@ class MIDIInterface:
                 relative_distances = set()
 
                 prev = 0
-                total_duration = 0
+                last_note_off = 0
                 for pos, event, real_tick, duration in events:
                     delta = pos - prev
 
                     relative_distances.add(delta)
                     delta_pairs.append((delta, (event, real_tick)))
                     prev = pos
-                    total_duration += duration
+                    last_note_off = max(pos + duration, last_note_off)
 
                 relative_distances = list(relative_distances)
                 relative_distances.sort()
@@ -111,7 +111,7 @@ class MIDIInterface:
                     adjusted_states[-1].append(event)
 
                 # Fill out the remainder of the the beat with space
-                percent = total_duration / beat_size
+                percent = last_note_off / beat_size
                 full_length = len(adjusted_states) / percent
                 while full_length > len(adjusted_states):
                     adjusted_states.append([])
