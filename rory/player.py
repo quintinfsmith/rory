@@ -66,7 +66,7 @@ class Player:
         self.is_active = True
         self.register = 0
         self.loop = [0, 0]
-        self.note_range = [21, 21 + 88]
+        self.note_range = (21, 109)
 
         self.ignored_channels = set()
 
@@ -80,14 +80,40 @@ class Player:
 
         self.next_state()
 
+        self.flag_range_input = False
+        self._new_range = None
+
         if 'controller_path' in kwargs:
             self.midi_controller = RoryController(self, kwargs['controller_path'])
         else:
             self.midi_controller = RoryController(self)
 
+    def set_note_range(self, lower, upper):
+        self.note_range = (lower, upper)
+        self.flag_range_input = False
+        self._new_range = None
+
     def get_pressed_notes(self):
         ''' Get the notes that the midi device has held down '''
-        return self.midi_controller.pressed.copy()
+        notes = self.midi_controller.pressed.copy()
+        if self.flag_range_input:
+            if len(notes):
+                lower = min(notes)
+                upper = max(notes)
+                if self._new_range is None:
+                    self._new_range = (lower, upper)
+                else:
+                    self._new_range = (
+                        min(self._new_range[0], lower),
+                        max(self._new_range[1], upper)
+                    )
+
+                if self._new_range[0] != self._new_range[1]:
+                    self.set_note_range(*self._new_range)
+        return notes
+
+    def flag_new_range(self):
+        self.flag_range_input = True
 
     def do_state_check(self):
         ''' Check if the midi device is pressing the coresponding notes '''

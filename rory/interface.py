@@ -139,9 +139,14 @@ class RoryStage:
             self.kill
         )
 
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            'r',
+            playerscene.flag_new_range
+        )
+
         self.interactor.set_context(self.CONTEXT_PLAYER)
         self.start_scene(self.CONTEXT_PLAYER)
-
 
     def kill(self):
         self.playing = False
@@ -295,22 +300,30 @@ class PlayerScene(RoryScene):
         self.last_rendered_position = -1
         self.last_rendered_loop = (0, 0)
         self.last_rendered_ignored_channels = None
+        self.last_rendered_note_range = self.player.note_range
         self.rect_help_menu = None
         self.flag_show_menu = False
 
         self.mapped_colors = {}
         self.rechanneled = {}
 
+    def flag_new_range(self):
+        self.player.flag_new_range()
+
+    def has_note_range_changed(self):
+        return self.last_rendered_note_range != self.player.note_range
+
     def tick(self):
         was_flagged = False
         player = self.player
-        if self.FLAG_BACKGROUND:
+        note_range_changed = self.has_note_range_changed()
+        if self.FLAG_BACKGROUND or note_range_changed:
             self.__draw_background()
             self.FLAG_BACKGROUND = False
             was_flagged = True
 
         song_position = player.song_position
-        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels:
+        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels or note_range_changed:
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
@@ -318,7 +331,7 @@ class PlayerScene(RoryScene):
             self.last_rendered_ignored_channels = self.player.ignored_channels.copy()
             was_flagged = True
 
-        if player.get_pressed_notes() != self.last_rendered_pressed:
+        if self.get_pressed_notes() != self.last_rendered_pressed:
             self.__draw_pressed_row()
             was_flagged = True
 
@@ -383,6 +396,8 @@ class PlayerScene(RoryScene):
             row = midi_interface.active_notes_map[position]
             blocked_xs = set()
             for _, message in row.items():
+                if message.note < self.player.note_range[0] or message.note > self.player.note_range[1]:
+                    continue
                 color = self.get_channel_color(message.channel)
                 # include color in cachekey for 'ignored'
                 cachekey = (message.channel, color, message.note, position)
@@ -405,8 +420,6 @@ class PlayerScene(RoryScene):
                         note_rect.set_bg_color(wrecked.BLACK)
 
                 note_rect.move(x, y)
-
-
 
             # Draw Measure Lines
             if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
@@ -451,7 +464,6 @@ class PlayerScene(RoryScene):
                 string = chr(9473) * self.rect_loop_end.width
                 self.rect_loop_end.set_string(0, 0, string)
 
-
         # Active Row Line
         active_y = self.rect_background.height - self.active_row_position
         if song_position in midi_interface.measure_map: # ═
@@ -463,7 +475,6 @@ class PlayerScene(RoryScene):
 
         for x in range(self.rect_background.width):
             self.rect_background.set_character(x, active_y, line_char)
-
 
         unused_cache_keys = set(self.visible_note_rects.keys()) - cache_keys_used
         for key in unused_cache_keys:
@@ -510,11 +521,15 @@ class PlayerScene(RoryScene):
         self.rect_position_display.set_string(0, 1, position_string)
         self.last_rendered_loop = self.player.loop.copy()
 
+    def get_pressed_notes(self):
+        notes = self.player.get_pressed_notes()
+        return notes
+
     def __draw_pressed_row(self):
         player = self.player
         midi_interface = player.midi_interface
         song_position = player.song_position
-        pressed_notes = player.get_pressed_notes()
+        pressed_notes = self.get_pressed_notes()
 
         keys = list(self.pressed_note_rects.keys())
         for key in keys:
@@ -524,7 +539,6 @@ class PlayerScene(RoryScene):
         active_state = midi_interface.get_state(song_position)
 
         y = self.rect_inner.height - self.active_row_position
-
 
         for note in pressed_notes:
             x = self.__get_displayed_key_position(note)
@@ -549,20 +563,25 @@ class PlayerScene(RoryScene):
         self.last_rendered_pressed = pressed_notes
 
     def __adjust_inner_rect_offset(self):
+        self.root.clear_characters()
+
         player = self.player
         note_range = player.note_range
-        width = self.__get_displayed_key_position(note_range[1] + 1)
+        width = self.__get_displayed_key_position(note_range[1]) + 1
 
         self.rect_inner.resize(
             height=self.root.height,
             width=width
         )
+
         inner_pos = max(0, (self.root.width - self.rect_inner.width) // 2)
         self.rect_inner.move(inner_pos, 0)
 
         for y in range(self.root.height):
             self.root.set_character(inner_pos - 1, y, chr(9475))
             self.root.set_character(inner_pos + width, y, chr(9475))
+
+        self.last_rendered_note_range = note_range
 
     def __draw_background(self):
         player = self.player
@@ -620,6 +639,7 @@ class PlayerScene(RoryScene):
             "i    - Ignore the channel in register",
             "u    - Unignore all channels",
             "p    - Jump to state in register",
+            "r    - resize keyboard ( Then press lowest and highest keys )",
             "[    - Set start of loop",
             "]    - Set end of loop",
             "\\    - Clear start & end of loop"
