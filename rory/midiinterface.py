@@ -2,16 +2,55 @@
 import math
 from apres import NoteOn, NoteOff, SetTempo, TimeSignature, MIDIEvent
 
-def greatest_common_divisor(number_a, number_b):
-    '''Euclid's method'''
-    bigger_int = max(number_a, number_b)
-    smaller_int = min(number_a, number_b)
+def ratios_to_common_divisor(ratios):
+    max_divisor = 1
+    zeros = []
+    used_divisors = set()
+    for i, (n, d) in enumerate(ratios):
+        d = int(d)
+        if d not in used_divisors:
+            max_divisor *= d
+        used_divisors.add(d)
+        if n == 0:
+            zeros.append(i)
+            ratios[i] = (d, d)
 
-    while smaller_int:
-        tmp = smaller_int
-        smaller_int = bigger_int % smaller_int
-        bigger_int = tmp
-    return int(bigger_int)
+
+    new_numerators = []
+    for n, d in ratios:
+        new_numerators.append(int(n * max_divisor / d))
+    new_numerators.append(int(max_divisor))
+    gcd = math.gcd(*new_numerators)
+    new_numerators.pop()
+
+    output = []
+    for n in new_numerators:
+        output.append((int(n // gcd), int(max_divisor // gcd)))
+
+    for z in zeros:
+        output[z] = (0, output[z][1])
+
+    return output
+
+def match_ratio(position, beat_size):
+    possible_ratios = []
+    closest_match = (None, 1)
+    if position == 0:
+        return (0, 1)
+    r = position / beat_size
+
+    for i in [2, 3, 4, 5, 6, 8]:
+        for j in range(1, i):
+            d = math.fabs(r - (j / i))
+            if d == 0:
+                return (j, i)
+            elif d < closest_match[1]:
+                closest_match = ((j, i), d)
+    if closest_match[0] is not None:
+        return closest_match[0]
+    else:
+        return (position, beat_size)
+
 
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
@@ -78,6 +117,8 @@ class MIDIInterface:
         self.state_map = []
         self.active_notes_map = []
         self.beat_map = {}
+        self.inv_beat_map = {}
+        self.rhythm_map = {0: (0, 1)}
         self.measure_map = [] # { state_position: measure_number }
         self.timing_map = {0: 0}
         self.transpose = 0
@@ -85,11 +126,13 @@ class MIDIInterface:
         self.__handle_kwargs(kwargs)
 
         beats = self.__calculate_beat_chunks()
+        rhythm_groupings = []
+        measure_offset = 0
         for beat, (events, beat_size, is_measure_start) in enumerate(beats):
-            adjusted_states = [[]]
+            adjusted_states = [(0, [])]
             if len(events):
                 delta_pairs = []
-                relative_distances = set()
+                relative_distances = set([0])
 
                 prev = 0
                 last_note_off = 0
@@ -97,24 +140,30 @@ class MIDIInterface:
                     delta = pos - prev
 
                     relative_distances.add(delta)
-                    delta_pairs.append((delta, (event, real_tick)))
+                    #delta_pairs.append((delta, (event, real_tick), None))
+                    delta_pairs.append((delta, (event, real_tick), pos + measure_offset))
                     prev = pos
+
                     last_note_off = max(pos + duration, last_note_off)
+
+
 
                 relative_distances = list(relative_distances)
                 relative_distances.sort()
-
-                for delta, event in delta_pairs:
+                for delta, event, rhythm_ratio in delta_pairs:
                     i = relative_distances.index(delta)
-                    for _ in range(i):
-                        adjusted_states.append([])
-                    adjusted_states[-1].append(event)
+                    if i == 0:
+                        adjusted_states[-1] = (rhythm_ratio, adjusted_states[-1][1])
+                    else:
+                        for _ in range(i):
+                            adjusted_states.append((rhythm_ratio, []))
+                    adjusted_states[-1][1].append(event)
 
                 # Fill out the remainder of the the beat with space
                 percent = last_note_off / beat_size
                 full_length = len(adjusted_states) / percent
                 while full_length > len(adjusted_states):
-                    adjusted_states.append([])
+                    adjusted_states.append((0, []))
 
                 del prev
 
@@ -122,15 +171,31 @@ class MIDIInterface:
                 self.measure_map.append(len(self.state_map))
 
             self.beat_map[len(self.state_map)] = beat
-            for _i, tick_events in enumerate(adjusted_states):
+            self.inv_beat_map[beat] = len(self.state_map)
+            for i, (rhythm_ratio, tick_events) in enumerate(adjusted_states):
                 self.state_map.append(set())
+                self.rhythm_map[len(self.state_map) - 1] = rhythm_ratio
+                rhythm_groupings.append((len(self.state_map) - 1, rhythm_ratio))
                 self.active_notes_map.append({})
                 for _j, (event, real_tick) in enumerate(tick_events):
                     event.set_note(event.note + self.transpose)
-
                     self.state_map[-1].add(event.note)
                     self.active_notes_map[-1][event.note] = event
-                    self.timing_map[len(self.state_map)] = real_tick
+                    self.timing_map[len(self.state_map) - 1] = real_tick
+
+            measure_offset += beat_size
+            # If end of list or measure
+            if beat + 1 == len(beats) or beats[beat + 1][2]:
+                rhythms = []
+                for (i, ratio) in rhythm_groupings:
+                    rhythms.append((ratio, measure_offset))
+                rhythms = ratios_to_common_divisor(rhythms)
+                for x, (i, _) in enumerate(rhythm_groupings):
+                    self.rhythm_map[i] = rhythms[x]
+                rhythm_groupings = []
+                measure_offset = 0
+
+
 
     def get_real_tick(self, song_position):
         ''' Get the tick from before the midi is processed for playing '''
@@ -313,6 +378,9 @@ class MIDIInterface:
             output = i
 
         return output
+
+    def get_beat(self, test_position):
+        return self.inv_beat_map[test_position]
 
     @staticmethod
     def get_note_name(midi_note):
