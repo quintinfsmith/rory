@@ -152,7 +152,6 @@ class MIDIInterface:
                     delta = pos - prev
 
                     relative_distances.add(delta)
-                    #delta_pairs.append((delta, (event, real_tick), None))
                     delta_pairs.append((delta, (event, real_tick), pos + measure_offset))
                     prev = pos
 
@@ -174,7 +173,7 @@ class MIDIInterface:
                 # Fill out the remainder of the the beat with space
                 percent = last_note_off / beat_size
                 full_length = len(adjusted_states) / percent
-                while full_length > len(adjusted_states):
+                while full_length - 1 > len(adjusted_states):
                     adjusted_states.append((0, []))
 
                 del prev
