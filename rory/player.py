@@ -60,11 +60,22 @@ class Player:
         position = self.midi_interface.get_first_position_in_measure(measure)
         self.set_state(position)
 
+    def reinit_midi_interface(self, **kwargs):
+        self.active_midi = MIDI(self.active_midi.path)
+        self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
+        self.clear_loop()
+        self.song_position = -1
+        self.next_state()
+
+    def get_transpose(self):
+        return self.midi_interface.transpose
+
     def __init__(self, **kwargs):
         self.active_midi = MIDI(kwargs['path'])
 
         self.is_active = True
         self.register = 0
+        self.flag_negative_register = False
         self.loop = [0, 0]
         self.note_range = (21, 109)
 
@@ -87,6 +98,15 @@ class Player:
             self.midi_controller = RoryController(self, kwargs['controller_path'])
         else:
             self.midi_controller = RoryController(self)
+
+    def get_register(self):
+        if self.flag_negative_register:
+            self.register *= -1
+
+        output = self.register
+        self.register = 0
+        self.flag_negative_register = False
+        return output
 
     def set_note_range(self, lower, upper):
         self.note_range = (lower, upper)
@@ -168,19 +188,22 @@ class Player:
 
     def set_register_digit(self, digit):
         '''Insert digit to register'''
-        assert (digit < 10), "Digit can't be more than 9. Called from somewhere it shouldn't be"
-
-        self.register *= 10
-        self.register += digit
+        if digit == ord('-'):
+            self.register = 0
+            self.flag_negative_register = True
+        else:
+            assert (digit < 10), "Digit can't be more than 9. Called from somewhere it shouldn't be"
+            self.register *= 10
+            self.register += digit
 
     def clear_register(self):
         '''Set the register to 0'''
         self.register = 0
+        self.flag_negative_register = False
 
     def jump_to_register_position(self):
         '''Set the song position to the value of the input register'''
-        self.set_state(self.register)
-        self.clear_register()
+        self.set_state(self.get_register())
 
 
 class RoryController(MIDIController):

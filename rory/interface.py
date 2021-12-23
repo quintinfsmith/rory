@@ -96,6 +96,12 @@ class RoryStage:
             )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
+            '-',
+            player.set_register_digit,
+            ord('-')
+        )
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
             "\x1b",
             player.clear_register
         )
@@ -131,6 +137,12 @@ class RoryStage:
             self.CONTEXT_PLAYER,
             '\\',
             player.clear_loop,
+        )
+
+        self.interactor.assign_context_sequence(
+            self.CONTEXT_PLAYER,
+            't',
+            playerscene.reset_transpose,
         )
 
         self.interactor.assign_context_sequence(
@@ -297,6 +309,7 @@ class PlayerScene(RoryScene):
 
         self.FLAG_BACKGROUND = True
         self.last_rendered_pressed = None
+        self.last_rendered_transpose = None
         self.last_rendered_position = -1
         self.last_rendered_loop = (0, 0)
         self.last_rendered_ignored_channels = None
@@ -310,6 +323,20 @@ class PlayerScene(RoryScene):
     def flag_new_range(self):
         self.player.flag_new_range()
 
+    def reset_transpose(self):
+        register = self.player.get_register()
+        self.player.reinit_midi_interface(
+            transpose=register
+        )
+
+    def has_transpose_changed(self):
+        current = self.player.get_transpose()
+        output = current != self.last_rendered_transpose
+        if (output):
+            self.last_rendered_transpose = current
+
+        return output
+
     def has_note_range_changed(self):
         return self.last_rendered_note_range != self.player.note_range
 
@@ -317,13 +344,14 @@ class PlayerScene(RoryScene):
         was_flagged = False
         player = self.player
         note_range_changed = self.has_note_range_changed()
-        if self.FLAG_BACKGROUND or note_range_changed:
+        transpose_changed = self.has_transpose_changed()
+        if self.FLAG_BACKGROUND or note_range_changed or transpose_changed:
             self.__draw_background()
             self.FLAG_BACKGROUND = False
             was_flagged = True
 
         song_position = player.song_position
-        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels or note_range_changed:
+        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels or note_range_changed or transpose_changed:
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
@@ -640,6 +668,7 @@ class PlayerScene(RoryScene):
             "u    - Unignore all channels",
             "p    - Jump to state in register",
             "r    - resize keyboard ( Then press lowest and highest keys )",
+            "t    - transpose the entire song by the register",
             "[    - Set start of loop",
             "]    - Set end of loop",
             "\\    - Clear start & end of loop"
@@ -679,11 +708,9 @@ class PlayerScene(RoryScene):
 
     def ignore_channel(self):
         try:
-            channel = self.rechanneled[self.player.register]
+            channel = self.rechanneled[self.player.get_register()]
         except KeyError:
             return
-
-        self.player.clear_register()
         self.player.ignore_channel(channel)
 
     def unignore_channels(self):
@@ -713,6 +740,5 @@ class PlayerScene(RoryScene):
         self.last_rendered_position = -1
 
     def jump_to_register_measure(self):
-        register = self.player.register
-        self.player.clear_register()
+        register = self.player.get_register()
         self.player.set_measure(register - 1)
