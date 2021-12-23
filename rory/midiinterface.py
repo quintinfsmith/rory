@@ -71,6 +71,8 @@ class MIDIInterface:
         current_numerator = 4
         beat_size = self.midi.ppqn
         active_notes = {}
+        min_note = 128
+        max_note = 0
         for tick, event in self.midi.get_all_events():
             final_tick = tick
             tick_diff = tick - running_beat_count[1]
@@ -83,6 +85,8 @@ class MIDIInterface:
             if isinstance(event, NoteOn) and event.channel != 9 and event.velocity > 0:
                 active_notes[(event.channel, event.note)] = (current_beat, len(beats[current_beat][0]))
                 beats[current_beat][0].append((tick_diff % beat_size, event, tick, 0))
+                min_note = min(min_note, event.note)
+                max_note = max(max_note, event.note)
 
             elif (isinstance(event, NoteOn) and event.channel != 9 and event.velocity == 0) or (isinstance(event, NoteOff) and event.channel != 9):
                 try:
@@ -107,6 +111,14 @@ class MIDIInterface:
 
         for b in range(len(beats)):
             beats[b][2] = (beat_map[b] in measure_map)
+
+        self.transpose = min(
+            max(
+                self.transpose,
+                min_note * -1
+            ),
+            128 - max_note
+        )
 
         return beats
 
@@ -178,7 +190,8 @@ class MIDIInterface:
                 rhythm_groupings.append((len(self.state_map) - 1, rhythm_ratio))
                 self.active_notes_map.append({})
                 for _j, (event, real_tick) in enumerate(tick_events):
-                    event.set_note(event.note + self.transpose)
+                    new_note = event.note + self.transpose
+                    event.set_note(new_note)
                     self.state_map[-1].add(event.note)
                     self.active_notes_map[-1][event.note] = event
                     self.timing_map[len(self.state_map) - 1] = real_tick
