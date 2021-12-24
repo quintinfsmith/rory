@@ -16,6 +16,22 @@ class RoryStage:
     '''Interface to Run the MidiPlayer'''
     CONTEXT_DEFAULT = 0
     CONTEXT_PLAYER = 1
+
+    CONTROL_QUIT = 'q'
+    CONTROL_NEXT_STATE = 'j'
+    CONTROL_PREV_STATE = 'k'
+    CONTROL_IGNORE_CHANNEL = 'i'
+    CONTROL_UNIGNORE_CHANNELS ='u'
+    CONTROL_TRANSPOSE = 't'
+    CONTROL_LOOP_START = '['
+    CONTROL_LOOP_END = ']'
+    CONTROL_LOOP_KILL = '\\'
+    CONTROL_CLEAR_REGISTER = '\x1b'
+    CONTROL_TOGGLE_HELP = 'h'
+    CONTROL_SET_POSITION = 'p'
+    CONTROL_SET_MEASURE = 'P'
+    CONTROL_SET_RANGE = 'r'
+
     def __init__(self):
         self.root = wrecked.init()
         self.scenes = {}
@@ -28,7 +44,7 @@ class RoryStage:
         self.interactor = Interactor()
         self.interactor.assign_context_sequence(
             self.CONTEXT_DEFAULT,
-            'q',
+            self.CONTROL_QUIT,
             self.kill
         )
 
@@ -66,24 +82,24 @@ class RoryStage:
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'j',
+            self.CONTROL_NEXT_STATE,
             player.next_state
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'i',
+            self.CONTROL_IGNORE_CHANNEL,
             playerscene.ignore_channel
         )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'u',
+            self.CONTROL_UNIGNORE_CHANNELS,
             playerscene.unignore_channels
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'k',
+            self.CONTROL_PREV_STATE,
             player.prev_state
         )
 
@@ -100,60 +116,61 @@ class RoryStage:
             player.set_register_digit,
             ord('-')
         )
+
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            "\x1b",
+            self.CONTROL_CLEAR_REGISTER,
             player.clear_register
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'h',
+            self.CONTROL_TOGGLE_HELP,
             playerscene.toggle_help_menu
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'p',
+            self.CONTROL_SET_POSITION,
             player.jump_to_register_position,
         )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'P',
+            self.CONTROL_SET_MEASURE,
             playerscene.jump_to_register_measure,
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            '[',
+            self.CONTROL_LOOP_START,
             player.set_loop_start_to_position,
         )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            ']',
+            self.CONTROL_LOOP_END,
             player.set_loop_end_to_position,
         )
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            '\\',
+            self.CONTROL_LOOP_KILL,
             player.clear_loop,
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            't',
+            self.CONTROL_TRANSPOSE,
             playerscene.reset_transpose,
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'q',
+            self.CONTROL_QUIT,
             self.kill
         )
 
         self.interactor.assign_context_sequence(
             self.CONTEXT_PLAYER,
-            'r',
+            self.CONTROL_SET_RANGE,
             playerscene.flag_new_range
         )
 
@@ -267,6 +284,29 @@ class PlayerScene(RoryScene):
         wrecked.BRIGHTMAGENTA,
         wrecked.BRIGHTYELLOW
     ]
+
+    CHARS = {
+        'measureline': chr(9590),
+        'loopline': chr(9473),
+        'activeline_measure': chr(9552),
+        'activeline_beat': chr(9472),
+        'activeline': chr(9548) ,
+        'sidepane': chr(9475),
+        'keyboard_sharp': chr(9608),
+        'keyboard_natural': chr(9620),
+        'keyboard_pressed': chr(9473),
+        'a_line': chr(9550),
+        'menu': {
+            'top': chr(9552),
+            'bottom': chr(9552),
+            'left': chr(9553),
+            'right': chr(9553),
+            'top_left': chr(9556),
+            'top_right': chr(9559),
+            'bottom_left': chr(9562),
+            'bottom_right': chr(9565)
+        }
+    }
 
     def __init__(self, rorystage: RoryStage, **kwargs):
         super().__init__(rorystage)
@@ -451,7 +491,7 @@ class PlayerScene(RoryScene):
 
             # Draw Measure Lines
             if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
-                line_char = chr(9590)
+                line_char = self.CHARS['measureline']
                 if position in midi_interface.measure_map:
                     base = 1
                 else:
@@ -479,7 +519,7 @@ class PlayerScene(RoryScene):
                 else:
                     self.rect_loop_start.move(0, y + 2)
                 self.rect_loop_start.resize(self.rect_background.width, 1)
-                string = chr(9473) * self.rect_loop_start.width
+                string = self.CHARS['loopline'] * self.rect_loop_start.width
                 self.rect_loop_start.set_string(0, 0, string)
 
             if position == self.player.loop[1]:
@@ -489,17 +529,17 @@ class PlayerScene(RoryScene):
                 else:
                     self.rect_loop_end.move(0, y - 2)
                 self.rect_loop_end.resize(self.rect_background.width, 1)
-                string = chr(9473) * self.rect_loop_end.width
+                string = self.CHARS['loopline'] * self.rect_loop_end.width
                 self.rect_loop_end.set_string(0, 0, string)
 
         # Active Row Line
         active_y = self.rect_background.height - self.active_row_position
         if song_position in midi_interface.measure_map: # ═
-            line_char = chr(9552)
+            line_char = self.CHARS['activeline_measure']
         elif song_position in midi_interface.beat_map: # ─
-            line_char = chr(9472)
+            line_char = self.CHARS['activeline_beat']
         else:
-            line_char = chr(9548) # ╌
+            line_char = self.CHARS['activeline']
 
         for x in range(self.rect_background.width):
             self.rect_background.set_character(x, active_y, line_char)
@@ -572,7 +612,7 @@ class PlayerScene(RoryScene):
             x = self.__get_displayed_key_position(note)
 
             note_rect = self.layer_active_notes.new_rect()
-            note_rect.set_character(0, 0, chr(9473))
+            note_rect.set_character(0, 0, self.CHARS['keyboard_pressed'])
             note_rect.set_bg_color(wrecked.BLACK)
             note_rect.move(x, 1)
             self.pressed_note_rects[note] = note_rect
@@ -606,8 +646,8 @@ class PlayerScene(RoryScene):
         self.rect_inner.move(inner_pos, 0)
 
         for y in range(self.root.height):
-            self.root.set_character(inner_pos - 1, y, chr(9475))
-            self.root.set_character(inner_pos + width, y, chr(9475))
+            self.root.set_character(inner_pos - 1, y, self.CHARS['sidepane'])
+            self.root.set_character(inner_pos + width, y, self.CHARS['sidepane'])
 
         self.last_rendered_note_range = note_range
 
@@ -639,16 +679,16 @@ class PlayerScene(RoryScene):
             x = self.__get_displayed_key_position(i)
 
             if i % 12 in self.SHARPS:
-                self.rect_background.set_character(x, y - 1, chr(9608))
+                self.rect_background.set_character(x, y - 1, self.CHARS['keyboard_sharp'])
             else:
-                self.rect_background.set_character(x, y + 1, chr(9620))
+                self.rect_background.set_character(x, y + 1, self.CHARS['keyboard_natural'])
 
             if (i + 3) % 12 == 0:
                 for j in range(0, y - 1):
-                    self.rect_background.set_character(x, j, chr(9550))
+                    self.rect_background.set_character(x, j, self.CHARS['a_line'])
 
                 for j in range(y + 2, self.rect_background.height):
-                    self.rect_background.set_character(x, j, chr(9550))
+                    self.rect_background.set_character(x, j, self.CHARS['a_line'])
 
     def draw_help_menu(self):
         if not self.rect_help_menu:
@@ -656,41 +696,48 @@ class PlayerScene(RoryScene):
 
         menu = self.rect_help_menu
 
+        descriptions = [
+            (RoryStage.CONTROL_QUIT, "Close Rory"),
+            (RoryStage.CONTROL_TOGGLE_HELP, "Toggle this pop up"),
+            ("0-9", "Set register"),
+            ("ESC", "Clear register"),
+            (RoryStage.CONTROL_NEXT_STATE, "Next state"),
+            (RoryStage.CONTROL_PREV_STATE, "Previous state"),
+            (RoryStage.CONTROL_IGNORE_CHANNEL, "Ignore the channel in register"),
+            (RoryStage.CONTROL_UNIGNORE_CHANNELS, "Unignore all channels"),
+            (RoryStage.CONTROL_SET_POSITION, "Jump to state in register"),
+            (RoryStage.CONTROL_SET_RANGE, "resize keyboard ( Then press lowest and highest keys )"),
+            (RoryStage.CONTROL_TRANSPOSE, "transpose the entire song by the register"),
+            (RoryStage.CONTROL_LOOP_START, "Set start of loop"),
+            (RoryStage.CONTROL_LOOP_END, "Set end of loop"),
+            (RoryStage.CONTROL_LOOP_KILL, "Clear start & end of loop")
+        ]
+
         lines = [
             "Controls",
             "",
-            "q    - Close Rory",
-            "h    - Toggle this pop up",
-            "0-9  - Set register",
-            "esc  - Clear register",
-            "j/k  - Next/previous state",
-            "i    - Ignore the channel in register",
-            "u    - Unignore all channels",
-            "p    - Jump to state in register",
-            "r    - resize keyboard ( Then press lowest and highest keys )",
-            "t    - transpose the entire song by the register",
-            "[    - Set start of loop",
-            "]    - Set end of loop",
-            "\\    - Clear start & end of loop"
         ]
+        for desc in descriptions:
+            lines.append("%s    - %s" % desc)
+
 
         new_height = min(self.root.height - 2, len(lines) + 2)
         menu.resize(int(self.root.width / 1.5), new_height)
         menu.move((self.root.width - menu.width) // 2, (self.root.height - menu.height) // 2)
-
+        menu_assets = self.CHARS['menu']
         # Draw border
         for y in range(1, menu.height - 1):
-            menu.set_character(0, y, chr(9553))
-            menu.set_character(menu.width - 1, y, chr(9553))
+            menu.set_character(0, y, menu_assets['left'])
+            menu.set_character(menu.width - 1, y, menu_assets['right'])
 
         for x in range(1, menu.width - 1):
-            menu.set_character(x, 0, chr(9552))
-            menu.set_character(x, menu.height - 1, chr(9552))
+            menu.set_character(x, 0, menu_assets['top'])
+            menu.set_character(x, menu.height - 1, menu_assets['bottom'])
 
-        menu.set_character(0,0, chr(9556))
-        menu.set_character(menu.width - 1, menu.height - 1, chr(9565))
-        menu.set_character(0,menu.height - 1, chr(9562))
-        menu.set_character(menu.width - 1, 0, chr(9559))
+        menu.set_character(0,0, menu_assets['top_left'])
+        menu.set_character(menu.width - 1, menu.height - 1, menu_assets['bottom_right'])
+        menu.set_character(0,menu.height - 1, menu_assets['bottom_left'])
+        menu.set_character(menu.width - 1, 0, menu_assets['top_right'])
 
 
         # Add the content
