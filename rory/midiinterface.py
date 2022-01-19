@@ -1,6 +1,7 @@
 '''Plays MIDILike Objects'''
 import math
 from apres import NoteOn, NoteOff, SetTempo, TimeSignature, MIDIEvent
+from rory.structures import Grouping
 
 def ratios_to_common_divisor(ratios):
     max_divisor = 1
@@ -65,10 +66,10 @@ class MIDIInterface:
 
         final_tick = 0 # will be the final tick with a note on event
         running_beat_count = (0, 0) # beat_count, last_tick_totalled
-        measure_map = [] # index: measure, value: midi tick
-        beat_map = [] # index: beat, value: midi tick
 
         current_numerator = 4
+        beat_in_measure = 0
+        current_measure = 0
         beat_size = self.midi.ppqn
         active_notes = {}
         min_note = 128
@@ -79,8 +80,11 @@ class MIDIInterface:
 
             current_beat = int(running_beat_count[0] + (tick_diff // beat_size))
             while len(beats) <= current_beat:
-                beats.append([[], beat_size, False])
-                beat_map.append(tick)
+                beats.append([[], beat_size, current_measure, current_numerator, beat_in_measure])
+                beat_in_measure += 1
+                if beat_in_measure == current_numerator:
+                    beat_in_measure = 0
+                    current_measure += 1
 
             if isinstance(event, NoteOn) and event.channel != 9 and event.velocity > 0:
                 active_notes[(event.channel, event.note)] = (current_beat, len(beats[current_beat][0]))
@@ -97,20 +101,15 @@ class MIDIInterface:
                     pass
 
             elif isinstance(event, TimeSignature):
-                for i in range(math.ceil(tick_diff // (beat_size * current_numerator))):
-                    measure_map.append((i * (beat_size * current_numerator)) + running_beat_count[1])
-
                 running_beat_count = (current_beat, tick)
                 current_numerator = event.numerator
                 beat_size = self.midi.ppqn // ((2 ** event.denominator) / 4)
+                beats[current_beat][3] = current_numerator
 
         if final_tick != running_beat_count[1]:
             tick_diff = final_tick - running_beat_count[1]
-            for i in range(math.ceil(tick_diff / (beat_size * current_numerator))):
-                measure_map.append((i * (beat_size * current_numerator)) + running_beat_count[1])
-
-        for b in range(len(beats)):
-            beats[b][2] = (beat_map[b] in measure_map)
+            #for i in range(math.ceil(tick_diff / (beat_size * current_numerator))):
+            #    measure_map.append((i * (beat_size * current_numerator)) + running_beat_count[1])
 
         self.transpose = min(
             max(
@@ -121,6 +120,34 @@ class MIDIInterface:
         )
 
         return beats
+
+    def __beats_to_grouping(self, beats):
+        grouping = Grouping()
+        measures = []
+        for (_events, _beat_size, measure, _numerator, _bim) in beats:
+            while len(measures) <= measure:
+                measures.append(measure)
+        grouping.set_size(len(measures))
+        for _events, _beat_size, m_index, numerator, _bim in beats:
+            measure = grouping.get_grouping(m_index)
+            measure.set_size(numerator)
+        for events, beat_size, m_index, _numerator, bim in beats:
+            measure = grouping.get_grouping(m_index)
+            for (pos, event, _real, _duration) in events:
+                beat = measure.get_grouping(bim)
+                beat.set_size(beat_size)
+
+            for (pos, event, real, _duration) in events:
+                beat = measure.get_grouping(bim)
+                tick = beat.get_grouping(int(pos))
+                tick.add_event((event, real))
+
+        for i in range(len(grouping)):
+            measure = grouping.get_grouping(i)
+            for j in range(len(measure)):
+                beat = measure.get_grouping(j)
+                beat.reduce()
+        return grouping
 
     def __init__(self, midi, **kwargs):
         self.midi = midi
@@ -138,74 +165,24 @@ class MIDIInterface:
         self.__handle_kwargs(kwargs)
 
         beats = self.__calculate_beat_chunks()
-        rhythm_groupings = []
-        measure_offset = 0
-        for beat, (events, beat_size, is_measure_start) in enumerate(beats):
-            adjusted_states = [(0, [])]
-            if len(events):
-                delta_pairs = []
-                relative_distances = set([0])
+        grouping = self.__beats_to_grouping(beats)
 
-                prev = 0
-                last_note_off = 0
-                for pos, event, real_tick, duration in events:
-                    delta = pos - prev
-
-                    relative_distances.add(delta)
-                    delta_pairs.append((delta, (event, real_tick), pos + measure_offset))
-                    prev = pos
-
-                    last_note_off = max(pos + duration, last_note_off)
-
-
-
-                relative_distances = list(relative_distances)
-                relative_distances.sort()
-                for delta, event, rhythm_ratio in delta_pairs:
-                    i = relative_distances.index(delta)
-                    if i == 0:
-                        adjusted_states[-1] = (rhythm_ratio, adjusted_states[-1][1])
-                    else:
-                        for _ in range(i):
-                            adjusted_states.append((rhythm_ratio, []))
-                    adjusted_states[-1][1].append(event)
-
-                # Fill out the remainder of the the beat with space
-                percent = last_note_off / beat_size
-                full_length = len(adjusted_states) / percent
-                while full_length - 1 > len(adjusted_states):
-                    adjusted_states.append((0, []))
-
-                del prev
-
-            if is_measure_start:
-                self.measure_map.append(len(self.state_map))
-
-            self.beat_map[len(self.state_map)] = beat
-            self.inv_beat_map[beat] = len(self.state_map)
-            for i, (rhythm_ratio, tick_events) in enumerate(adjusted_states):
-                self.state_map.append(set())
-                self.rhythm_map[len(self.state_map) - 1] = rhythm_ratio
-                rhythm_groupings.append((len(self.state_map) - 1, rhythm_ratio))
-                self.active_notes_map.append({})
-                for _j, (event, real_tick) in enumerate(tick_events):
-                    new_note = event.note + self.transpose
-                    event.set_note(new_note)
-                    self.state_map[-1].add(event.note)
-                    self.active_notes_map[-1][event.note] = event
-                    self.timing_map[len(self.state_map) - 1] = real_tick
-
-            measure_offset += beat_size
-            # If end of list or measure
-            if beat + 1 == len(beats) or beats[beat + 1][2]:
-                rhythms = []
-                for (i, ratio) in rhythm_groupings:
-                    rhythms.append((ratio, measure_offset))
-                rhythms = ratios_to_common_divisor(rhythms)
-                for x, (i, _) in enumerate(rhythm_groupings):
-                    self.rhythm_map[i] = rhythms[x]
-                rhythm_groupings = []
-                measure_offset = 0
+        beat_count = 0
+        for measure in grouping.iter():
+            self.measure_map.append(len(self.state_map))
+            for beat_index, beat in enumerate(measure.iter()):
+                self.beat_map[len(self.state_map)] = beat_count
+                self.inv_beat_map[beat_count] = len(self.state_map)
+                for eventlist in beat.get_flat_min():
+                    self.state_map.append(set())
+                    self.active_notes_map.append({})
+                    for event, real_tick in eventlist:
+                        new_note = event.note + self.transpose
+                        event.set_note(new_note)
+                        self.state_map[-1].add(event.note)
+                        self.active_notes_map[-1][event.note] = event
+                        self.timing_map[len(self.state_map) - 1] = real_tick
+                beat_count += 1
 
 
 
