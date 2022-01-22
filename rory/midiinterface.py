@@ -3,56 +3,6 @@ import math
 from apres import NoteOn, NoteOff, SetTempo, TimeSignature, MIDIEvent
 from rory.structures import Grouping
 
-def ratios_to_common_divisor(ratios):
-    max_divisor = 1
-    zeros = []
-    used_divisors = set()
-    for i, (n, d) in enumerate(ratios):
-        d = int(d)
-        if d not in used_divisors:
-            max_divisor *= d
-        used_divisors.add(d)
-        if n == 0:
-            zeros.append(i)
-            ratios[i] = (d, d)
-
-
-    new_numerators = []
-    for n, d in ratios:
-        new_numerators.append(int(n * max_divisor / d))
-    new_numerators.append(int(max_divisor))
-    gcd = math.gcd(*new_numerators)
-    new_numerators.pop()
-
-    output = []
-    for n in new_numerators:
-        output.append((int(n // gcd), int(max_divisor // gcd)))
-
-    for z in zeros:
-        output[z] = (0, output[z][1])
-
-    return output
-
-def match_ratio(position, beat_size):
-    possible_ratios = []
-    closest_match = (None, 1)
-    if position == 0:
-        return (0, 1)
-    r = position / beat_size
-
-    for i in [2, 3, 4, 5, 6, 8]:
-        for j in range(1, i):
-            d = math.fabs(r - (j / i))
-            if d == 0:
-                return (j, i)
-            elif d < closest_match[1]:
-                closest_match = ((j, i), d)
-    if closest_match[0] is not None:
-        return closest_match[0]
-    else:
-        return (position, beat_size)
-
-
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''
     notelist = 'CCDDEFFGGAAB'
@@ -104,6 +54,7 @@ class MIDIInterface:
                 running_beat_count = (current_beat, tick)
                 current_numerator = event.numerator
                 beat_size = self.midi.ppqn // ((2 ** event.denominator) / 4)
+                beats[current_beat][1] = beat_size
                 beats[current_beat][3] = current_numerator
 
         if final_tick != running_beat_count[1]:
@@ -127,10 +78,12 @@ class MIDIInterface:
         for (_events, _beat_size, measure, _numerator, _bim) in beats:
             while len(measures) <= measure:
                 measures.append(measure)
+
         grouping.set_size(len(measures))
         for _events, _beat_size, m_index, numerator, _bim in beats:
             measure = grouping.get_grouping(m_index)
             measure.set_size(numerator)
+
         for events, beat_size, m_index, _numerator, bim in beats:
             measure = grouping.get_grouping(m_index)
             for (pos, event, _real, _duration) in events:
