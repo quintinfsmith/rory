@@ -35,6 +35,9 @@ class Grouping:
         return output
 
     def reduce(self):
+        if not self.divisions:
+            return
+
         group_map = {}
         pos_paths = {}
         s = []
@@ -46,7 +49,6 @@ class Grouping:
                 s.append((i, i))
 
         paths = {}
-
         stack = [(s, len(self.divisions), [])]
         while stack:
             current_structure, current_div, path = stack.pop(0)
@@ -64,17 +66,26 @@ class Grouping:
 
             if smallest_divisions:
                 gcd = math.gcd(*smallest_divisions)
-                for i in range(gcd):
-                    next_level = []
+                if gcd == 1:
                     for (index, o_index) in indeces:
-                        n = int((index * gcd) / current_div)
-                        if i == n:
-                            next_level.append((index - ((current_div // gcd) * i), o_index))
+                        next_level = [(0, o_index)]
 
-                    current_structure.append(next_level)
-                    next_path = path.copy()
-                    next_path.append(i)
-                    stack.append((next_level, current_div // gcd, next_path))
+                        next_path = path.copy()
+                        next_path.append(0)
+
+                        current_structure.append(next_level)
+                        stack.append((next_level, 1, next_path))
+                else:
+                    for i in range(gcd):
+                        next_level = []
+                        for (index, o_index) in indeces:
+                            n = int((index * gcd) / current_div)
+                            if i == n:
+                                next_level.append((index - ((current_div // gcd) * i), o_index))
+                        current_structure.append(next_level)
+                        next_path = path.copy()
+                        next_path.append(i)
+                        stack.append((next_level, current_div // gcd, next_path))
 
         og_divs = self.divisions
         stack = [(s, self)]
