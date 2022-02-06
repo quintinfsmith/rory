@@ -17,22 +17,25 @@ class Grouping:
 
     def get_flat_min(self):
         if len(self) == 0:
-            return [self.events]
+            return (1, [(0, set(self.events))])
+
         sub_divs = []
         div_counts = []
         for div in self.iter():
             sub_div = div.get_flat_min()
-            div_counts.append(len(sub_div))
+            div_counts.append(sub_div[0])
             sub_divs.append(sub_div)
+
         new_size = math.prod(div_counts) // math.gcd(*div_counts)
         output = []
-        for sub_div in sub_divs:
-            factor = new_size // len(sub_div)
-            for item in sub_div:
-                output.append(item)
-                for i in range(factor - 1):
-                    output.append([])
-        return output
+        size = 0
+        for p, sub_div in enumerate(sub_divs):
+            factor = new_size // sub_div[0]
+            for i, item in sub_div[1]:
+                if len(item):
+                    output.append(((i * factor) + (p * new_size), item))
+            size += new_size
+        return (size, output)
 
     def reduce(self):
         if not self.divisions:

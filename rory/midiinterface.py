@@ -95,11 +95,6 @@ class MIDIInterface:
                 tick = beat.get_grouping(int(pos))
                 tick.add_event((event, real))
 
-        for i in range(len(grouping)):
-            measure = grouping.get_grouping(i)
-            for j in range(len(measure)):
-                beat = measure.get_grouping(j)
-                beat.reduce()
         return grouping
 
     def __init__(self, midi, **kwargs):
@@ -124,17 +119,32 @@ class MIDIInterface:
         for measure in grouping.iter():
             self.measure_map.append(len(self.state_map))
             for beat_index, beat in enumerate(measure.iter()):
+                beat.reduce()
                 self.beat_map[len(self.state_map)] = beat_count
                 self.inv_beat_map[beat_count] = len(self.state_map)
-                for eventlist in beat.get_flat_min():
+
+                l, flat_min = beat.get_flat_min()
+
+                if len(flat_min) / l >= .50:
+                    frames_to_add = l
+                else:
+                    frames_to_add = int(len(flat_min) * 1.5)
+
+                frames_to_add = max(1, frames_to_add)
+
+                initial_i = len(self.state_map)
+                for i in range(frames_to_add):
                     self.state_map.append(set())
                     self.active_notes_map.append({})
+
+                for index, eventlist in flat_min:
+                    i = int(initial_i + ((index / l) * frames_to_add))
                     for event, real_tick in eventlist:
                         new_note = event.note + self.transpose
                         event.set_note(new_note)
-                        self.state_map[-1].add(event.note)
-                        self.active_notes_map[-1][event.note] = event
-                        self.timing_map[len(self.state_map) - 1] = real_tick
+                        self.state_map[i].add(event.note)
+                        self.active_notes_map[i][event.note] = event
+                        self.timing_map[i] = real_tick
                 beat_count += 1
 
 
