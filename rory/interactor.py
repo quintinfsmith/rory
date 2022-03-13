@@ -4,17 +4,11 @@ import threading
 import time
 import tty
 import sys
+import select
+import os
 
-def read_character():
-    '''Read character from stdin'''
-    init_fileno = sys.stdin.fileno() # store original pipe n
-    init_attr = termios.tcgetattr(init_fileno)  # store original input settings
-    try:
-        tty.setraw(sys.stdin.fileno()) # remove wait for "return"
-        ch = sys.stdin.read(1) # Read single character into memory
-    finally:
-        termios.tcsetattr(init_fileno, termios.TCSADRAIN, init_attr) # reset input settings
-    return ch
+class ContextChange(Exception):
+    '''Thrown when context is changed on interactor mid-read'''
 
 
 class FunctionTreeNode(object):
@@ -84,16 +78,64 @@ class Interactor(object):
 
         self.ignoring_input = 0
         self.downtime = 1 / 60
+        self.kill_flag = False
+
+        self._init_fileno = None
+        self._init_attr = None
+
+    def read_character(self):
+        '''Read character from stdin'''
+        self._init_fileno = sys.stdin.fileno() # store original pipe n
+        self._init_attr = termios.tcgetattr(self._init_fileno)  # store original input settings
+        try:
+            tty.setraw(sys.stdin.fileno()) # remove wait for "return"
+            ch = None
+            in_context = self.active_context
+            while not self.kill_flag and ch is None:
+                try:
+                    ready, _, __ = select.select([sys.stdin], [], [], 0)
+                except TypeError:
+                    ready = []
+                except ValueError:
+                    ready = []
+
+                if sys.stdin in ready:
+                    try:
+                        output = os.read(self._init_fileno, 1)
+                        if output:
+                            ch = chr(output[0])
+                        else:
+                            continue
+                    except ValueError:
+                        continue
+
+                if self.active_context != in_context:
+                    raise ContextChange()
+
+                if ch is None:
+                    time.sleep(.01)
+        finally:
+            self.restore_input_settings()
+
+        return ch
+
+    def restore_input_settings(self):
+        if self._init_fileno is not None:
+            termios.tcsetattr(self._init_fileno, termios.TCSADRAIN, self._init_attr) # reset input settings
+        self._init_fileno = None
+        self._init_attr = None
 
 
     def get_input(self):
         '''Send keypress to be handled'''
-        new_chr = read_character()
-
-        if time.time() - self.ignoring_input < self.downtime:
-            pass
-        else:
-            self.check_cmd(new_chr)
+        try:
+            new_chr = self.read_character()
+            if time.time() - self.ignoring_input < self.downtime:
+                pass
+            else:
+                self.check_cmd(new_chr)
+        except ContextChange as e:
+            self.active_node = self.cmd_nodes[self.active_context]
 
 
     def check_cmd(self, char):

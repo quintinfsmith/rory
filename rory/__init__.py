@@ -14,6 +14,7 @@ __url__ = "https://github.com/quintinfsmith/rory"
 def main():
     import sys
     import time
+    import os
     from rory.interface import RoryStage, TerminalTooNarrow, InvalidMIDIFile
     options = {
         "-t": ("transpose", int),
@@ -50,7 +51,7 @@ def main():
         interface.play()
 
         if len(sys.argv) < 2:
-            kwargs['path'] = '/home/pent/Midis/'
+            kwargs['path'] = os.path.realpath(".")
             interface.start_scene(
                 RoryStage.CONTEXT_BROWSER,
                 **kwargs
