@@ -8,29 +8,28 @@ from apres import MIDI, InvalidMIDIFile
 from rory.player import Player
 from rory.interactor import Interactor
 from typing import Final
+import os
 
 class TerminalTooNarrow(Exception):
     '''Error thrown when the minimum width required isn't available'''
 
 class RoryStage:
     '''Interface to Run the MidiPlayer'''
+    KILL = 1
+    PAUSE = 2
+
     CONTEXT_DEFAULT = 0
     CONTEXT_PLAYER = 1
+    CONTEXT_BROWSER = 2
 
     CONTROL_QUIT = 'q'
-    CONTROL_NEXT_STATE = 'j'
-    CONTROL_PREV_STATE = 'k'
-    CONTROL_IGNORE_CHANNEL = 'i'
-    CONTROL_UNIGNORE_CHANNELS ='u'
-    CONTROL_TRANSPOSE = 't'
-    CONTROL_LOOP_START = '['
-    CONTROL_LOOP_END = ']'
-    CONTROL_LOOP_KILL = '\\'
-    CONTROL_CLEAR_REGISTER = '\x1b'
-    CONTROL_TOGGLE_HELP = 'h'
-    CONTROL_SET_POSITION = 'p'
-    CONTROL_SET_MEASURE = 'P'
-    CONTROL_SET_RANGE = 'r'
+
+
+    def _input_daemon(self):
+        '''Main loop, just handles computer keyboard input'''
+
+        while self.playing:
+            self.interactor.get_input()
 
     def __init__(self):
         self.root = wrecked.init()
@@ -48,11 +47,16 @@ class RoryStage:
             self.kill
         )
 
-        self.delay = 1/64
-
+        self.delay = 1/32
         self.playing = False
 
-        self.playerscene = None
+        self.scene_constructors = {
+            self.CONTEXT_PLAYER: PlayerScene,
+            self.CONTEXT_BROWSER: BrowserScene
+        }
+
+        self.history_stack = []
+
 
     def set_fps(self, fps):
         self.delay = 1 / fps
@@ -74,105 +78,9 @@ class RoryStage:
                 transpose=transpose
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
-            thread = threading.Thread(target=self._input_daemon)
-            thread.start()
 
         playerscene = self.scenes[self.CONTEXT_PLAYER]
         player = playerscene.player
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_NEXT_STATE,
-            player.next_state
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_IGNORE_CHANNEL,
-            playerscene.ignore_channel
-        )
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_UNIGNORE_CHANNELS,
-            playerscene.unignore_channels
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_PREV_STATE,
-            player.prev_state
-        )
-
-        for digit in range(10):
-            self.interactor.assign_context_sequence(
-                self.CONTEXT_PLAYER,
-                str(digit),
-                player.set_register_digit,
-                digit
-            )
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            '-',
-            player.set_register_digit,
-            ord('-')
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_CLEAR_REGISTER,
-            player.clear_register
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_TOGGLE_HELP,
-            playerscene.toggle_help_menu
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_SET_POSITION,
-            player.jump_to_register_position,
-        )
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_SET_MEASURE,
-            playerscene.jump_to_register_measure,
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_LOOP_START,
-            player.set_loop_start_to_position,
-        )
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_LOOP_END,
-            player.set_loop_end_to_position,
-        )
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_LOOP_KILL,
-            player.clear_loop,
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_TRANSPOSE,
-            playerscene.reset_transpose,
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_QUIT,
-            self.kill
-        )
-
-        self.interactor.assign_context_sequence(
-            self.CONTEXT_PLAYER,
-            self.CONTROL_SET_RANGE,
-            playerscene.flag_new_range
-        )
 
         self.interactor.set_context(self.CONTEXT_PLAYER)
         self.start_scene(self.CONTEXT_PLAYER)
@@ -181,15 +89,11 @@ class RoryStage:
         self.playing = False
 
         for scene in self.scenes.values():
-            scene.kill()
+            scene.disable()
+            scene.root.detach()
+            del scene
+
         wrecked.kill()
-
-
-    def _input_daemon(self):
-        '''Main loop, just handles computer keyboard input'''
-
-        while self.playing:
-            self.interactor.get_input()
 
     def resize(self, width, height):
         self.root.resize(width, height)
@@ -209,11 +113,16 @@ class RoryStage:
     def play(self):
         self.playing = True
 
+        thread = threading.Thread(target=self._input_daemon)
+        thread.start()
+
         play_thread = threading.Thread(target=self._play)
         play_thread.start()
 
-
     def _play(self):
+        while not self.active_scene:
+            time.sleep(self.delay)
+
         while self.playing:
             self._resize_check()
 
@@ -224,20 +133,49 @@ class RoryStage:
 
             if scene:
                 try:
-                    if scene.tick():
+                    if scene.has_kill_message():
+                        self.process_kill_message(scene.get_kill_message())
+                    elif scene.tick():
                         scene.draw()
                 except Exception as e:
                     self.kill()
                     raise e
+            else:
+                self.kill()
+
             time.sleep(self.delay)
 
-    def start_scene(self, new_scene_key):
+    def remove_scene(self, key):
+        if self.scenes[self.active_scene]:
+            self.scenes[self.active_scene].disable()
+            self.scenes[self.active_scene].root.detach()
+            del self.scenes[self.active_scene]
+
+    def process_kill_message(self, msg):
+        dokill, scene_context, kwargs = msg
+
+        if dokill:
+            self.remove_scene(self.active_scene)
+            if len(self.history_stack):
+                previous_scene_key = self.history_stack.pop()
+                self.active_scene = None
+                self.start_scene(previous_scene_key)
+
+        elif scene_context:
+            self.history_stack.append(self.active_scene)
+            self.start_scene(scene_context, **kwargs)
+
+    def start_scene(self, new_scene_key, **kwargs):
         if self.active_scene:
             self.scenes[self.active_scene].disable()
 
+        self.interactor.set_context(new_scene_key)
+
+        if not new_scene_key in self.scenes.keys():
+            self.scenes[new_scene_key] = self.scene_constructors[new_scene_key](self, **kwargs)
+
+        self.scenes[new_scene_key].enable()
         self.active_scene = new_scene_key
-        self.scenes[self.active_scene].enable()
-        self.root.draw()
 
     def new_rect(self):
         rect = self.root.new_rect()
@@ -245,8 +183,14 @@ class RoryStage:
         return rect
 
 class RoryScene:
+    def init_interactor(self, interactor):
+        pass
+
     def __init__(self, rorystage):
+        self.stage = rorystage
         self.root = rorystage.new_rect()
+        self.kill_message = None
+        self.init_interactor(rorystage.interactor)
 
     def disable(self):
         self.root.disable()
@@ -260,17 +204,277 @@ class RoryScene:
     def tick(self):
         pass
 
-    def kill(self):
+    def has_kill_message(self):
+        return bool(self.kill_message)
+
+    def get_kill_message(self):
+        output = self.kill_message
+        self.kill_message = None
+        return output
+
+    def takedown(self):
         pass
+
+    def end_scene(self, kill_status=True, next_context=None, message=None):
+        self.kill_message = (kill_status, next_context, message)
 
     def resize(self, new_width, new_height):
         self.root.resize(new_width, new_height)
+
+class BrowserScene(RoryScene):
+    CONTROL_QUIT = 'q'
+    def init_interactor(self, interactor):
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            self.CONTROL_QUIT,
+            self.end_scene
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            'j',
+            self.next_row
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            'k',
+            self.prev_row
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            'h',
+            self.prev_col
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            'l',
+            self.next_col
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_BROWSER,
+            "\r",
+            self.select
+        )
+
+    def __init__(self, rorystage: RoryStage, **kwargs):
+        super().__init__(rorystage)
+        if 'path' in kwargs:
+            self.path = kwargs['path']
+        else:
+            self.path = os.environ['HOME']
+
+        self.path_offsets = {}
+        self._working_file_list = []
+
+        self.set_working_path(self.path)
+
+        self.rect_title = self.root.new_rect()
+        self.rect_title_path = self.rect_title.new_rect()
+        self.rect_offset = self.root.new_rect()
+        self.rect_browser_main = self.root.new_rect()
+        self.working_rect_columns = []
+        self.working_rect_files = []
+
+        self.rendered_path = None
+        self.rendered_offset = None
+
+    def get_offset(self):
+        return self.path_offsets[self.working_path]
+
+    def select(self):
+        isdir, path = self._working_file_list[self.get_offset()]
+
+        if isdir:
+            self.set_working_path(self.working_path + '/' + path)
+        else:
+            self.end_scene(False,  RoryStage.CONTEXT_PLAYER, { 'path': self.working_path + '/' + path })
+
+    def set_working_path(self, new_path):
+        self.working_path = os.path.realpath(new_path)
+        if self.working_path not in self.path_offsets:
+            self.path_offsets[self.working_path] = 0
+
+        self._working_file_list = [(True, '..')]
+        dirs = []
+        files = []
+        for f in os.listdir(self.working_path):
+            if os.path.isfile(self.working_path + '/' + f):
+                if (f[f.rfind(".") + 1:].lower() == 'mid'):
+                    files.append(f)
+            elif os.path.isdir(self.working_path + '/' + f):
+                dirs.append(f)
+
+        dirs.sort()
+        for d in dirs:
+            self._working_file_list.append((True, d))
+        files.sort()
+        for f in files:
+            self._working_file_list.append((False, f))
+        self.rendered_offset = None
+
+    def next_row(self):
+        offset = self.path_offsets[self.working_path]
+        offset += len(self.working_rect_columns)
+        offset = min(len(self._working_file_list) - 1, offset)
+        self.path_offsets[self.working_path] = offset
+
+    def prev_row(self):
+        offset = self.path_offsets[self.working_path]
+        offset -= len(self.working_rect_columns)
+        offset = max(0, offset)
+        self.path_offsets[self.working_path] = offset
+
+    def next_col(self):
+        offset = self.path_offsets[self.working_path]
+        offset += 1
+        offset = min(len(self._working_file_list) - 1, offset)
+        self.path_offsets[self.working_path] = offset
+
+    def prev_col(self):
+        offset = self.path_offsets[self.working_path]
+        offset -= 1
+        offset = max(0, offset)
+        self.path_offsets[self.working_path] = offset
+
+    def tick(self):
+        was_changed = False
+
+        if self.working_path != self.rendered_path:
+            self.rect_browser_main.resize(self.root.width, self.root.height - 1)
+            self.rect_browser_main.move(0,1)
+
+            min_column_width = 50
+            columns = 1
+            while True:
+                if len(self._working_file_list) / columns < self.rect_browser_main.height:
+                    break
+                elif self.rect_browser_main.width / columns < min_column_width:
+                    break
+                else:
+                    columns += 1
+
+            for path in self.working_rect_files:
+                path.detach()
+                del path
+            self.working_rect_files = []
+
+            column_width = (self.root.width - (columns * 2)) // columns
+            for column in self.working_rect_columns:
+                column.remove()
+                del column
+            self.working_rect_columns = []
+
+
+            files_per_column = max(1, len(self._working_file_list) // columns)
+            extra = len(self._working_file_list) % files_per_column
+            for i in range(columns):
+                column_height = files_per_column
+                if extra:
+                    column_height += 1
+                    extra -= 1
+                rect_col = self.rect_browser_main.new_rect(width=column_width, height=column_height)
+                rect_col.move((i * (column_width + 1)), 0)
+                self.working_rect_columns.append(rect_col)
+
+            for i, (isdir, f) in enumerate(self._working_file_list):
+                rect_column = self.working_rect_columns[i % columns]
+                rect_file = rect_column.new_rect()
+                rect_file.resize(rect_column.width, 1)
+                if isdir:
+                    rect_file.set_fg_color(wrecked.BLUE)
+                    f_text = "%02d) %s" % (i, f)
+                else:
+                    f_text = "%02d) %s" % (i, f[0:f.rfind(".")])
+
+                if len(f_text) > column_width:
+                    f_text = f_text[0:column_width]
+                y = i // columns
+                rect_file.move(0, y)
+                rect_file.set_string(0, 0, f_text)
+                self.working_rect_files.append(rect_file)
+
+            self.rendered_path = self.working_path
+
+        offset = self.path_offsets[self.working_path]
+        if offset != self.rendered_offset:
+            denom = len(self._working_file_list) - 1
+            numer = offset
+            display_string = "%d/%d" % (numer, denom)
+            self.rect_offset.resize(len(display_string), 1)
+            self.rect_offset.move(self.root.width - len(display_string), 0)
+            self.rect_offset.set_string(0, 0, display_string)
+
+            new_width = self.root.width - self.rect_offset.width
+
+            prefix = "Files In: "
+            self.rect_title.resize(new_width, 1)
+            self.rect_title.move(0, 0)
+            self.rect_title.set_string(0, 0, prefix)
+
+            new_width -= len(prefix)
+            title_string = self.working_path[self.working_path.rfind("/") + 1:]
+            if new_width < len(title_string):
+                title_string = title_string[0:new_width]
+                if len(title_string) - new_width  > 3:
+                    title_string = title_string[0:-3] + '...'
+            else:
+                new_width = len(title_string)
+
+            self.rect_title_path.resize(new_width, 1)
+            self.rect_title_path.move(len(prefix), 0)
+            self.rect_title_path.underline()
+            self.rect_title_path.set_string(0, 0, title_string)
+
+            columns = len(self.working_rect_columns)
+            column_width = (self.root.width - (columns * 2)) // columns
+            cursor_x = offset % columns
+            cursor_y = offset // columns
+            isdir, fname = self._working_file_list[offset]
+            fname = fname[0:min(len(fname), column_width)]
+            if not isdir:
+                fname = fname[0:fname.rfind(".")]
+            f_text = "%02d) %s" % (offset, fname)
+
+            if self.rendered_offset is not None:
+                self.working_rect_files[self.rendered_offset].unset_invert()
+
+            working_column = self.working_rect_columns[cursor_x]
+
+            rect_cursor = self.working_rect_files[offset]
+            rect_cursor.invert()
+
+            # Shift Page
+            column_page = (offset // len(self.working_rect_columns)) // self.rect_browser_main.height
+            for i, column in enumerate(self.working_rect_columns):
+                column.move(i * column_width, 0 - (column_page * self.rect_browser_main.height))
+
+
+            self.rendered_offset = offset
+
+            was_changed = True
+
+        return was_changed
 
 class PlayerScene(RoryScene):
     '''Handles visualization of the Player'''
     # Display constants
     SHARPS: Final[tuple[int]] = (1, 3, 6, 8, 10)
     NOTELIST: Final[str] = 'CCDDEFFGGAAB'
+
+    CONTROL_QUIT = 'q'
+    CONTROL_NEXT_STATE = 'j'
+    CONTROL_PREV_STATE = 'k'
+    CONTROL_IGNORE_CHANNEL = 'i'
+    CONTROL_UNIGNORE_CHANNELS ='u'
+    CONTROL_TRANSPOSE = 't'
+    CONTROL_LOOP_START = '['
+    CONTROL_LOOP_END = ']'
+    CONTROL_LOOP_KILL = '\\'
+    CONTROL_CLEAR_REGISTER = '\x1b'
+    CONTROL_TOGGLE_HELP = 'h'
+    CONTROL_SET_POSITION = 'p'
+    CONTROL_SET_MEASURE = 'P'
+    CONTROL_SET_RANGE = 'r'
 
     COLORORDER: Final[list[int]] = [
         wrecked.BLUE,
@@ -308,7 +512,106 @@ class PlayerScene(RoryScene):
         }
     }
 
+    def init_interactor(self, interactor):
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_NEXT_STATE,
+            self.player.next_state
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_IGNORE_CHANNEL,
+            self.ignore_channel
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_UNIGNORE_CHANNELS,
+            self.unignore_channels
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_PREV_STATE,
+            self.player.prev_state
+        )
+
+        for digit in range(10):
+            interactor.assign_context_sequence(
+                RoryStage.CONTEXT_PLAYER,
+                str(digit),
+                self.player.set_register_digit,
+                digit
+            )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            '-',
+            self.player.set_register_digit,
+            ord('-')
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_CLEAR_REGISTER,
+            self.player.clear_register
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_TOGGLE_HELP,
+            self.toggle_help_menu
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_SET_POSITION,
+            self.player.jump_to_register_position,
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_SET_MEASURE,
+            self.jump_to_register_measure,
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_LOOP_START,
+            self.player.set_loop_start_to_position,
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_LOOP_END,
+            self.player.set_loop_end_to_position,
+        )
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_LOOP_KILL,
+            self.player.clear_loop,
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_TRANSPOSE,
+            self.reset_transpose,
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_QUIT,
+            self.end_scene
+        )
+
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            self.CONTROL_SET_RANGE,
+            self.flag_new_range
+        )
+
     def __init__(self, rorystage: RoryStage, **kwargs):
+        self.player = Player(**kwargs)
+
         super().__init__(rorystage)
 
         self.active_midi = MIDI(kwargs['path'])
@@ -345,7 +648,6 @@ class PlayerScene(RoryScene):
         self.rect_loop_end.set_fg_color(wrecked.BRIGHTWHITE)
 
         self.active_row_position = 8
-        self.player = Player(**kwargs)
 
         self.FLAG_BACKGROUND = True
         self.last_rendered_pressed = None
@@ -745,7 +1047,7 @@ class PlayerScene(RoryScene):
             menu.set_string(2, 1 + i, line)
 
     def __get_displayed_key_position(self, midi_key):
-        # TODO: Make me more effecient
+        # TODO: Make me more efficient
         position = 0
         for i in range(self.player.note_range[0], midi_key):
             if i in (2, 7):
@@ -764,7 +1066,6 @@ class PlayerScene(RoryScene):
         for channel in self.player.ignored_channels.copy():
             self.player.unignore_channel(channel)
 
-
     def get_channel_color(self, channel):
         if channel not in self.mapped_colors:
             self.rechanneled[len(self.mapped_colors) % len(self.COLORORDER)] = channel
@@ -776,10 +1077,11 @@ class PlayerScene(RoryScene):
             color = self.mapped_colors[channel]
         return color
 
-    def kill(self):
+    def end_scene(self):
         ''' Tear down the player backend '''
         if self.player:
             self.player.kill()
+        super().end_scene()
 
     def resize(self, new_width, new_height):
         super().resize(max(new_width, self.rect_inner.width + 2), new_height)

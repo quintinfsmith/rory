@@ -40,28 +40,38 @@ def main():
         else:
             i += 1
 
-    if len(sys.argv) < 2:
-        print("Specify Midi To Play")
-        sys.exit()
-
-
     try:
         interface = RoryStage()
     except TerminalTooNarrow:
         print("Terminal needs to be at least 106 characters wide")
         sys.exit()
 
-    interface.play()
     try:
-        interface.play_along(sys.argv[1], **kwargs)
+        interface.play()
+
+        if len(sys.argv) < 2:
+            kwargs['path'] = '/home/pent/Midis/'
+            interface.start_scene(
+                RoryStage.CONTEXT_BROWSER,
+                **kwargs
+            )
+        else:
+            kwargs['path'] = sys.argv[1]
+            interface.start_scene(
+                RoryStage.CONTEXT_PLAYER,
+                **kwargs
+            )
 
         while interface.playing:
             time.sleep(.4)
 
+
+    except KeyboardInterrupt:
         interface.kill()
     except InvalidMIDIFile:
         interface.kill()
         print("\"%s\" is not a valid MIDI" % sys.argv[1])
+
 
 
 if __name__ == "__main__":
