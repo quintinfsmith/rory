@@ -30,6 +30,7 @@ class RoryStage:
 
         while self.playing:
             self.interactor.get_input()
+        self.interactor.restore_input_settings()
 
     def __init__(self):
         self.root = wrecked.init()
@@ -56,7 +57,6 @@ class RoryStage:
         }
 
         self.history_stack = []
-
 
     def set_fps(self, fps):
         self.delay = 1 / fps
@@ -87,6 +87,7 @@ class RoryStage:
 
     def kill(self):
         self.playing = False
+        self.interactor.kill_flag = True
 
         for scene in self.scenes.values():
             scene.disable()
@@ -169,12 +170,13 @@ class RoryStage:
         if self.active_scene:
             self.scenes[self.active_scene].disable()
 
-        self.interactor.set_context(new_scene_key)
 
         if not new_scene_key in self.scenes.keys():
             self.scenes[new_scene_key] = self.scene_constructors[new_scene_key](self, **kwargs)
 
+        self.interactor.set_context(new_scene_key)
         self.scenes[new_scene_key].enable()
+        self.scenes[new_scene_key].draw()
         self.active_scene = new_scene_key
 
     def new_rect(self):
@@ -446,7 +448,7 @@ class BrowserScene(RoryScene):
             # Shift Page
             column_page = (offset // len(self.working_rect_columns)) // self.rect_browser_main.height
             for i, column in enumerate(self.working_rect_columns):
-                column.move(i * column_width, 0 - (column_page * self.rect_browser_main.height))
+                column.move(i * (column_width + 1), 0 - (column_page * self.rect_browser_main.height))
 
 
             self.rendered_offset = offset
