@@ -27,10 +27,11 @@ class RoryStage:
 
     def _input_daemon(self):
         '''Main loop, just handles computer keyboard input'''
-
+        self.interactor_running = True
         while self.playing:
             self.interactor.get_input()
         self.interactor.restore_input_settings()
+        self.interactor_running = False
 
     def __init__(self):
         self.root = wrecked.init()
@@ -57,6 +58,7 @@ class RoryStage:
         }
 
         self.history_stack = []
+        self.interactor_running = False
 
     def set_fps(self, fps):
         self.delay = 1 / fps
@@ -94,6 +96,8 @@ class RoryStage:
             scene.root.detach()
             del scene
 
+        while self.interactor_running:
+            time.sleep(.1)
         wrecked.kill()
 
     def resize(self, width, height):
