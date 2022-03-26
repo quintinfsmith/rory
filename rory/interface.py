@@ -1005,20 +1005,20 @@ class PlayerScene(RoryScene):
         menu = self.rect_help_menu
 
         descriptions = [
-            (RoryStage.CONTROL_QUIT, "Close Rory"),
-            (RoryStage.CONTROL_TOGGLE_HELP, "Toggle this pop up"),
+            (PlayerScene.CONTROL_QUIT, "Close Rory"),
+            (PlayerScene.CONTROL_TOGGLE_HELP, "Toggle this pop up"),
             ("0-9", "Set register"),
             ("ESC", "Clear register"),
-            (RoryStage.CONTROL_NEXT_STATE, "Next state"),
-            (RoryStage.CONTROL_PREV_STATE, "Previous state"),
-            (RoryStage.CONTROL_IGNORE_CHANNEL, "Ignore the channel in register"),
-            (RoryStage.CONTROL_UNIGNORE_CHANNELS, "Unignore all channels"),
-            (RoryStage.CONTROL_SET_POSITION, "Jump to state in register"),
-            (RoryStage.CONTROL_SET_RANGE, "resize keyboard ( Then press lowest and highest keys )"),
-            (RoryStage.CONTROL_TRANSPOSE, "transpose the entire song by the register"),
-            (RoryStage.CONTROL_LOOP_START, "Set start of loop"),
-            (RoryStage.CONTROL_LOOP_END, "Set end of loop"),
-            (RoryStage.CONTROL_LOOP_KILL, "Clear start & end of loop")
+            (PlayerScene.CONTROL_NEXT_STATE, "Next state"),
+            (PlayerScene.CONTROL_PREV_STATE, "Previous state"),
+            (PlayerScene.CONTROL_IGNORE_CHANNEL, "Ignore the channel in register"),
+            (PlayerScene.CONTROL_UNIGNORE_CHANNELS, "Unignore all channels"),
+            (PlayerScene.CONTROL_SET_POSITION, "Jump to state in register"),
+            (PlayerScene.CONTROL_SET_RANGE, "resize keyboard ( Then press lowest and highest keys )"),
+            (PlayerScene.CONTROL_TRANSPOSE, "transpose the entire song by the register"),
+            (PlayerScene.CONTROL_LOOP_START, "Set start of loop"),
+            (PlayerScene.CONTROL_LOOP_END, "Set end of loop"),
+            (PlayerScene.CONTROL_LOOP_KILL, "Clear start & end of loop")
         ]
 
         lines = [
