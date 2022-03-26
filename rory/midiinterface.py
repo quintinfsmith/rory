@@ -120,7 +120,7 @@ class MIDIInterface:
         for measure in grouping.iter():
             self.measure_map.append(len(self.state_map))
             for beat_index, beat in enumerate(measure.iter()):
-                beat.reduce()
+                #beat.reduce() // FIXME: reduce is broken  is sometimes removing beats altogether
                 self.beat_map[len(self.state_map)] = beat_count
                 self.inv_beat_map[beat_count] = len(self.state_map)
 
@@ -132,6 +132,7 @@ class MIDIInterface:
                     frames_to_add = int(len(flat_min) * 1.5)
 
                 frames_to_add = max(1, frames_to_add)
+                #frames_to_add= l
 
                 initial_i = len(self.state_map)
                 for i in range(frames_to_add):

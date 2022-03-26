@@ -95,8 +95,8 @@ class Grouping:
         while stack:
             arm, grouping = stack.pop(0)
             grouping.set_size(len(arm))
-            for i in range(len(arm)):
-                stack.append((arm[i], grouping.get_grouping(i)))
+            for i, element in enumerate(arm):
+                stack.append((element, grouping.get_grouping(i)))
 
         for k, p in paths.items():
             g = self
