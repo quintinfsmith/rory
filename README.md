@@ -25,6 +25,7 @@ The song will only scroll upon hitting the correct key combinations.
 
 ### Controls
 'q': Quit<br/>
+'h': Bring up help window<br/>
 'j': Next State<br/>
 'k': Previous state<br/>
 '[': set loop start<br/>
