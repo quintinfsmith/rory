@@ -15,7 +15,8 @@ def main():
     import sys
     import time
     import os
-    from rory.interface import RoryStage, TerminalTooNarrow, InvalidMIDIFile
+    from apres import InvalidMIDIFile
+    from rory.interface import RoryStage, TerminalTooNarrow
     options = {
         "-t": ("transpose", int),
     }

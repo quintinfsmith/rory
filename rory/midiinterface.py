@@ -1,6 +1,5 @@
 '''Plays MIDILike Objects'''
-import math
-from apres import NoteOn, NoteOff, SetTempo, TimeSignature, MIDIEvent
+from apres import NoteOn, NoteOff, TimeSignature
 from rory.structures import Grouping
 
 class MIDIInterface:
@@ -12,9 +11,9 @@ class MIDIInterface:
             self.transpose = kwargs['transpose']
 
     def __calculate_beat_chunks(self):
+        ''' Group the midi events into beats '''
         beats = []
 
-        final_tick = 0 # will be the final tick with a note on event
         running_beat_count = (0, 0) # beat_count, last_tick_totalled
 
         current_numerator = 4
@@ -23,24 +22,37 @@ class MIDIInterface:
         min_note = 128
         max_note = 0
         for tick, event in self.midi.get_all_events():
-            final_tick = tick
             tick_diff = tick - running_beat_count[1]
 
             current_beat = int(running_beat_count[0] + (tick_diff // beat_size))
             while len(beats) <= current_beat:
                 beats.append([[], beat_size, None, current_numerator, None])
 
-            if isinstance(event, NoteOn) and event.channel != 9 and event.velocity > 0:
-                active_notes[(event.channel, event.note)] = (current_beat, len(beats[current_beat][0]))
-                beats[current_beat][0].append((tick_diff % beat_size, event, tick, 0))
+            if self.is_note_on(event):
+                active_notes[(event.channel, event.note)] = (
+                    current_beat,
+                    len(beats[current_beat][0])
+                )
+
+                beats[current_beat][0].append((
+                    tick_diff % beat_size,
+                    event,
+                    tick,
+                    0
+                ))
                 min_note = min(min_note, event.note)
                 max_note = max(max_note, event.note)
 
-            elif (isinstance(event, NoteOn) and event.channel != 9 and event.velocity == 0) or (isinstance(event, NoteOff) and event.channel != 9):
+            elif self.is_note_off(event):
                 try:
                     beat, index = active_notes[(event.channel, event.note)]
-                    _a, _b, original_tick, duration = beats[beat][0][index]
-                    beats[beat][0][index] = (_a, _b, original_tick, tick - original_tick)
+                    _a, _b, original_tick, _ = beats[beat][0][index]
+                    beats[beat][0][index] = (
+                        _a,
+                        _b,
+                        original_tick,
+                        tick - original_tick
+                    )
                 except KeyError:
                     pass
 
@@ -54,8 +66,14 @@ class MIDIInterface:
         # Insert beat_in_measure and current measure
         beat_in_measure = 0
         current_measure = 0
-        for i, (a, b, _, numerator, __) in enumerate(beats):
-            beats[i] = [a, b, current_measure, numerator, beat_in_measure]
+        for i, (_a, _b, _, numerator, _) in enumerate(beats):
+            beats[i] = [
+                _a,
+                _b,
+                current_measure,
+                numerator,
+                beat_in_measure
+            ]
 
             beat_in_measure += 1
             if beat_in_measure == numerator:
@@ -70,33 +88,8 @@ class MIDIInterface:
             128 - max_note
         )
 
-
         return beats
 
-    def __beats_to_grouping(self, beats):
-        grouping = Grouping()
-        measures = []
-        for (_events, _beat_size, measure, _numerator, _bim) in beats:
-            while len(measures) <= measure:
-                measures.append(measure)
-
-        grouping.set_size(len(measures))
-        for _events, _beat_size, m_index, numerator, _bim in beats:
-            measure = grouping.get_grouping(m_index)
-            measure.set_size(numerator)
-
-        for events, beat_size, m_index, _numerator, bim in beats:
-            measure = grouping.get_grouping(m_index)
-            for (pos, event, _real, _duration) in events:
-                beat = measure.get_grouping(bim)
-                beat.set_size(beat_size)
-
-            for (pos, event, real, _duration) in events:
-                beat = measure.get_grouping(bim)
-                tick = beat.get_grouping(int(pos))
-                tick.add_event((event, real))
-
-        return grouping
 
     def __init__(self, midi, **kwargs):
         self.midi = midi
@@ -106,9 +99,13 @@ class MIDIInterface:
         self.active_notes_map = []
         self.beat_map = {}
         self.inv_beat_map = {}
-        self.rhythm_map = {0: (0, 1)}
+        self.rhythm_map = {
+            0: (0, 1)
+        }
         self.measure_map = [] # { state_position: measure_number }
-        self.timing_map = {0: 0}
+        self.timing_map = {
+            0: 0
+        }
         self.transpose = 0
 
         self.__handle_kwargs(kwargs)
@@ -119,20 +116,19 @@ class MIDIInterface:
         beat_count = 0
         for measure in grouping.iter():
             self.measure_map.append(len(self.state_map))
-            for beat_index, beat in enumerate(measure.iter()):
+            for _beat_index, beat in enumerate(measure.iter()):
                 #beat.reduce() // FIXME: reduce is broken  is sometimes removing beats altogether
                 self.beat_map[len(self.state_map)] = beat_count
                 self.inv_beat_map[beat_count] = len(self.state_map)
 
-                l, flat_min = beat.get_flat_min()
+                active_state_count, flat_min = beat.get_flat_min()
 
-                if len(flat_min) / l >= .50:
-                    frames_to_add = l
+                if len(flat_min) / active_state_count >= .50:
+                    frames_to_add = active_state_count
                 else:
                     frames_to_add = int(len(flat_min) * 1.5)
 
                 frames_to_add = max(1, frames_to_add)
-                #frames_to_add= l
 
                 initial_i = len(self.state_map)
                 for i in range(frames_to_add):
@@ -140,7 +136,7 @@ class MIDIInterface:
                     self.active_notes_map.append({})
 
                 for index, eventlist in flat_min:
-                    i = int(initial_i + ((index / l) * frames_to_add))
+                    i = int(initial_i + ((index / active_state_count) * frames_to_add))
                     for event, real_tick in eventlist:
                         new_note = event.note + self.transpose
                         event.set_note(new_note)
@@ -303,11 +299,11 @@ class MIDIInterface:
             if name[-2:] == "/1":
                 slash = self.get_note_name(tonic)
                 tonic += pressed[-1]
-                name = "%s%s%s" % (self.get_note_name(tonic), name[0:-1], slash)
+                name = f"{self.get_note_name(tonic)}{name[0:-1]}{slash}"
             elif name[-2:] == "/2":
                 slash = self.get_note_name(tonic)
                 tonic += pressed[-2]
-                name = "%s%s%s" % (self.get_note_name(tonic), name[0:-1], slash)
+                name = f"{self.get_note_name(tonic)}{name[0:-1]}{slash}"
             else:
                 name = self.get_note_name(tonic) + name
         else:
@@ -319,11 +315,19 @@ class MIDIInterface:
         return len(self.state_map)
 
     def get_first_position_in_measure(self, measure):
-        measure = min(measure, max(len(self.measure_map) - 1, 0))
+        ''' Returns the index of the first tick of the measure in the state map '''
+        measure = min(
+            measure,
+            max(
+                len(self.measure_map) - 1,
+                0
+            )
+        )
         return self.measure_map[measure]
 
 
     def get_measure(self, test_position):
+        ''' Given an index in the state map, returns the corresponding measure '''
         output = 0
 
         for (i, relative_position) in enumerate(self.measure_map):
@@ -334,13 +338,61 @@ class MIDIInterface:
         return output
 
     def get_beat(self, test_position):
+        ''' Given an index in the state map, returns the corresponding beat '''
         return self.inv_beat_map[test_position]
 
     @staticmethod
     def get_note_name(midi_note):
         ''' Get note's letter name '''
         name = MIDIInterface.notelist[midi_note % len(MIDIInterface.notelist)]
-        if midi_note % len(MIDIInterface.notelist) in (1,3,6,8,10):
+        if midi_note % len(MIDIInterface.notelist) in (1, 3, 6, 8, 10):
             name += "#"
 
         return name
+
+    @staticmethod
+    def is_note_off(event):
+        ''' checks if event is *effectively* a noteOff event '''
+        # NoteOn with 0 velocity are treated as note off
+
+        return (
+            isinstance(event, NoteOn) and
+            event.channel != 9 and
+            event.velocity == 0
+        ) or (
+            isinstance(event, NoteOff) and
+            event.channel != 9
+        )
+
+    @staticmethod
+    def is_note_on(event):
+        ''' checks if event is *effectively* a noteOn event '''
+        return (
+            isinstance(event, NoteOn) and
+            event.channel != 9 and
+            event.velocity > 0
+        )
+
+    @staticmethod
+    def __beats_to_grouping(beats):
+        ''' Convert the beats into 'Grouping' structure for ease of manipulation. '''
+        grouping = Grouping()
+        measures = []
+        for (_, _, m_index, _, _) in beats:
+            while len(measures) <= m_index:
+                measures.append(m_index)
+
+        grouping.set_size(len(measures))
+        for _, _, m_index, numerator, _ in beats:
+            grouping.get_grouping(m_index).set_size(numerator)
+
+        for events, beat_size, m_index, _, bim in beats:
+            beat = grouping.get_grouping(m_index).get_grouping(bim)
+            for (pos, event, _real, _duration) in events:
+                beat.set_size(beat_size)
+
+            for (pos, event, real, _duration) in events:
+                tick = beat.get_grouping(int(pos))
+                tick.add_event((event, real))
+
+        return grouping

@@ -2,13 +2,13 @@
 from __future__ import annotations
 import threading
 import time
+import os
+from typing import Final
 import wrecked
-from wrecked import get_terminal_size, Rect
-from apres import MIDI, InvalidMIDIFile
+from wrecked import get_terminal_size
+from apres import MIDI
 from rory.player import Player
 from rory.interactor import Interactor
-from typing import Final
-import os
 
 class TerminalTooNarrow(Exception):
     '''Error thrown when the minimum width required isn't available'''
@@ -25,8 +25,8 @@ class RoryStage:
     CONTROL_QUIT = 'q'
 
 
-    def _input_daemon(self):
-        '''Main loop, just handles computer keyboard input'''
+    def daemon_input(self):
+        '''just handles computer keyboard input'''
         self.interactor_running = True
         while self.playing:
             self.interactor.get_input()
@@ -61,19 +61,19 @@ class RoryStage:
         self.interactor_running = False
 
     def set_fps(self, fps):
+        ''' Set the delay between each tick, calculated from Frames Per Second '''
         self.delay = 1 / fps
 
     def key_scene(self, key, scene):
+        ''' Assign a RoryScene to a key '''
         self.scenes[key] = scene
 
     def play_along(self, midi_path, **kwargs):
         '''Run the Player with the loaded MidiLike Object'''
 
-        if not self.playerscene:
-            if 'transpose' in kwargs:
-                transpose = kwargs['transpose']
-            else:
-                transpose = 0
+        if self.CONTEXT_PLAYER not in self.scenes:
+            transpose = kwargs.get('transpose', 0)
+
             scene = PlayerScene(
                 self,
                 path=midi_path,
@@ -81,13 +81,16 @@ class RoryStage:
             )
             self.key_scene(self.CONTEXT_PLAYER, scene)
 
-        playerscene = self.scenes[self.CONTEXT_PLAYER]
-        player = playerscene.player
-
         self.interactor.set_context(self.CONTEXT_PLAYER)
         self.start_scene(self.CONTEXT_PLAYER)
 
     def kill(self):
+        '''
+            Detaches all scenes.
+            Stops the input an player daemons.
+            Then returns the terminal to its normal state.
+        '''
+
         self.playing = False
         self.interactor.kill_flag = True
 
@@ -101,6 +104,7 @@ class RoryStage:
         wrecked.kill()
 
     def resize(self, width, height):
+        ''' Resize the wrecked screen and adjust the active scene's size '''
         self.root.resize(width, height)
         try:
             scene = self.scenes[self.active_scene]
@@ -111,20 +115,26 @@ class RoryStage:
             scene.resize(width, height)
 
     def _resize_check(self):
+        ''' If the terminal has changed size, calls resize on the stage. '''
         if wrecked.fit_to_terminal():
-            w, h = get_terminal_size()
-            self.resize(w, h)
+            self.resize(*get_terminal_size())
 
     def play(self):
+        ''' Start the play and input daemons. No scene *needs* to be active '''
         self.playing = True
 
-        thread = threading.Thread(target=self._input_daemon)
+        thread = threading.Thread(target=self.daemon_input)
         thread.start()
 
-        play_thread = threading.Thread(target=self._play)
+        play_thread = threading.Thread(target=self.daemon_play)
         play_thread.start()
 
-    def _play(self):
+    def daemon_play(self):
+        '''
+            Called by the play function as a thread.
+            Will update the wrecked root as changes to the scenes occur.
+        '''
+
         while not self.active_scene:
             time.sleep(self.delay)
 
@@ -142,26 +152,28 @@ class RoryStage:
                         self.process_kill_message(scene.get_kill_message())
                     elif scene.tick():
                         scene.draw()
-                except Exception as e:
+                except Exception as generic_exception:
                     self.kill()
-                    raise e
+                    raise generic_exception
             else:
                 self.kill()
 
             time.sleep(self.delay)
 
     def remove_scene(self, key):
-        if self.scenes[self.active_scene]:
-            self.scenes[self.active_scene].disable()
-            self.scenes[self.active_scene].root.detach()
-            del self.scenes[self.active_scene]
+        ''' Remove the scene found @ 'key' '''
+        if self.scenes[key]:
+            self.scenes[key].disable()
+            self.scenes[key].root.detach()
+            del self.scenes[key]
 
     def process_kill_message(self, msg):
+        ''' Process kill message that may have been set in a scene '''
         dokill, scene_context, kwargs = msg
 
         if dokill:
             self.remove_scene(self.active_scene)
-            if len(self.history_stack):
+            if self.history_stack:
                 previous_scene_key = self.history_stack.pop()
                 self.active_scene = None
                 self.start_scene(previous_scene_key)
@@ -171,11 +183,11 @@ class RoryStage:
             self.start_scene(scene_context, **kwargs)
 
     def start_scene(self, new_scene_key, **kwargs):
+        ''' Stops the active scene, Creates a predefined scene and sets it as active '''
         if self.active_scene:
             self.scenes[self.active_scene].disable()
 
-
-        if not new_scene_key in self.scenes.keys():
+        if new_scene_key not in self.scenes:
             self.scenes[new_scene_key] = self.scene_constructors[new_scene_key](self, **kwargs)
 
         self.interactor.set_context(new_scene_key)
@@ -184,13 +196,23 @@ class RoryStage:
         self.active_scene = new_scene_key
 
     def new_rect(self):
+        ''' Create a new wrecked Rect at wrecked Root '''
         rect = self.root.new_rect()
         rect.resize(self.root.width, self.root.height)
         return rect
 
 class RoryScene:
+    ''' Abstract Class.
+        Allows functionally different sections of the program
+        to be displayed independently of eachother by the RoryStage
+    '''
+
     def init_interactor(self, interactor):
-        pass
+        '''
+            Abstract method.
+            Used to assign command sequences to the interactor
+        '''
+        raise NotImplementedError
 
     def __init__(self, rorystage):
         self.stage = rorystage
@@ -199,35 +221,50 @@ class RoryScene:
         self.init_interactor(rorystage.interactor)
 
     def disable(self):
+        ''' Disables the scene so it will not keep being drawn '''
         self.root.disable()
 
     def enable(self):
+        ''' Enables the scene so i can be drawn '''
         self.root.enable()
 
     def draw(self):
+        ''' Call the wrecked draw function '''
         self.root.draw()
 
     def tick(self):
-        pass
+        '''
+            Abstract method.
+            Called multiple times per second to update the visuals of the scene.
+        '''
+        raise NotImplementedError
 
     def has_kill_message(self):
+        ''' Has a kill message been set? '''
         return bool(self.kill_message)
 
     def get_kill_message(self):
+        ''' Get the kill message and unset it '''
         output = self.kill_message
         self.kill_message = None
         return output
 
     def takedown(self):
-        pass
+        ''' Optional Abstract method.
+            Called on kill to allow for any changes that need
+            to be done before the scene is destroyed.
+        '''
 
     def end_scene(self, kill_status=True, next_context=None, message=None):
+        ''' Sets the kill message '''
         self.kill_message = (kill_status, next_context, message)
 
     def resize(self, new_width, new_height):
+        ''' Resize the scene's wrecked Rect '''
         self.root.resize(new_width, new_height)
 
 class BrowserScene(RoryScene):
+    ''' File Browser. Shows only .mid files and directories '''
     CONTROL_QUIT = 'q'
     def init_interactor(self, interactor):
         interactor.assign_context_sequence(
@@ -285,17 +322,24 @@ class BrowserScene(RoryScene):
         self.rendered_offset = None
 
     def get_offset(self):
+        ''' Get the current position of the cursor '''
         return self.path_offsets[self.working_path]
 
     def select(self):
+        ''' Either go into a selected directory or run a selected .mid '''
         isdir, path = self._working_file_list[self.get_offset()]
 
         if isdir:
             self.set_working_path(self.working_path + '/' + path)
         else:
-            self.end_scene(False,  RoryStage.CONTEXT_PLAYER, { 'path': self.working_path + '/' + path })
+            self.end_scene(
+                False,
+                RoryStage.CONTEXT_PLAYER,
+                { 'path': self.working_path + '/' + path }
+            )
 
     def set_working_path(self, new_path):
+        ''' Set the path to browse '''
         self.working_path = os.path.realpath(new_path)
         if self.working_path not in self.path_offsets:
             self.path_offsets[self.working_path] = 0
@@ -303,46 +347,51 @@ class BrowserScene(RoryScene):
         self._working_file_list = [(True, '..')]
         dirs = []
         files = []
-        for f in os.listdir(self.working_path):
-            if os.path.isfile(self.working_path + '/' + f):
-                if (f[f.rfind(".") + 1:].lower() == 'mid'):
-                    files.append(f)
-            elif os.path.isdir(self.working_path + '/' + f):
-                dirs.append(f)
+        for filename in os.listdir(self.working_path):
+            if os.path.isfile(self.working_path + '/' + filename):
+                if filename[filename.rfind(".") + 1:].lower() == 'mid':
+                    files.append(filename)
+            elif os.path.isdir(self.working_path + '/' + filename):
+                dirs.append(filename)
 
         dirs.sort()
-        for d in dirs:
-            self._working_file_list.append((True, d))
+        for directory in dirs:
+            self._working_file_list.append((True, directory))
         files.sort()
-        for f in files:
-            self._working_file_list.append((False, f))
+        for filename in files:
+            self._working_file_list.append((False, filename))
         self.rendered_offset = None
 
     def next_row(self):
+        ''' Move the cursor down to the next row '''
         offset = self.path_offsets[self.working_path]
         offset += len(self.working_rect_columns)
         offset = min(len(self._working_file_list) - 1, offset)
         self.path_offsets[self.working_path] = offset
 
     def prev_row(self):
+        ''' Move the cursor up to the previous row '''
         offset = self.path_offsets[self.working_path]
         offset -= len(self.working_rect_columns)
         offset = max(0, offset)
         self.path_offsets[self.working_path] = offset
 
     def next_col(self):
+        ''' Move the cursor over to the next column '''
         offset = self.path_offsets[self.working_path]
         offset += 1
         offset = min(len(self._working_file_list) - 1, offset)
         self.path_offsets[self.working_path] = offset
 
     def prev_col(self):
+        ''' Move the cursor over to the previous column '''
         offset = self.path_offsets[self.working_path]
         offset -= 1
         offset = max(0, offset)
         self.path_offsets[self.working_path] = offset
 
     def tick(self):
+        ''' Update the display '''
         was_changed = False
 
         if self.working_path != self.rendered_path:
@@ -352,12 +401,13 @@ class BrowserScene(RoryScene):
             min_column_width = 50
             columns = 1
             while True:
-                if len(self._working_file_list) / columns < self.rect_browser_main.height:
-                    break
-                elif self.rect_browser_main.width / columns < min_column_width:
-                    break
-                else:
+                if not (
+                    len(self._working_file_list) / columns < self.rect_browser_main.height or
+                    self.rect_browser_main.width / columns < min_column_width
+                ):
                     columns += 1
+                else:
+                    break
 
             for path in self.working_rect_files:
                 path.detach()
@@ -382,15 +432,15 @@ class BrowserScene(RoryScene):
                 rect_col.move((i * (column_width + 1)), 0)
                 self.working_rect_columns.append(rect_col)
 
-            for i, (isdir, f) in enumerate(self._working_file_list):
+            for i, (isdir, filename) in enumerate(self._working_file_list):
                 rect_column = self.working_rect_columns[i % columns]
                 rect_file = rect_column.new_rect()
                 rect_file.resize(rect_column.width, 1)
                 if isdir:
                     rect_file.set_fg_color(wrecked.BLUE)
-                    f_text = "%02d) %s" % (i, f)
+                    f_text = "%02d) %s" % (i, filename)
                 else:
-                    f_text = "%02d) %s" % (i, f[0:f.rfind(".")])
+                    f_text = "%02d) %s" % (i, filename[0:filename.rfind(".")])
 
                 if len(f_text) > column_width:
                     f_text = f_text[0:column_width]
@@ -405,7 +455,7 @@ class BrowserScene(RoryScene):
         if offset != self.rendered_offset:
             denom = len(self._working_file_list) - 1
             numer = offset
-            display_string = "%d/%d" % (numer, denom)
+            display_string = f"{numer}/{denom}"
             self.rect_offset.resize(len(display_string), 1)
             self.rect_offset.move(self.root.width - len(display_string), 0)
             self.rect_offset.set_string(0, 0, display_string)
@@ -433,8 +483,6 @@ class BrowserScene(RoryScene):
 
             columns = len(self.working_rect_columns)
             column_width = (self.root.width - (columns * 2)) // columns
-            cursor_x = offset % columns
-            cursor_y = offset // columns
             isdir, fname = self._working_file_list[offset]
             fname = fname[0:min(len(fname), column_width)]
             if not isdir:
@@ -444,15 +492,17 @@ class BrowserScene(RoryScene):
             if self.rendered_offset is not None:
                 self.working_rect_files[self.rendered_offset].unset_invert()
 
-            working_column = self.working_rect_columns[cursor_x]
-
             rect_cursor = self.working_rect_files[offset]
             rect_cursor.invert()
 
             # Shift Page
-            column_page = (offset // len(self.working_rect_columns)) // self.rect_browser_main.height
+            column_page = (offset // len(self.working_rect_columns))
+            column_page //= self.rect_browser_main.height
             for i, column in enumerate(self.working_rect_columns):
-                column.move(i * (column_width + 1), 0 - (column_page * self.rect_browser_main.height))
+                column.move(
+                    i * (column_width + 1),
+                    0 - (column_page * self.rect_browser_main.height)
+                )
 
 
             self.rendered_offset = offset
@@ -669,23 +719,27 @@ class PlayerScene(RoryScene):
         self.rechanneled = {}
 
     def flag_new_range(self):
+        ''' Let the player know that the user wants to change the range of playable notes '''
         self.player.flag_new_range()
 
     def reset_transpose(self):
+        ''' Set the transposition back to 0 '''
         register = self.player.get_register()
         self.player.reinit_midi_interface(
             transpose=register
         )
 
     def has_transpose_changed(self):
+        ''' Check if transposition has changed '''
         current = self.player.get_transpose()
         output = current != self.last_rendered_transpose
-        if (output):
+        if output:
             self.last_rendered_transpose = current
 
         return output
 
     def has_note_range_changed(self):
+        ''' Check if the range of playable notes has changed '''
         return self.last_rendered_note_range != self.player.note_range
 
     def tick(self):
@@ -699,7 +753,13 @@ class PlayerScene(RoryScene):
             was_flagged = True
 
         song_position = player.song_position
-        if self.last_rendered_position != song_position or self.last_rendered_loop != player.loop or self.last_rendered_ignored_channels != self.player.ignored_channels or note_range_changed or transpose_changed:
+        if (
+            self.last_rendered_position != song_position
+            or self.last_rendered_loop != player.loop
+            or self.last_rendered_ignored_channels != self.player.ignored_channels
+            or note_range_changed
+            or transpose_changed
+        ):
             self.__draw_visible_notes()
             self.__draw_chord_name()
             self.last_rendered_position = song_position
@@ -729,6 +789,7 @@ class PlayerScene(RoryScene):
         return was_flagged
 
     def toggle_help_menu(self):
+        ''' Set the flag to draw the help menu in the tick function '''
         self.flag_show_menu = not self.flag_show_menu
 
     def __draw_chord_name(self):
@@ -798,7 +859,7 @@ class PlayerScene(RoryScene):
                 note_rect.move(x, y)
 
             # Draw Measure Lines
-            if position in midi_interface.beat_map.keys() and _y != self.active_row_position:
+            if position in midi_interface.beat_map and _y != self.active_row_position:
                 line_char = self.CHARS['measureline']
                 if position in midi_interface.measure_map:
                     base = 1
@@ -872,32 +933,54 @@ class PlayerScene(RoryScene):
         midi_interface = self.player.midi_interface
         state_map = midi_interface.state_map
         if self.player.loop != [0, len(state_map) - 1]:
-            l = len(str(max(self.player.loop)))
-            fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
+            order = len(str(max(self.player.loop)))
+            fmt_string = f"[%0{order}d: %0{order}d :%0{order}d]"
             position_string = fmt_string % (self.player.loop[0], song_position, self.player.loop[1])
 
             min_measure = self.__get_measure(self.player.loop[0])
             max_measure = self.__get_measure(self.player.loop[1])
-            l = len(str(max_measure))
-            fmt_string = "[%%0%dd: %%0%dd :%%0%dd]" % (l, l, l)
-            measure_string = fmt_string % (min_measure, self.__get_measure(song_position), max_measure)
+            order = len(str(max_measure))
+            fmt_string = f"[%0{order}d: %0{order}d :%0{order}d]"
+            measure_string = fmt_string % (
+                min_measure,
+                self.__get_measure(song_position),
+                max_measure
+            )
         else:
-            l = len(str(len(state_map)))
-            fmt_string = "%%0%dd/%%0%dd" % (l, l)
+            order = len(str(len(state_map)))
+            fmt_string = f"%0{order}d/%0{order}d"
             position_string = fmt_string % (song_position, len(state_map))
 
             max_measure = self.__get_measure(len(state_map))
-            l = len(str(max_measure))
-            fmt_string = "%%0%dd/%%0%dd" % (l, l)
+            order = len(str(max_measure))
+            fmt_string = f"%0{order}d/%0{order}d"
             measure_string = fmt_string % (self.__get_measure(song_position), max_measure)
 
-        self.rect_position_display.resize(len(position_string), 2)
-        self.rect_position_display.move(max(0, self.rect_background.width - len(position_string)), self.rect_background.height - 2)
-        self.rect_position_display.set_string(len(position_string) - len(measure_string), 0, measure_string)
-        self.rect_position_display.set_string(0, 1, position_string)
+        self.rect_position_display.resize(
+            len(position_string),
+            2
+        )
+        self.rect_position_display.move(
+            max(
+                0,
+                self.rect_background.width - len(position_string)
+            ),
+            self.rect_background.height - 2
+        )
+        self.rect_position_display.set_string(
+            len(position_string) - len(measure_string),
+            0,
+            measure_string
+        )
+        self.rect_position_display.set_string(
+            0,
+            1,
+            position_string
+        )
         self.last_rendered_loop = self.player.loop.copy()
 
     def get_pressed_notes(self):
+        ''' Get a set of notes currently being held down '''
         notes = self.player.get_pressed_notes()
         return notes
 
@@ -913,8 +996,6 @@ class PlayerScene(RoryScene):
             del self.pressed_note_rects[key]
 
         active_state = midi_interface.get_state(song_position)
-
-        y = self.rect_inner.height - self.active_row_position
 
         for note in pressed_notes:
             x = self.__get_displayed_key_position(note)
@@ -999,6 +1080,7 @@ class PlayerScene(RoryScene):
                     self.rect_background.set_character(x, j, self.CHARS['a_line'])
 
     def draw_help_menu(self):
+        ''' Draw the help menu '''
         if not self.rect_help_menu:
             self.rect_help_menu = self.root.new_rect()
 
@@ -1014,7 +1096,10 @@ class PlayerScene(RoryScene):
             (PlayerScene.CONTROL_IGNORE_CHANNEL, "Ignore the channel in register"),
             (PlayerScene.CONTROL_UNIGNORE_CHANNELS, "Unignore all channels"),
             (PlayerScene.CONTROL_SET_POSITION, "Jump to state in register"),
-            (PlayerScene.CONTROL_SET_RANGE, "resize keyboard ( Then press lowest and highest keys )"),
+            (
+                PlayerScene.CONTROL_SET_RANGE,
+                "resize keyboard ( Then press lowest and highest keys )"
+            ),
             (PlayerScene.CONTROL_TRANSPOSE, "transpose the entire song by the register"),
             (PlayerScene.CONTROL_LOOP_START, "Set start of loop"),
             (PlayerScene.CONTROL_LOOP_END, "Set end of loop"),
@@ -1026,7 +1111,7 @@ class PlayerScene(RoryScene):
             "",
         ]
         for desc in descriptions:
-            lines.append("%s    - %s" % desc)
+            lines.append(f"{desc[0]}    - {desc[1]}")
 
 
         new_height = min(self.root.height - 2, len(lines) + 2)
@@ -1062,6 +1147,10 @@ class PlayerScene(RoryScene):
         return position
 
     def ignore_channel(self):
+        '''
+            Prevent user from having to press notes on the channel
+            denoted by the value of the register
+        '''
         try:
             channel = self.rechanneled[self.player.get_register()]
         except KeyError:
@@ -1069,13 +1158,16 @@ class PlayerScene(RoryScene):
         self.player.ignore_channel(channel)
 
     def unignore_channels(self):
+        ''' Require user to hit notes on all channels '''
         for channel in self.player.ignored_channels.copy():
             self.player.unignore_channel(channel)
 
     def get_channel_color(self, channel):
+        ''' Get the color value assigned to the given channel '''
         if channel not in self.mapped_colors:
-            self.rechanneled[len(self.mapped_colors) % len(self.COLORORDER)] = channel
-            self.mapped_colors[channel] = self.COLORORDER[len(self.mapped_colors) % len(self.COLORORDER)]
+            color = len(self.mapped_colors) % len(self.COLORORDER)
+            self.rechanneled[color] = channel
+            self.mapped_colors[channel] = self.COLORORDER[color]
 
         if channel in self.player.ignored_channels:
             color = wrecked.BRIGHTBLACK
@@ -1095,5 +1187,9 @@ class PlayerScene(RoryScene):
         self.last_rendered_position = -1
 
     def jump_to_register_measure(self):
+        '''
+            Move the player's position to the beginning of the measure
+            denoted by the value currently set in the register
+        '''
         register = self.player.get_register()
         self.player.set_measure(register - 1)
