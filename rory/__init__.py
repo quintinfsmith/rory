@@ -19,6 +19,7 @@ def main():
     from rory.interface import RoryStage, TerminalTooNarrow
     options = {
         "-t": ("transpose", int),
+        "-m": ('numode', int)
     }
 
     arguments = sys.argv[1:]

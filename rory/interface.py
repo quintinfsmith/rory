@@ -301,10 +301,7 @@ class BrowserScene(RoryScene):
 
     def __init__(self, rorystage: RoryStage, **kwargs):
         super().__init__(rorystage)
-        if 'path' in kwargs:
-            self.path = kwargs['path']
-        else:
-            self.path = os.environ['HOME']
+        self.path = kwargs.get('path', os.environ['HOME'])
 
         self.path_offsets = {}
         self._working_file_list = []
@@ -504,9 +501,7 @@ class BrowserScene(RoryScene):
                     0 - (column_page * self.rect_browser_main.height)
                 )
 
-
             self.rendered_offset = offset
-
             was_changed = True
 
         return was_changed
@@ -667,6 +662,7 @@ class PlayerScene(RoryScene):
 
     def __init__(self, rorystage: RoryStage, **kwargs):
         self.player = Player(**kwargs)
+        self.nu_mode = kwargs.get('numode', False)
 
         super().__init__(rorystage)
 
@@ -797,7 +793,7 @@ class PlayerScene(RoryScene):
         active_channels = midi_interface.get_active_channels(self.player.song_position)
         chord_names = []
         for channel in active_channels:
-            chord_name = midi_interface.get_chord_name(self.player.song_position, channel)
+            chord_name = midi_interface.get_chord_name(self.player.song_position, channel, self.nu_mode)
             if chord_name:
                 chord_names.append(chord_name)
 
@@ -848,7 +844,12 @@ class PlayerScene(RoryScene):
                 except KeyError:
                     note_rect = self.layer_visible_notes.new_rect()
                     self.visible_note_rects[cachekey] = note_rect
-                    note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
+                    if self.nu_mode:
+                        notename = '0123456789AB'[(message.note + 3) % 12]
+                        note_rect.set_character(0, 0, notename)
+                    else:
+                        note_rect.set_character(0, 0, self.NOTELIST[message.note % 12])
+
                     if message.note % 12 in self.SHARPS:
                         note_rect.set_bg_color(color)
                         note_rect.set_fg_color(wrecked.BLACK)

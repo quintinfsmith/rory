@@ -7,8 +7,7 @@ class MIDIInterface:
     notelist = 'CCDDEFFGGAAB'
 
     def __handle_kwargs(self, kwargs):
-        if 'transpose' in kwargs:
-            self.transpose = kwargs['transpose']
+        self.transpose = kwargs.get('transpose', 0)
 
     def __calculate_beat_chunks(self):
         ''' Group the midi events into beats '''
@@ -222,7 +221,43 @@ class MIDIInterface:
 
         return active
 
-    def get_chord_name(self, position, channel):
+    def get_chord_name(self, position, channel, nu_mode=False):
+        if nu_mode:
+            output = self.get_chord_name_nu(position, channel)
+        else:
+            output = self.get_chord_name_standard(position, channel)
+        return output
+
+    def get_chord_name_nu(self, position, channel):
+        ''' Trying Something Different. Returns a Base8 representation of the pressed notes. '''
+
+        pressed = []
+        for note, event in self.active_notes_map[position].items():
+            if event.channel == channel:
+                pressed.append(note)
+
+        tonic = min(pressed)
+        for i, pressed_note in enumerate(pressed):
+            pressed[i] = (pressed_note - tonic) % 12
+        pressed = list(set(pressed))
+        pressed.sort()
+
+        pressed = tuple(pressed)
+        chord_value = 0
+        for p in pressed:
+            chord_value += (2 ** p)
+
+        return str(chord_value)
+
+       # output = ""
+       # while chord_value:
+       #     output += str(chord_value % 8)
+       #     chord_value //= 8
+
+       # return output[::-1]
+
+
+    def get_chord_name_standard(self, position, channel):
         ''' Attempt to detect the name of the chord being played at a given position '''
         chord_names = {
             (0, 3, 7): "m",
@@ -279,7 +314,6 @@ class MIDIInterface:
             (0, 4, 7, 17): "add11",
         }
 
-
         pressed = []
         for note, event in self.active_notes_map[position].items():
             if event.channel == channel:
@@ -289,7 +323,6 @@ class MIDIInterface:
         for i, pressed_note in enumerate(pressed):
             pressed[i] = (pressed_note - tonic) % 12
         pressed = list(set(pressed))
-
         pressed.sort()
 
         pressed = tuple(pressed)
