@@ -4,6 +4,7 @@ class Grouping:
     def __init__(self):
         self.divisions = []
         self.events = set()
+
     def __len__(self):
         return len(self.divisions)
 
@@ -17,7 +18,7 @@ class Grouping:
 
     def get_flat_min(self):
         if len(self) == 0:
-            return (1, [(0, set(self.events))])
+            return (1, [(0, list(self.events))])
 
         sub_divs = []
         div_counts = []
@@ -89,7 +90,6 @@ class Grouping:
                         next_path = path.copy()
                         next_path.append(i)
                         stack.append((next_level, current_div // gcd, next_path))
-
         og_divs = self.divisions
         stack = [(s, self)]
         while stack:
@@ -113,28 +113,40 @@ class Grouping:
         if not self.divisions:
             return
 
+        sizes = []
+        subgroup_backup = []
+        child_count = len(self.divisions)
         for child in self.divisions:
             child.flatten()
+            sizes.append(max(1, len(child)))
+            subgroup_backup.append(child)
 
-        sizes = []
-        for child in self.divisions:
-            l = len(child.divisions)
-            sizes.append(l)
-        if sizes and sum(sizes) == len(self.divisions) * sizes[0] and sum(sizes):
-            new_size = sizes[0] * len(self.divisions)
-            og_divs = self.divisions
-            self.set_size(new_size)
-            n = 0
-            for i, child in enumerate(og_divs):
-                for subchild in child.divisions:
-                    self.divisions[n] = subchild
-                    n += 1
+        new_size = len(sizes)
+        sizes = list(set(sizes))
+        for size in sizes:
+            new_size *= size
+        self.set_size(new_size)
+        chunk_size = new_size // child_count
+        for i, child in enumerate(subgroup_backup):
+            new_position_coarse = i *  chunk_size
+            if len(child):
+                fine_chunk_size = chunk_size // len(child)
+                for j in range(len(child)):
+                    new_position_fine = j * fine_chunk_size
+                    for event in child.get_grouping(j).events:
+                        self.get_grouping(new_position_coarse + new_position_fine).add_event(event)
+            else:
+                new_position_fine = 0
+                for event in child.events:
+                    self.get_grouping(new_position_coarse + new_position_fine).add_event(event)
+
 
     def get_grouping(self, i):
         return self.divisions[i]
 
     def add_event(self, event):
         self.events.add(event)
+
     def remove_event(self, event):
         self.events.remove(event)
 
@@ -173,7 +185,7 @@ class Grouping:
         else:
             for i, grouping in enumerate(self.divisions):
                 grp_str = grouping.get_str(depth +1).strip()
-                if (grp_str):
+                if grp_str:
                     output += "%s%d/%d) \t%s\n" % ("\t" * depth, i + 1, len(self.divisions), grp_str)
 
         return output.strip() + "\n"
@@ -184,10 +196,26 @@ class Grouping:
 
 if __name__ == "__main__":
     opus = Grouping()
-    measures = 480
-    opus.set_size(measures)
-    for i in range(16):
-        opus.get_grouping(measures * i  // 16).add_event(40)
+    opus.set_size(4)
+    for i in range(3):
+        grouping = opus.get_grouping(i)
+        grouping.set_size(3)
+        for j in range(3):
+            grouping.get_grouping(j).add_event(1)
+
+    final = opus.get_grouping(3)
+    final.set_size(12)
+    final.get_grouping(0).add_event(2)
+    final.get_grouping(4).add_event(2)
+    final.get_grouping(8).add_event(2)
+    final.get_grouping(0).add_event(8)
+    final.get_grouping(9).add_event(8)
+
+    #print(opus)
+    #print(opus.get_flat_min())
+    print(opus)
+    opus.flatten()
+    #print(opus.get_flat_min())
+    print(opus)
     opus.reduce()
-    #opus.flatten()
-    print(opus.get_flat_min())
+    print(opus)
