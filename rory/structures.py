@@ -15,12 +15,19 @@ class GroupingState(Enum):
 class Grouping:
     def __init__(self):
         self.size: int = 1
-        self.divisions: dict[int, Grouping] = {}
+        self.divisions = {}
         self.events = set()
         self.state: GroupingState = GroupingState.Open
 
     def get_state(self) -> GroupingState:
         return self.state
+
+    def is_structural(self):
+        return self.state == GroupingState.Structure
+    def is_event(self):
+        return self.state == GroupingState.Event
+    def is_open(self):
+        return self.state == GroupingState.Open
 
     def __len__(self):
         return self.size
@@ -33,39 +40,45 @@ class Grouping:
         self.divisions = {}
         self.size = size
 
-    def reduce(self):
+    def reduce(self, target_size=0):
         if self.state != GroupingState.Structure:
             return
 
         # Get the active indeces on the current level
-        indeces = list(self.divisions.keys())
-        print(indeces)
+        indeces = []
+        for i, grouping in self.divisions.items():
+            indeces.append((i, grouping))
         indeces.sort()
 
-        # YO Q!, Right now the math working but nothing being modified.
-        # I think making this a recusive function may make it simpler to track
-        # event indeces in order to modify them
-        stack = [(1, indeces, self.size)]
+        # Use a temporary Grouping to build the reduced versionW
+        place_holder = Grouping()
+        stack = [(1, indeces, self.size, place_holder)]
+        first_pass = True
         while stack:
-            print(stack[0])
-            denominator, indeces, previous_size = stack.pop(0)
+            denominator, indeces, previous_size, grouping = stack.pop(0)
             current_size = previous_size // denominator
 
             # Create separate lists to represent the new equal groupings
             split_indeces = []
             for _ in range(denominator):
                 split_indeces.append([])
+            grouping.set_size(denominator)
 
             # move the indeces into their new lists
-            for i in indeces:
+            for i, subgrouping in indeces:
                 split_index = i // current_size
-                split_indeces[split_index].append(i % current_size)
+                split_indeces[split_index].append((i % current_size, subgrouping))
 
             for i in range(denominator):
                 working_indeces = split_indeces[i]
+                if not working_indeces:
+                    continue
+
+                working_grouping = grouping.get_grouping(i)
+
                 # Get the most reduced version of each index
                 minimum_divs = []
-                for index in working_indeces:
+                for index, subgrouping in working_indeces:
                     most_reduced = int(current_size / math.gcd(current_size, index))
                     # mod the indeces to match their new relative positions
                     if most_reduced > 1:
@@ -73,9 +86,32 @@ class Grouping:
 
                 minimum_divs = list(set(minimum_divs))
                 minimum_divs.sort()
-                if minimum_divs:
-                    stack.append((minimum_divs[0], working_indeces, current_size))
+                if first_pass and target_size > 0:
+                    stack.append((
+                        target_size,
+                        working_indeces,
+                        current_size,
+                        working_grouping
+                    ))
+                elif minimum_divs:
+                    stack.append((
+                        minimum_divs[0],
+                        working_indeces,
+                        current_size,
+                        working_grouping
+                    ))
+                else: # Leaf
+                    _, event_grouping = working_indeces.pop(0)
+                    for event in event_grouping.events:
+                        working_grouping.add_event(event)
+            first_pass = False
 
+        self.set_size(len(place_holder.get_grouping(0)))
+        for i, grouping in place_holder.get_grouping(0).divisions.items():
+            self.set_grouping(i, grouping)
+
+
+        return place_holder
 
 
 
@@ -103,22 +139,31 @@ class Grouping:
         #        next_path.append(i)
         #        stack.append((next_level, current_div // gcd, next_path))
 
-
+    def is_flat(self):
+        is_flat = True
+        for i, child in self.divisions.items():
+            if child.get_state() == GroupingState.Structure:
+                is_flat = False
+                break
+        return is_flat
 
     def flatten(self):
         ''' if all the subdivisions are the same sizes, merge them up into this level '''
-        if not self.divisions:
+        if self.is_flat():
             return
 
         sizes = []
         subgroup_backup = []
         original_size = self.size
         for i, child in self.divisions.items():
-            child.flatten()
-            sizes.append(max(1, len(child)))
+            if child.get_state() != GroupingState.Structure:
+                pass
+            else:
+                child.flatten()
+                sizes.append(max(1, len(child)))
             subgroup_backup.append((i, child))
 
-        # TODO: This could probably be minimized/factored
+        # TODO: This needs to be minimized/factored
         new_size = len(sizes)
         sizes = list(set(sizes))
         for size in sizes:
@@ -127,20 +172,15 @@ class Grouping:
         self.set_size(new_size)
         chunk_size = new_size / original_size
         for i, child in subgroup_backup:
-            new_position_coarse = i * chunk_size
-            if child.get_state() == GroupingState.Structure:
-                fine_chunk_size = chunk_size / len(child)
-                for j, grandchild in child.divisions.items():
-                    new_position_fine = j * fine_chunk_size
-                    position = new_position_coarse + new_position_fine
-                    for event in grandchild.events:
-                        self.get_grouping(int(position)).add_event(event)
-            else:
-                new_position_fine = 0
-                position = new_position_coarse + new_position_fine
-                for event in child.events:
-                    self.get_grouping(int(position)).add_event(event)
+            pass
+            #TODO Reimplement
 
+    def set_grouping(self, i: int, grouping: Grouping):
+        if self.state != GroupingState.Structure:
+            raise BadStateError()
+        if i >= self.size:
+            raise IndexError()
+        self.divisions[i] = grouping
 
     def get_grouping(self, i: int) -> Grouping:
         if self.state != GroupingState.Structure:
@@ -157,20 +197,26 @@ class Grouping:
 
         return output
 
-    def add_event(self, event: int):
+    def add_event(self, event):
         if self.state == GroupingState.Structure:
             raise BadStateError()
 
         self.state = GroupingState.Event
         self.events.add(event)
 
-    def remove_event(self, event: int):
+    def remove_event(self, event):
         if self.state != GroupingState.Event:
             raise BadStateError()
         if event not in self.events:
             raise IndexError(f"{event} not in event list")
 
         self.events.remove(event)
+
+    def get_events(self):
+        if self.state != GroupingState.Event:
+            raise BadStateError()
+
+        return self.events
 
     def get_str(self, depth=0):
         output = ''
@@ -188,6 +234,15 @@ class Grouping:
     def __str__(self):
         return self.get_str()
 
+    def iter(self):
+        output = []
+        for i in range(self.size):
+            grouping = self.get_grouping(i)
+            output.append(grouping)
+        return output
+
+    def get_active_groups(self):
+        return list(self.divisions.items())
 
 def main():
     opus = Grouping()
@@ -195,20 +250,28 @@ def main():
     opus.get_grouping(0).add_event(1)
     opus.get_grouping(4).add_event(1)
     opus.get_grouping(8).add_event(1)
+
     opus.get_grouping(12).add_event(1)
     opus.get_grouping(16).add_event(1)
     opus.get_grouping(20).add_event(1)
+
     opus.get_grouping(24).add_event(1)
     opus.get_grouping(28).add_event(1)
     opus.get_grouping(32).add_event(1)
+
     opus.get_grouping(36).add_event(1)
-    opus.get_grouping(39).add_event(1)
-    opus.get_grouping(42).add_event(1)
-    opus.get_grouping(45).add_event(2)
+    opus.get_grouping(40).add_event(1)
+    opus.get_grouping(44).add_event(1)
+
+    opus.get_grouping(47).add_event(2)
 
 
-    #print(opus)
+    print(opus)
     #print(opus.get_flat_min())
-    opus.reduce()
+    opus.reduce(4)
+    print(opus)
+    opus.flatten()
+    print(opus)
+
 if __name__ == "__main__":
     main()

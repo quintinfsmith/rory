@@ -58,7 +58,7 @@ class MIDIInterface:
             elif isinstance(event, TimeSignature):
                 running_beat_count = (current_beat, tick)
                 current_numerator = event.numerator
-                beat_size = self.midi.ppqn // ((2 ** event.denominator) / 4)
+                beat_size = int(self.midi.ppqn // ((2 ** event.denominator) / 4))
                 beats[current_beat][1] = beat_size
                 beats[current_beat][3] = current_numerator
 
@@ -116,32 +116,31 @@ class MIDIInterface:
         for measure in grouping.iter():
             self.measure_map.append(len(self.state_map))
             for _beat_index, beat in enumerate(measure.iter()):
-                #beat.reduce() // FIXME: reduce is broken  is sometimes removing beats altogether
+                if beat.is_open():
+                    continue
+
+  #              beat.reduce()
+                beat.flatten()
+
                 self.beat_map[len(self.state_map)] = beat_count
                 self.inv_beat_map[beat_count] = len(self.state_map)
 
-                active_state_count, flat_min = beat.get_flat_min()
+                i = len(self.state_map)
+                for group in beat.iter():
+                    if not group.is_event():
+                        continue
 
-                if len(flat_min) / active_state_count >= .50:
-                    frames_to_add = active_state_count
-                else:
-                    frames_to_add = int(len(flat_min) * 1.5)
-
-                frames_to_add = max(1, frames_to_add)
-
-                initial_i = len(self.state_map)
-                for i in range(frames_to_add):
                     self.state_map.append(set())
                     self.active_notes_map.append({})
 
-                for index, eventlist in flat_min:
-                    i = int(initial_i + ((index / active_state_count) * frames_to_add))
-                    for event, real_tick in eventlist:
+                    for event, realtick in list(group.events):
                         new_note = event.note + self.transpose
                         event.set_note(new_note)
                         self.state_map[i].add(event.note)
                         self.active_notes_map[i][event.note] = event
-                        self.timing_map[i] = real_tick
+                        self.timing_map[i] = realtick
+                    i += 1
+
                 beat_count += 1
 
 
