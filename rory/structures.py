@@ -1,48 +1,130 @@
+"""
+    Specialized generic structures to help with midi note processing.
+    Only Grouping at the moment.
+"""
 from __future__ import annotations
 import math
-from abc import ABC
 from enum import Enum, auto
 from typing import Optional
 
 class BadStateError(Exception):
     """Thrown if an incompatible operation is attempted on a Grouping Object"""
+class SelfAssignError(Exception):
+    """Thrown when a Grouping is assigned to itself as a subgrouping"""
 
 class GroupingState(Enum):
-    Event = auto()
-    Structure = auto()
-    Open = auto()
+    """The states that a Grouping can be in"""
+    EVENT = auto()
+    STRUCTURE = auto()
+    OPEN = auto()
 
 class Grouping:
+    """
+        Tree-like structure that can be flattened and
+        unflattened as necessary while keeping relative positions
+    """
     def __init__(self):
         self.size: int = 1
         self.divisions = {}
         self.events = set()
-        self.state: GroupingState = GroupingState.Open
+        self.state: GroupingState = GroupingState.OPEN
+        self.parent: Optional[Grouping] = None
 
-    def get_state(self) -> GroupingState:
-        return self.state
+    def __str__(self):
+        output = ''
+        if self.events:
+            output += str(self.events)
+        else:
+            for i, grouping in self.divisions.items():
+                grp_str = str(grouping).strip()
+                if grp_str:
+                    tab = "\t" * self.get_depth()
+                    output += f"{tab}{i+1}/{len(self)}) \t{grp_str}\n"
 
-    def is_structural(self):
-        return self.state == GroupingState.Structure
-    def is_event(self):
-        return self.state == GroupingState.Event
-    def is_open(self):
-        return self.state == GroupingState.Open
+        return output.strip() + "\n"
 
     def __len__(self):
         return self.size
 
-    def set_size(self, size: int):
-        if self.state == GroupingState.Event:
+    def __getitem__(self, i: int) -> Grouping:
+        """
+            Get a the grouping at the specified index.
+            Will create a new grouping if none exists yet
+        """
+        if not self.is_structural():
             raise BadStateError()
 
-        self.state = GroupingState.Structure
+        if i >= self.size:
+            raise IndexError()
+
+        try:
+            output = self.divisions[i]
+        except KeyError:
+            output = Grouping()
+            self[i] = output
+
+        return output
+
+    def __setitem__(self, i: int, grouping: Grouping):
+        """Assign an existing Grouping to be a subgrouping."""
+        if not self.is_structural():
+            raise BadStateError()
+
+        if grouping == self:
+            raise SelfAssignError()
+
+        if i >= self.size:
+            raise IndexError()
+
+        grouping.parent = self
+        self.divisions[i] = grouping
+
+    def _get_state(self) -> GroupingState:
+        return self.state
+
+    def is_structural(self) -> bool:
+        """Check if this grouping has sub groupings"""
+        return self._get_state() == GroupingState.STRUCTURE
+
+    def is_event(self) -> bool:
+        """Check if this grouping has any events"""
+        return self._get_state() == GroupingState.EVENT
+
+    def is_open(self) -> bool:
+        """Check that this grouping is neither event nor structural"""
+        return self._get_state() == GroupingState.OPEN
+
+    def is_flat(self) -> bool:
+        """Check if this grouping has no sub-subgroupings and only event/open subgroupings"""
+        is_flat = True
+        for child in self.divisions.values():
+            if child.is_structural():
+                is_flat = False
+                break
+        return is_flat
+
+    def set_size(self, size: int):
+        """Resize a grouping if it doesn't have any events. Will clobber existing subgroupings."""
+        if self.is_event():
+            raise BadStateError()
+
+        self.set_state(GroupingState.STRUCTURE)
         self.divisions = {}
         self.size = size
 
+    def set_state(self, new_state: GroupingState):
+        """Sets the state of the Grouping so that invalid operations can't be applied to them"""
+        self.state = new_state
+
+    # TODO: Should this be recursive?
     def reduce(self, target_size=0):
-        if self.state != GroupingState.Structure:
-            return
+        """
+            Reduce a flat list of event groupings into smaller divisions
+            while keeping the correct ratios.
+            (eg midi events to musical notation)
+        """
+        if not self.is_structural():
+            raise BadStateError()
 
         # Get the active indeces on the current level
         indeces = []
@@ -50,7 +132,7 @@ class Grouping:
             indeces.append((i, grouping))
         indeces.sort()
 
-        # Use a temporary Grouping to build the reduced versionW
+        # Use a temporary Grouping to build the reduced version
         place_holder = Grouping()
         stack = [(1, indeces, self.size, place_holder)]
         first_pass = True
@@ -74,7 +156,7 @@ class Grouping:
                 if not working_indeces:
                     continue
 
-                working_grouping = grouping.get_grouping(i)
+                working_grouping = grouping[i]
 
                 # Get the most reduced version of each index
                 minimum_divs = []
@@ -106,59 +188,22 @@ class Grouping:
                         working_grouping.add_event(event)
             first_pass = False
 
-        self.set_size(len(place_holder.get_grouping(0)))
-        for i, grouping in place_holder.get_grouping(0).divisions.items():
-            self.set_grouping(i, grouping)
-
+        self.set_size(len(place_holder[0]))
+        for i, grouping in place_holder[0].divisions.items():
+            self[i] = grouping
 
         return place_holder
 
-
-
-        #min_div = min(*smallest_divisions)
-        #indeces = [i / min_div for i in smallest_divisions]
-        #new_size = self.size // min_div
-
-        #if smallest_divisions:
-        #    gcd = math.gcd(*smallest_divisions)
-        #    for index in indeces:
-        #        pass
-
-
-        #if smallest_divisions:
-        #    gcd = math.gcd(*smallest_divisions)
-        #    print(gcd, smallest_divisions)
-        #    for i in range(gcd):
-        #        next_level = []
-        #        for (index, o_index) in indeces:
-        #            n = int((index * gcd) / current_div)
-            #            if i == n:
-        #                next_level.append((index - ((current_div // gcd) * i), o_index))
-        #        current_structure.append(next_level)
-        #        next_path = path.copy()
-        #        next_path.append(i)
-        #        stack.append((next_level, current_div // gcd, next_path))
-
-    def is_flat(self):
-        is_flat = True
-        for i, child in self.divisions.items():
-            if child.get_state() == GroupingState.Structure:
-                is_flat = False
-                break
-        return is_flat
-
     def flatten(self):
-        ''' if all the subdivisions are the same sizes, merge them up into this level '''
-        if self.is_flat():
-            return
+        """if all the subdivisions are the same sizes, merge them up into this level"""
 
         sizes = []
         subgroup_backup = []
         original_size = self.size
         for i, child in self.divisions.items():
-            if child.get_state() != GroupingState.Structure:
+            if not child.is_structural():
                 pass
-            else:
+            elif not child.is_flat():
                 child.flatten()
                 sizes.append(max(1, len(child)))
             subgroup_backup.append((i, child))
@@ -175,96 +220,70 @@ class Grouping:
             pass
             #TODO Reimplement
 
-    def set_grouping(self, i: int, grouping: Grouping):
-        if self.state != GroupingState.Structure:
-            raise BadStateError()
-        if i >= self.size:
-            raise IndexError()
-        self.divisions[i] = grouping
-
-    def get_grouping(self, i: int) -> Grouping:
-        if self.state != GroupingState.Structure:
-            raise BadStateError()
-
-        if i >= self.size:
-            raise IndexError()
-
-        try:
-            output = self.divisions[i]
-        except KeyError:
-            output = Grouping()
-            self.divisions[i] = output
-
-        return output
 
     def add_event(self, event):
-        if self.state == GroupingState.Structure:
+        """Add an event to grouping's set of events"""
+        if self.is_structural():
             raise BadStateError()
 
-        self.state = GroupingState.Event
+        self.set_state(GroupingState.EVENT)
         self.events.add(event)
 
     def remove_event(self, event):
-        if self.state != GroupingState.Event:
+        """Remove an event from the groupings set of events"""
+        if not self.is_event():
             raise BadStateError()
+
         if event not in self.events:
             raise IndexError(f"{event} not in event list")
 
         self.events.remove(event)
 
     def get_events(self):
-        if self.state != GroupingState.Event:
+        """Get set of grouping's set of events"""
+        if not self.is_event():
             raise BadStateError()
 
         return self.events
 
-    def get_str(self, depth=0):
-        output = ''
-        if self.events:
-            output += str(self.events)
-        else:
-            for i, grouping in self.divisions.items():
-                grp_str = grouping.get_str(depth +1).strip()
-                if grp_str:
-                    tab = "\t" * depth
-                    output += f"{tab}{i+1}/{len(self)}) \t{grp_str}\n"
+    def get_depth(self):
+        """Find how many parents/supergroupings this grouping has """
+        depth = 0
+        working_grouping = self
+        while working_grouping is not None:
+            depth += 1
+            working_grouping = working_grouping.parent
 
-        return output.strip() + "\n"
+        return depth
 
-    def __str__(self):
-        return self.get_str()
-
-    def iter(self):
+    def __list__(self):
         output = []
         for i in range(self.size):
-            grouping = self.get_grouping(i)
+            grouping = self[i]
             output.append(grouping)
         return output
 
-    def get_active_groups(self):
-        return list(self.divisions.items())
-
 def main():
+    """Testing Main Function"""
     opus = Grouping()
     opus.set_size(48)
-    opus.get_grouping(0).add_event(1)
-    opus.get_grouping(4).add_event(1)
-    opus.get_grouping(8).add_event(1)
+    opus[0].add_event(1)
+    opus[4].add_event(1)
+    opus[8].add_event(1)
 
-    opus.get_grouping(12).add_event(1)
-    opus.get_grouping(16).add_event(1)
-    opus.get_grouping(20).add_event(1)
+    opus[12].add_event(1)
+    opus[16].add_event(1)
+    opus[20].add_event(1)
 
-    opus.get_grouping(24).add_event(1)
-    opus.get_grouping(28).add_event(1)
-    opus.get_grouping(32).add_event(1)
+    opus[24].add_event(1)
+    opus[28].add_event(1)
+    opus[32].add_event(1)
 
-    opus.get_grouping(36).add_event(1)
-    opus.get_grouping(40).add_event(1)
-    opus.get_grouping(44).add_event(1)
+    opus[36].add_event(1)
+    opus[40].add_event(1)
+    opus[44].add_event(1)
 
-    opus.get_grouping(47).add_event(2)
-
+    opus[47].add_event(2)
 
     print(opus)
     #print(opus.get_flat_min())
