@@ -18,6 +18,7 @@ class GroupingState(Enum):
     STRUCTURE = auto()
     OPEN = auto()
 
+
 class Grouping:
     """
         Tree-like structure that can be flattened and
@@ -195,30 +196,36 @@ class Grouping:
         return place_holder
 
     def flatten(self):
-        """if all the subdivisions are the same sizes, merge them up into this level"""
+        """Merge all subgroupings into single level, preserving ratios"""
 
         sizes = []
         subgroup_backup = []
         original_size = self.size
+        # First, recursively merge sub-subgroupings into subgroupings
         for i, child in self.divisions.items():
             if not child.is_structural():
                 pass
-            elif not child.is_flat():
-                child.flatten()
-                sizes.append(max(1, len(child)))
+            else:
+                if not child.is_flat():
+                    child.flatten()
+                sizes.append(len(child))
+
             subgroup_backup.append((i, child))
 
-        # TODO: This needs to be minimized/factored
-        new_size = len(sizes)
-        sizes = list(set(sizes))
-        for size in sizes:
-            new_size *= size
+        new_chunk_size = math.lcm(*sizes)
+        new_size = new_chunk_size * len(self)
 
         self.set_size(new_size)
-        chunk_size = new_size / original_size
         for i, child in subgroup_backup:
-            pass
-            #TODO Reimplement
+            offset = i * new_chunk_size
+            if child.is_structural():
+                for j, grandchild in enumerate(list(child)):
+                    if grandchild.is_event():
+                        fine_offset = int(j * new_chunk_size / len(child))
+                        self[offset + fine_offset] = grandchild
+            else:
+                self[offset] = child
+
 
 
     def add_event(self, event):
@@ -253,7 +260,6 @@ class Grouping:
         while working_grouping is not None:
             depth += 1
             working_grouping = working_grouping.parent
-
         return depth
 
     def __list__(self):
@@ -262,6 +268,31 @@ class Grouping:
             grouping = self[i]
             output.append(grouping)
         return output
+
+
+def get_prime_factors(n):
+    primes = []
+    for i in range(2, n // 2):
+        is_prime = True
+        for p in primes:
+            if i % p == 0:
+                is_prime = False
+                break
+        if is_prime:
+            primes.append(i)
+
+    # No primes found, n must be prime
+    if not primes:
+        primes = [n]
+
+    factors = []
+    for p in primes:
+        if p > n / 2:
+            break
+        if n % p == 0:
+            factors.append(p)
+
+    return factors
 
 def main():
     """Testing Main Function"""
@@ -286,7 +317,6 @@ def main():
     opus[47].add_event(2)
 
     print(opus)
-    #print(opus.get_flat_min())
     opus.reduce(4)
     print(opus)
     opus.flatten()
@@ -294,3 +324,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print(get_prime_factors(27))
