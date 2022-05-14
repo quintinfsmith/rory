@@ -113,9 +113,9 @@ class MIDIInterface:
         grouping = self.__beats_to_grouping(beats)
 
         beat_count = 0
-        for measure in grouping.iter():
+        for measure in list(grouping):
             self.measure_map.append(len(self.state_map))
-            for _beat_index, beat in enumerate(measure.iter()):
+            for _beat_index, beat in enumerate(list(measure)):
                 if beat.is_open():
                     continue
 
@@ -126,7 +126,7 @@ class MIDIInterface:
                 self.inv_beat_map[beat_count] = len(self.state_map)
 
                 i = len(self.state_map)
-                for group in beat.iter():
+                for group in list(beat):
                     if not group.is_event():
                         continue
 
@@ -416,15 +416,15 @@ class MIDIInterface:
 
         grouping.set_size(len(measures))
         for _, _, m_index, numerator, _ in beats:
-            grouping.get_grouping(m_index).set_size(numerator)
+            grouping[m_index].set_size(numerator)
 
         for events, beat_size, m_index, _, bim in beats:
-            beat = grouping.get_grouping(m_index).get_grouping(bim)
+            beat = grouping[m_index][bim]
             for (pos, event, _real, _duration) in events:
                 beat.set_size(beat_size)
 
             for (pos, event, real, _duration) in events:
-                tick = beat.get_grouping(int(pos))
+                tick = beat[int(pos)]
                 tick.add_event((event, real))
 
         return grouping
