@@ -686,11 +686,11 @@ class PlayerScene(RoryScene):
         self.rect_position_display.underline()
         self.rect_position_display.set_bg_color(wrecked.BLACK)
         self.rect_position_display.set_fg_color(wrecked.WHITE)
-        self.rect_chord_names = self.rect_background.new_rect()
-        self.rect_chord_names.bold()
-        self.rect_chord_names.underline()
-        self.rect_chord_names.set_bg_color(wrecked.BLACK)
-        self.rect_chord_names.set_fg_color(wrecked.WHITE)
+        #self.rect_chord_names = self.rect_background.new_rect()
+        #self.rect_chord_names.bold()
+        #self.rect_chord_names.underline()
+        #self.rect_chord_names.set_bg_color(wrecked.BLACK)
+        #self.rect_chord_names.set_fg_color(wrecked.WHITE)
 
         self.rect_background.set_bg_color(wrecked.BLACK)
         self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
@@ -757,7 +757,7 @@ class PlayerScene(RoryScene):
             or transpose_changed
         ):
             self.__draw_visible_notes()
-            self.__draw_chord_name()
+            #self.__draw_chord_name()
             self.last_rendered_position = song_position
             self.last_rendered_pressed = None
             self.last_rendered_ignored_channels = self.player.ignored_channels.copy()
