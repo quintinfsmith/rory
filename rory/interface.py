@@ -4,6 +4,7 @@ import threading
 import time
 import os
 from typing import Final
+from abc import ABC
 import wrecked
 from wrecked import get_terminal_size
 from apres import MIDI
@@ -201,20 +202,19 @@ class RoryStage:
         rect.resize(self.root.width, self.root.height)
         return rect
 
-class RoryScene:
-    ''' Abstract Class.
+class RoryScene(ABC):
+    '''
         Allows functionally different sections of the program
         to be displayed independently of eachother by the RoryStage
     '''
 
-    def init_interactor(self, interactor):
+    def init_interactor(self, interactor: Interactor):
         '''
-            Abstract method.
             Used to assign command sequences to the interactor
         '''
         raise NotImplementedError
 
-    def __init__(self, rorystage):
+    def __init__(self, rorystage: RoryStage):
         self.stage = rorystage
         self.root = rorystage.new_rect()
         self.kill_message = None
