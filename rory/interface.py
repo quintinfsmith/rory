@@ -670,6 +670,7 @@ class PlayerScene(RoryScene):
 
         self.rect_inner = self.root.new_rect()
         self.rect_background = self.rect_inner.new_rect()
+        self.rect_active_row_line = self.rect_background.new_rect()
 
         self.layer_visible_notes = self.rect_background.new_rect()
         self.rect_loop_start = self.layer_visible_notes.new_rect()
@@ -714,6 +715,10 @@ class PlayerScene(RoryScene):
         self.mapped_colors = {}
         self.rechanneled = {}
 
+        self.metronome_enabled = False
+        self.metronome_state = 0
+        self.last_metronome_tick = 0
+
     def flag_new_range(self):
         ''' Let the player know that the user wants to change the range of playable notes '''
         self.player.flag_new_range()
@@ -757,11 +762,24 @@ class PlayerScene(RoryScene):
             or transpose_changed
         ):
             self.__draw_visible_notes()
-            #self.__draw_chord_name()
             self.last_rendered_position = song_position
             self.last_rendered_pressed = None
             self.last_rendered_ignored_channels = self.player.ignored_channels.copy()
             was_flagged = True
+
+
+        if self.metronome_enabled:
+            if self.last_metronome_tick <= time.time() - (1 / (self.player.current_tempo / 60)):
+                self.last_metronome_tick = time.time()
+                self.metronome_state = 2
+                self.__draw_active_row_line()
+                was_flagged= True
+            elif self.metronome_state > 0:
+                self.metronome_state -= 1
+                if self.metronome_state == 0:
+                    self.__draw_active_row_line()
+                    was_flagged = True
+
 
         if self.get_pressed_notes() != self.last_rendered_pressed:
             self.__draw_pressed_row()
@@ -788,19 +806,6 @@ class PlayerScene(RoryScene):
         ''' Set the flag to draw the help menu in the tick function '''
         self.flag_show_menu = not self.flag_show_menu
 
-    def __draw_chord_name(self):
-        midi_interface = self.player.midi_interface
-        active_channels = midi_interface.get_active_channels(self.player.song_position)
-        chord_names = []
-        for channel in active_channels:
-            chord_name = midi_interface.get_chord_name(self.player.song_position, channel, self.nu_mode)
-            if chord_name:
-                chord_names.append(chord_name)
-
-        chord_string = " | ".join(chord_names)
-        self.rect_chord_names.resize(len(chord_string), 1)
-        self.rect_chord_names.move(0, self.rect_background.height - 1)
-        self.rect_chord_names.set_string(0, 0, chord_string)
 
     def __draw_visible_notes(self):
         self.rect_loop_start.disable()
@@ -866,6 +871,7 @@ class PlayerScene(RoryScene):
                     base = 1
                 else:
                     base = 3
+
                 for x in range(1, self.rect_background.width, base):
                     if x in blocked_xs:
                         continue
@@ -902,17 +908,10 @@ class PlayerScene(RoryScene):
                 string = self.CHARS['loopline'] * self.rect_loop_end.width
                 self.rect_loop_end.set_string(0, 0, string)
 
-        # Active Row Line
         active_y = self.rect_background.height - self.active_row_position
-        if song_position in midi_interface.measure_map: # ═
-            line_char = self.CHARS['activeline_measure']
-        elif song_position in midi_interface.beat_map: # ─
-            line_char = self.CHARS['activeline_beat']
-        else:
-            line_char = self.CHARS['activeline']
-
-        for x in range(self.rect_background.width):
-            self.rect_background.set_character(x, active_y, line_char)
+        self.rect_active_row_line.resize(self.rect_background.width, 1)
+        self.rect_active_row_line.move(0, active_y)
+        self.__draw_active_row_line()
 
         unused_cache_keys = set(self.visible_note_rects.keys()) - cache_keys_used
         for key in unused_cache_keys:
@@ -925,6 +924,27 @@ class PlayerScene(RoryScene):
             del self.visible_note_rects_lines[key]
 
         self.__draw_song_position()
+
+    def __draw_active_row_line(self):
+        midi_interface = self.player.midi_interface
+        song_position = self.player.song_position
+
+        if song_position in midi_interface.measure_map: # ═
+            line_char = self.CHARS['activeline_measure']
+        elif song_position in midi_interface.beat_map: # ─
+            line_char = self.CHARS['activeline_beat']
+        else:
+            line_char = self.CHARS['activeline']
+
+        for x in range(self.rect_active_row_line.width):
+            self.rect_active_row_line.set_character(x, 0, line_char)
+
+        if not self.metronome_state:
+            self.rect_active_row_line.set_fg_color(wrecked.BRIGHTBLACK)
+        else:
+            self.rect_active_row_line.set_fg_color(wrecked.YELLOW)
+
+
 
     def __get_measure(self, song_position):
         return self.player.midi_interface.get_measure(song_position) + 1

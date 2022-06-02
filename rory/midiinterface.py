@@ -1,5 +1,5 @@
 '''Plays MIDILike Objects'''
-from apres import NoteOn, NoteOff, TimeSignature
+from apres import NoteOn, NoteOff, TimeSignature, SetTempo
 from rory.structures import Grouping
 
 class MIDIInterface:
@@ -62,6 +62,9 @@ class MIDIInterface:
                 beats[current_beat][1] = beat_size
                 beats[current_beat][3] = current_numerator
 
+            elif isinstance(event, SetTempo):
+                self.tempo_map.append((tick, event.get_bpm()))
+
         # Insert beat_in_measure and current measure
         beat_in_measure = 0
         current_measure = 0
@@ -106,11 +109,14 @@ class MIDIInterface:
             0: 0
         }
         self.transpose = 0
+        self.tempo_map = []
 
         self.__handle_kwargs(kwargs)
 
         beats = self.__calculate_beat_chunks()
         grouping = self.__beats_to_grouping(beats)
+        self.tempo_map.sort()
+        self.tempo_map = self.tempo_map[::-1]
 
         beat_count = 0
         for measure in list(grouping):
@@ -143,7 +149,11 @@ class MIDIInterface:
 
                 beat_count += 1
 
-
+    def get_tempo_at_tick(self, tick):
+        for i, tempo in self.tempo_map:
+            if tick >= i:
+                return tempo
+        return 120
 
     def get_real_tick(self, song_position):
         ''' Get the tick from before the midi is processed for playing '''
@@ -247,14 +257,6 @@ class MIDIInterface:
             chord_value += (2 ** p)
 
         return str(chord_value)
-
-       # output = ""
-       # while chord_value:
-       #     output += str(chord_value % 8)
-       #     chord_value //= 8
-
-       # return output[::-1]
-
 
     def get_chord_name_standard(self, position, channel):
         ''' Attempt to detect the name of the chord being played at a given position '''
