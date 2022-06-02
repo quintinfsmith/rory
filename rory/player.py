@@ -29,7 +29,7 @@ class Player:
             self.song_position = new_position
         else:
             self.song_position = new_position
-
+        self.update_tempo()
 
     def prev_state(self):
         '''Change the song position to the last state with notes.'''
@@ -55,6 +55,11 @@ class Player:
 
         if self.song_position == self.loop[1]:
             self.song_position = self.loop[0]
+        self.update_tempo()
+
+    def update_tempo(self):
+        tick = self.midi_interface.get_real_tick(self.song_position)
+        self.current_tempo = self.midi_interface.get_tempo_at_tick(tick)
 
     def set_measure(self, measure):
         position = self.midi_interface.get_first_position_in_measure(measure)
@@ -72,6 +77,7 @@ class Player:
 
     def __init__(self, **kwargs):
         self.active_midi = MIDI(kwargs['path'])
+        self.current_tempo = 120
 
         self.is_active = True
         self.register = 0
@@ -90,6 +96,7 @@ class Player:
         self.song_position = -1
 
         self.next_state()
+
 
         self.flag_range_input = False
         self._new_range = None
