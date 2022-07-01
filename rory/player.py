@@ -76,7 +76,7 @@ class Player:
         return self.midi_interface.transpose
 
     def __init__(self, **kwargs):
-        self.active_midi = MIDI(kwargs['path'])
+        self.active_midi = MIDI.load(kwargs['path'])
         self.current_tempo = 120
 
         self.is_active = True
