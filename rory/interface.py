@@ -666,7 +666,7 @@ class PlayerScene(RoryScene):
 
         super().__init__(rorystage)
 
-        self.active_midi = MIDI(kwargs['path'])
+        self.active_midi = MIDI.load(kwargs['path'])
 
         self.rect_inner = self.root.new_rect()
         self.rect_background = self.rect_inner.new_rect()
