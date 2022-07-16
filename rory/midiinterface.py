@@ -22,7 +22,6 @@ class MIDIInterface:
         max_note = 0
         for tick, event in self.midi.get_all_events():
             tick_diff = tick - running_beat_count[1]
-
             current_beat = int(running_beat_count[0] + (tick_diff // beat_size))
             while len(beats) <= current_beat:
                 beats.append([[], beat_size, None, current_numerator, None])
@@ -125,7 +124,6 @@ class MIDIInterface:
                 if beat.is_open():
                     continue
 
-  #              beat.reduce()
                 beat.flatten()
 
                 self.beat_map[len(self.state_map)] = beat_count
