@@ -7,11 +7,18 @@ class MIDIInterfaceTest(unittest.TestCase):
         # Set up a test midi to use withthe interface
         test_midi = apres.MIDI()
         for i in range(12):
-            note_on = apres.NoteOn(note=64 + i, velocity=100, channel=0)
-            note_off = apres.NoteOff(note=64 + i, velocity=100, channel=0)
+            note_on = apres.NoteOn(
+                note=64 + i,
+                velocity=100,
+                channel=0
+            )
+            note_off = apres.NoteOff(
+                note=64 + i,
+                velocity=100,
+                channel=0
+            )
             test_midi.add_event(note_on, wait=0)
             test_midi.add_event(note_off, wait=40)
-
         self.test_interface = MIDIInterface(test_midi)
 
     def tearDown(self):
@@ -23,5 +30,6 @@ class MIDIInterfaceTest(unittest.TestCase):
             if state:
                 active_states_counted += 1
 
+        assert not (active_states_counted < 12), "Found too few states"
         assert active_states_counted == 12, "Somehow found more notes than are in the midi"
 
