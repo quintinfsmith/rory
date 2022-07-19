@@ -18,7 +18,7 @@ setuptools.setup(
     python_requires="~=3.7",
     py_modules=["rory"],
     entry_points={ "console_scripts": ["rory = rory:main"] },
-    url="https://github.com/quintinfsmith/rory",
+    url="https://burnsomni.net/software/rory",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
