@@ -66,7 +66,7 @@ class Player:
         self.set_state(position)
 
     def reinit_midi_interface(self, **kwargs):
-        self.active_midi = MIDI(self.active_midi.path)
+        self.active_midi = MIDI.load(self.active_path)
         self.midi_interface = MIDIInterface(self.active_midi, **kwargs)
         self.clear_loop()
         self.song_position = -1
@@ -76,7 +76,8 @@ class Player:
         return self.midi_interface.transpose
 
     def __init__(self, **kwargs):
-        self.active_midi = MIDI.load(kwargs['path'])
+        self.active_path = kwargs.get('path', '')
+        self.active_midi = MIDI.load(self.active_path)
         self.current_tempo = 120
 
         self.is_active = True
@@ -101,10 +102,7 @@ class Player:
         self.flag_range_input = False
         self._new_range = None
 
-        if 'controller_path' in kwargs:
-            self.midi_controller = RoryController(self, kwargs['controller_path'])
-        else:
-            self.midi_controller = RoryController(self)
+        self.midi_controller = RoryController(self)
 
     def get_register(self):
         if self.flag_negative_register:
@@ -214,16 +212,17 @@ class Player:
 
 
 class RoryController(MIDIController):
-    def __init__(self, player, path = ""):
+    def __init__(self, player):
         self.player = player
 
-        if not path:
-            for filename in os.listdir("/dev/"):
-                if "midi" in filename:
-                    path = "/dev/%s" % filename
-                    break
+        channel = 0
+        device_index = 0
+        for filename in os.listdir("/dev/snd/"):
+            if "midi" in filename:
+                device_index = int(filename[filename.rfind("D") + 1])
+                channel = int(filename[filename.rfind("C") + 1])
 
-        super().__init__(path)
+        super().__init__(channel, device_index)
 
         self.pressed = set()
 
@@ -232,7 +231,7 @@ class RoryController(MIDIController):
         notifier.daemon = True
         notifier.start()
         self.watch_manager.add_watch(
-            "/dev/",
+            "/dev/snd/",
             pyinotify.IN_CREATE | pyinotify.IN_DELETE
         )
 
@@ -281,10 +280,10 @@ class RoryController(MIDIController):
             pass
         self.do_state_check()
 
-    def connect(self, path):
+    def connect(self):
         self.player.need_to_release = set()
         try:
-            super().connect(path)
+            super().connect()
             # Automatically start listening for input on connect
             input_thread = threading.Thread(
                 target=self.listen
@@ -303,10 +302,17 @@ class TaskHandler(pyinotify.ProcessEvent):
         '''Hook to connect when midi device is plugged in'''
         if event.name[0:4] == 'midi':
             time.sleep(.5)
-            self.controller.connect(event.pathname)
+            self.controller.channel = int(event.name[event.name.rfind("C") + 1])
+            self.controller.device_id = int(event.name[event.name.rfind("D") + 1])
+            self.controller.connect()
+
+
 
     def process_IN_DELETE(self, event):
         '''Hook to disconnect when midi device is unplugged'''
-        if self.controller.midipath == event.pathname:
-            self.controller.disconnect()
+        if 'midi' in event.name:
+            channel = event.name[event.name.rfind("C") + 1]
+            device_id = event.name[event.name.rfind("D") + 1]
+            if channel == self.controller.channel and device_id == self.controller.device_id:
+                self.controller.disconnect()
 
