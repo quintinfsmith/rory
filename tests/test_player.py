@@ -130,7 +130,7 @@ class PlayerTest(unittest.TestCase):
     def test_input_daemon(self):
         self.player.set_state(0)
         assert self.player.song_position == 1
-        assert self.player.midi_controller.is_connected()
+        assert self.player.controller_manager.is_connected()
 
         # Midi note 64 ON (Correct Key)
         with open(self.midi_controller_path, "ab") as fp:

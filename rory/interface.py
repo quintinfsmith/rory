@@ -660,6 +660,18 @@ class PlayerScene(RoryScene):
             self.flag_new_range
         )
 
+        interactor.assign_context_sequence(
+            RoryStage.CONTEXT_PLAYER,
+            'v',
+            self.screengrab
+        )
+
+
+    def screengrab(self):
+        ansi_string = wrecked.get_current_ansi_string()
+        with open("SCREENER", "w") as fp:
+            fp.write(ansi_string)
+
     def __init__(self, rorystage: RoryStage, **kwargs):
         self.player = Player(**kwargs)
         self.nu_mode = kwargs.get('numode', False)
