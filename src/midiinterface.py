@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
 from apres import NoteOn, NoteOff, TimeSignature, SetTempo
-from src.structures import Grouping
+from .structures import Grouping
 
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''

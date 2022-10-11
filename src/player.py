@@ -5,7 +5,7 @@ import os
 import pyinotify
 
 from apres import MIDI, MIDIController, MIDIEvent, NoteOn, NoteOff
-from src.midiinterface import MIDIInterface
+from .midiinterface import MIDIInterface
 
 class Player:
     '''Plays MIDILike Objects'''

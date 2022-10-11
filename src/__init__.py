@@ -16,7 +16,7 @@ def main():
     import time
     import os
     from apres import InvalidMIDIFile
-    from src.interface import RoryStage, TerminalTooNarrow
+    from .interface import RoryStage, TerminalTooNarrow
     options = {
         "-t": ("transpose", int),
         "-m": ('numode', int)

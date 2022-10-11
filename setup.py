@@ -17,9 +17,9 @@ setuptools.setup(
     keywords=[],
     python_requires="~=3.7",
     py_modules=["rory"],
-    entry_points={ "console_scripts": ["rory = src:main"] },
-    url="https://burnsomni.net/software/rory",
-    packages=setuptools.find_packages(),
+    entry_points={ "console_scripts": ["rory = rory:main"] },
+    url="https://burnsomni.net/git/rory",
+    packages=['rory'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
