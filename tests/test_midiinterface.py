@@ -1,6 +1,6 @@
 import apres
 import unittest
-from rory.midiinterface import MIDIInterface
+from src.midiinterface import MIDIInterface
 
 class MIDIInterfaceTest(unittest.TestCase):
     def setUp(self):

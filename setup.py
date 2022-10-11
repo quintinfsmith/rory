@@ -1,5 +1,5 @@
 import setuptools
-from rory import __version__, __author__, __email__, __url__, __license__
+from src import __version__, __author__, __email__, __url__, __license__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -17,7 +17,7 @@ setuptools.setup(
     keywords=[],
     python_requires="~=3.7",
     py_modules=["rory"],
-    entry_points={ "console_scripts": ["rory = rory:main"] },
+    entry_points={ "console_scripts": ["rory = src:main"] },
     url="https://burnsomni.net/software/rory",
     packages=setuptools.find_packages(),
     classifiers=[

@@ -1,6 +1,6 @@
 '''Plays MIDILike Objects'''
 from apres import NoteOn, NoteOff, TimeSignature, SetTempo
-from rory.structures import Grouping
+from src.structures import Grouping
 
 class MIDIInterface:
     '''Layer between Player and the MIDI input file'''

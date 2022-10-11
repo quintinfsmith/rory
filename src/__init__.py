@@ -9,14 +9,14 @@ __version__ = "0.3.6"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
-__url__ = "https://github.com/quintinfsmith/rory"
+__url__ = "https://burnsomni.net/git/rory"
 
 def main():
     import sys
     import time
     import os
     from apres import InvalidMIDIFile
-    from rory.interface import RoryStage, TerminalTooNarrow
+    from src.interface import RoryStage, TerminalTooNarrow
     options = {
         "-t": ("transpose", int),
         "-m": ('numode', int)

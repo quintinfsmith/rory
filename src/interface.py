@@ -8,8 +8,8 @@ from abc import ABC
 import wrecked
 from wrecked import get_terminal_size
 from apres import MIDI
-from rory.player import Player
-from rory.interactor import Interactor
+from src.player import Player
+from src.interactor import Interactor
 
 class TerminalTooNarrow(Exception):
     '''Error thrown when the minimum width required isn't available'''

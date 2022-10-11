@@ -4,7 +4,7 @@ import os
 import apres
 from apres import MIDIController
 
-from rory.player import Player, RoryController
+from src.player import Player, RoryController
 
 class PlayerTest(unittest.TestCase):
     def setUp(self):
