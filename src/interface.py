@@ -951,6 +951,7 @@ class PlayerScene(RoryScene):
         for x in range(self.rect_active_row_line.width):
             self.rect_active_row_line.set_character(x, 0, line_char)
 
+        self.rect_active_row_line.set_bg_color(wrecked.BLACK)
         if not self.metronome_state:
             self.rect_active_row_line.set_fg_color(wrecked.BRIGHTBLACK)
         else:
