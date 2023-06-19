@@ -697,7 +697,8 @@ class PlayerScene(RoryScene):
         self.rect_position_display = self.rect_background.new_rect()
         self.rect_position_display.bold()
         self.rect_position_display.underline()
-        self.rect_position_display.set_bg_color(wrecked.BLACK)
+        #self.rect_position_display.set_bg_color(wrecked.BLACK)
+        self.rect_position_display.unset_bg_color()
         self.rect_position_display.set_fg_color(wrecked.WHITE)
         #self.rect_chord_names = self.rect_background.new_rect()
         #self.rect_chord_names.bold()
@@ -705,10 +706,13 @@ class PlayerScene(RoryScene):
         #self.rect_chord_names.set_bg_color(wrecked.BLACK)
         #self.rect_chord_names.set_fg_color(wrecked.WHITE)
 
-        self.rect_background.set_bg_color(wrecked.BLACK)
+        #self.rect_background.set_bg_color(wrecked.BLACK)
+        self.rect_background.unset_bg_color()
         self.rect_background.set_fg_color(wrecked.BRIGHTBLACK)
-        self.rect_loop_start.set_bg_color(wrecked.BLACK)
-        self.rect_loop_end.set_bg_color(wrecked.BLACK)
+        #self.rect_loop_start.set_bg_color(wrecked.BLACK)
+        self.rect_loop_start.unset_bg_color()
+        #self.rect_loop_end.set_bg_color(wrecked.BLACK)
+        self.rect_loop_end.unset_bg_color()
         self.rect_loop_start.set_fg_color(wrecked.BRIGHTWHITE)
         self.rect_loop_end.set_fg_color(wrecked.BRIGHTWHITE)
 
@@ -872,7 +876,8 @@ class PlayerScene(RoryScene):
                         note_rect.set_fg_color(wrecked.BLACK)
                     else:
                         note_rect.set_fg_color(color)
-                        note_rect.set_bg_color(wrecked.BLACK)
+                        #note_rect.set_bg_color(wrecked.BLACK)
+                        note_rect.unset_bg_color()
 
                 note_rect.move(x, y)
 
@@ -895,7 +900,8 @@ class PlayerScene(RoryScene):
                         line_rect = self.layer_visible_notes.new_rect()
                         line_rect.set_character(0, 0, line_char)
                         line_rect.set_fg_color(wrecked.BRIGHTBLACK)
-                        line_rect.set_bg_color(wrecked.BLACK)
+                        #line_rect.set_bg_color(wrecked.BLACK)
+                        line_rect.unset_bg_color()
                         self.visible_note_rects_lines[(position, x)] = line_rect
                     line_rect.move(x, y)
 
@@ -951,7 +957,8 @@ class PlayerScene(RoryScene):
         for x in range(self.rect_active_row_line.width):
             self.rect_active_row_line.set_character(x, 0, line_char)
 
-        self.rect_active_row_line.set_bg_color(wrecked.BLACK)
+        #self.rect_active_row_line.set_bg_color(wrecked.BLACK)
+        self.rect_active_row_line.unset_bg_color()
         if not self.metronome_state:
             self.rect_active_row_line.set_fg_color(wrecked.BRIGHTBLACK)
         else:
@@ -1036,7 +1043,8 @@ class PlayerScene(RoryScene):
 
             note_rect = self.layer_active_notes.new_rect()
             note_rect.set_character(0, 0, self.CHARS['keyboard_pressed'])
-            note_rect.set_bg_color(wrecked.BLACK)
+            #note_rect.set_bg_color(wrecked.BLACK)
+            note_rect.unset_bg_color()
             note_rect.move(x, 1)
             self.pressed_note_rects[note] = note_rect
 
