@@ -4,7 +4,7 @@ Learn Piano using MIDI files and a MIDI Keyboard<br/>
 [![PyPI](https://img.shields.io/pypi/v/rory?style=flat-square)](https://pypi.org/project/rory/)
 [![PyPI - License](https://img.shields.io/pypi/l/rory?style=flat-square)](https://burnsomni.net/project/rory/?branch=master&path=LICENSE)
 
-<img src="https://raw.githubusercontent.com/quintinfsmith/rory/master/res/sample.svg" />
+<!--img src="https://raw.githubusercontent.com/quintinfsmith/rory/master/res/sample.svg" /-->
 
 ## Installation
 ```bash
