@@ -1,5 +1,5 @@
 import setuptools
-from src import __version__, __author__, __email__, __url__, __license__
+from rory import __version__, __author__, __email__, __url__, __license__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
