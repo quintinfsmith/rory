@@ -104,6 +104,15 @@ class Player:
         self._new_range = None
 
         self.controller_manager = ControllerManager()
+        self.controller_manager.add_callback("release_note", self._release_note_callback)
+        self.controller_manager.add_callback("new_controller", self._callback_clear_releases)
+        self.controller_manager.add_callback("do_state_check", self.do_state_check)
+
+    def _callback_clear_releases(self):
+        self.need_to_release = set()
+
+    def _release_note_callback(self, note):
+        self.need_to_release.remove(note)
 
     def get_register(self):
         if self.flag_negative_register:

@@ -20,13 +20,25 @@ class ControllerManager:
         device_index = 0
         self.controller = None
         self.active_key = None
+        self.is_listening = True
         self.watcher = threading.Thread(target=self.kludge_watch_for_midi_devices)
         self.watcher.start()
 
     def kludge_watch_for_midi_devices(self):
-        asyncio.run(self.watch_for_midi_devices())
+        asyncio.run(self.async_process())
+
+    async def async_process(self):
+        watcher_task = asyncio.create_task(self.watch_for_midi_devices())
+        await asyncio.create_task(self.task_killer(watcher_task))
+
+    async def task_killer(self, task):
+        """Kill the an async task when is_listening becomes false."""
+        while self.is_listening:
+           await asyncio.sleep(.5)
+        task.cancel()
 
     async def watch_for_midi_devices(self):
+        self.is_listening = True
         for filename in os.listdir("/dev/snd/"):
             if "midi" in filename:
                 device_index = int(filename[filename.rfind("D") + 1])
@@ -61,6 +73,7 @@ class ControllerManager:
 
     def close(self):
         self.disconnect_current()
+        self.is_listening = False
 
     def press_note(self, note):
         '''Press a Midi Note'''
