@@ -6,6 +6,7 @@ import pyinotify
 
 from apres import MIDI, MIDIController, MIDIEvent, NoteOn, NoteOff
 from .midiinterface import MIDIInterface
+from .controller_manager import ControllerManager
 
 class Player:
     '''Plays MIDILike Objects'''
@@ -102,7 +103,7 @@ class Player:
         self.flag_range_input = False
         self._new_range = None
 
-        self.controller_manager = ControllerManager(self)
+        self.controller_manager = ControllerManager()
 
     def get_register(self):
         if self.flag_negative_register:
@@ -232,120 +233,3 @@ class RoryController(MIDIController):
     def release_note(self, note):
         '''Release a Midi Note'''
         self.controller_manager.release_note(note)
-
-class ControllerManager:
-    def __init__(self, player):
-        self.player = player
-
-        self.pressed = set()
-        self.state_check_ticket = 0
-        self.processing_ticket = 0
-
-        channel = 0
-        device_index = 0
-        self.controller = None
-        self.active_key = None
-        for filename in os.listdir("/dev/snd/"):
-            if "midi" in filename:
-                device_index = int(filename[filename.rfind("D") + 1])
-                channel = int(filename[filename.rfind("C") + 1])
-                self.new_controller(channel, device_index)
-                break
-
-        self.watch_manager = pyinotify.WatchManager()
-        self.notifier = pyinotify.ThreadedNotifier(self.watch_manager, TaskHandler(self))
-        self.notifier.daemon = True
-        self.notifier.start()
-        self.watch_manager.add_watch(
-            "/dev/snd/",
-            pyinotify.IN_CREATE | pyinotify.IN_DELETE
-        )
-
-    def get_pressed(self):
-        return self.pressed.copy()
-
-    def close(self):
-        self.disconnect_current()
-        self.notifier.stop()
-
-    def press_note(self, note):
-        '''Press a Midi Note'''
-        self.pressed.add(note)
-        self.do_state_check()
-
-    def release_note(self, note):
-        '''Release a Midi Note'''
-        try:
-            self.pressed.remove(note)
-        except KeyError:
-            pass
-        try:
-            self.player.need_to_release.remove(note)
-        except KeyError:
-            pass
-        self.do_state_check()
-
-    def do_state_check(self):
-        ''' Ticketed wrapper for player's do_state_check '''
-        my_ticket = self.state_check_ticket
-        self.state_check_ticket += 1
-
-        while my_ticket != self.processing_ticket:
-            time.sleep(.05)
-
-        # If there are newer tickets queued, skip this state_check
-        if my_ticket == self.state_check_ticket - 1:
-            self.player.do_state_check()
-        else:
-            pass
-
-        self.processing_ticket += 1
-
-    def new_controller(self, channel, device_id):
-        if self.controller is not None:
-            self.controller.close()
-
-        self.player.need_to_release = set()
-        self.controller = RoryController(channel, device_id, self)
-        thread = threading.Thread(target=self.controller.listen)
-        thread.start()
-        self.active_key = (channel, device_id)
-
-    def disconnect_current(self):
-        if self.controller is None:
-            return
-
-        self.controller.close()
-        self.controller = None
-
-    def get_active_key(self):
-        return self.active_key
-
-    def is_connected(self):
-        return self.controller is not None
-
-
-
-class TaskHandler(pyinotify.ProcessEvent):
-    '''Event hooks to connect/disconnect from newly made midi device'''
-    def __init__(self, controller_manager):
-        self.controller_manager = controller_manager
-        super().__init__()
-
-    def process_IN_CREATE(self, event):
-        '''Hook to connect when midi device is plugged in'''
-        if event.name[0:4] == 'midi':
-            time.sleep(.5)
-            channel = int(event.name[event.name.rfind("C") + 1])
-            device_id = int(event.name[event.name.rfind("D") + 1])
-            self.controller_manager.new_controller(channel, device_id)
-
-    def process_IN_DELETE(self, event):
-        '''Hook to disconnect when midi device is unplugged'''
-        if 'midi' in event.name:
-            channel = event.name[event.name.rfind("C") + 1]
-            device_id = event.name[event.name.rfind("D") + 1]
-            active_key = self.controller_manager.get_active_key()
-            if active_key == (channel, device_id):
-                self.controller_manager.disconnect_current()
-

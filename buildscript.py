@@ -9,7 +9,7 @@ os.chdir(file_path[0:file_path.rfind("/") + 1])
 
 os.system("cp src rory -r")
 if "--local" in sys.argv:
-    os.system("python3 setup.py install --prefix ~/.local/")
+    os.system("python3 setup.py install --prefix $VIRTUAL_ENV/")
 elif "--publish" in sys.argv:
     os.system("python3 setup.py sdist bdist_wheel")
     os.system("python3 -m twine upload dist/*")
