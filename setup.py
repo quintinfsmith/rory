@@ -10,7 +10,7 @@ setuptools.setup(
     description="Play along to MIDI files in console",
     author="Quintin Smith",
     author_email="smith.quintin@protonmail.com",
-    install_requires=['pyinotify', 'wrecked', 'apres'],
+    install_requires=['asyncinotify', 'wrecked', 'apres'],
     long_description=long_description,
     long_description_content_type="text/markdown",
     license=__license__,
