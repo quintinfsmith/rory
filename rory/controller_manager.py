@@ -43,13 +43,14 @@ class ControllerManager:
             if "midi" in filename:
                 device_index = int(filename[filename.rfind("D") + 1])
                 channel = int(filename[filename.rfind("C") + 1])
-                initial_controller_task = asyncio.create_task(self.new_controller(channel, device_index))
+                self.new_controller(channel, device_index)
                 break
 
         with Inotify() as inotify:
             inotify.add_watch("/dev/snd/", Mask.CREATE | Mask.DELETE)
+
             async for event in inotify:
-                if event.path is None:
+                if event.name is None:
                     continue
 
                 file_name = event.path.parts[-1]
@@ -58,7 +59,8 @@ class ControllerManager:
                         time.sleep(.5)
                         channel = int(file_name[file_name.rfind("C") + 1])
                         device_id = int(file_name[file_name.rfind("D") + 1])
-                        task = asyncio.create_task(self.new_controller(channel, device_id))
+                        self.new_controller(channel, device_id)
+
                 elif event.mask == Mask.DELETE:
                     if 'midi' in file_name:
                         channel = file_name[file_name.rfind("C") + 1]
@@ -66,7 +68,6 @@ class ControllerManager:
                         active_key = self.get_active_key()
                         if active_key == (channel, device_id):
                             self.disconnect_current()
-
 
     def get_pressed(self):
         return self.pressed.copy()
@@ -111,22 +112,22 @@ class ControllerManager:
     def _do_callbacks(self, key, *args):
         if key in self.callbacks:
             for (callback, context_args) in self.callbacks[key]:
-                callback[key](*context_args, *args)
+                callback(*context_args, *args)
 
     def add_callback(self, key, callback, *args):
         if key not in self.callbacks:
             self.callbacks[key] = []
         self.callbacks[key].append((callback, args))
 
-    async def new_controller(self, channel, device_id):
+    def new_controller(self, channel, device_id):
         if self.controller is not None:
             self.controller.close()
 
         self._do_callbacks("new_controller")
         self.controller = RoryController(channel, device_id, self)
         self.active_key = (channel, device_id)
-
-        self.controller.listen()
+        thread = threading.Thread(target=self.controller.listen)
+        thread.start()
 
     def disconnect_current(self):
         if self.controller is None:
