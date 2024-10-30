@@ -39,27 +39,28 @@ class RoryStage:
         self.scenes = {}
         self.active_scene = None
 
+        self.interactor = Interactor()
+        self.history_stack = []
+        self.interactor_running = False
+        self.delay = 1/32
+        self.playing = False
+
         if self.root.width < 106:
             self.kill()
             raise TerminalTooNarrow()
 
-        self.interactor = Interactor()
         self.interactor.assign_context_sequence(
             self.CONTEXT_DEFAULT,
             self.CONTROL_QUIT,
             self.kill
         )
 
-        self.delay = 1/32
-        self.playing = False
 
         self.scene_constructors = {
             self.CONTEXT_PLAYER: PlayerScene,
             self.CONTEXT_BROWSER: BrowserScene
         }
 
-        self.history_stack = []
-        self.interactor_running = False
 
     def set_fps(self, fps):
         ''' Set the delay between each tick, calculated from Frames Per Second '''

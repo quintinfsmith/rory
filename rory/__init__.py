@@ -5,7 +5,7 @@ Usage:
     rory path/to/midi.midi
 """
 
-__version__ = "0.3.8"
+__version__ = "0.3.9"
 __license__ = "GPL-2.0"
 __author__ = "Quintin Smith"
 __email__ = "smith.quintin@protonmail.com"
